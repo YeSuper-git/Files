@@ -102,7 +102,7 @@ public sealed partial class AvManagerPage : Page
         finally { ScanProgress.Visibility = Visibility.Collapsed; }
     }
 
-    private void AddCard(string label, int value, Microsoft.UI.Color? color = null)
+    private void AddCard(string label, int value, Windows.UI.Color? color = null)
     {
         var b = new Border { Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"], CornerRadius = new CornerRadius(8), Padding = new Thickness(16, 12, 16, 12) };
         var s = new StackPanel();
