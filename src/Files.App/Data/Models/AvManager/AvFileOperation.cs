@@ -9,6 +9,6 @@ public sealed class AvFileOperation
     public string Source { get; init; } = string.Empty;
     public string Target { get; init; } = string.Empty;
     public string? Code { get; init; }
-    public string Status { get; init; } = string.Empty;
-    public string? Reason { get; init; }
+    public string Status { get; set; } = string.Empty;
+    public string? Reason { get; set; }
 }
