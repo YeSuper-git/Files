@@ -35,7 +35,7 @@
                 <Button Content="字幕分类" Click="OnPreviewClassifySubs" />
                 <Button Content="撤销" Click="OnUndo" />
                 <Button Content="历史" Click="OnHistory" />
-                <AutoSuggestBox x:Name="SearchBox" PlaceholderText="搜索名称或番号..." QueryIcon="{FontIcon Glyph=&#xE721;}" HorizontalAlignment="Stretch" Width="200" Margin="12,0,0,0" TextChanged="OnSearchChanged" />
+                <AutoSuggestBox x:Name="SearchBox" PlaceholderText="搜索名称或番号..."  HorizontalAlignment="Stretch" Width="200" Margin="12,0,0,0" TextChanged="OnSearchChanged" />
             </StackPanel>
 
             <!-- Progress -->
