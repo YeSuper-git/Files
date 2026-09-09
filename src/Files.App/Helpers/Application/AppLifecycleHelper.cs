@@ -330,6 +330,11 @@ namespace Files.App.Helpers
 					.AddSingleton<ITagsContext, TagsContext>()
 					.AddSingleton<ISidebarContext, SidebarContext>()
 					.AddSingleton<IShelfContext, ShelfContext>()
+					// AV Resource Manager
+					.AddSingleton<Files.App.Services.AvManager.IAvCodeParser, Files.App.Services.AvManager.AvCodeParser>()
+					.AddSingleton<Files.App.Services.AvManager.IAvScanner, Files.App.Services.AvManager.AvScanner>()
+					.AddSingleton<Files.App.Services.AvManager.IAvOperationsService, Files.App.Services.AvManager.AvOperationsService>()
+					.AddTransient<Files.App.ViewModels.AvManager.AvManagerViewModel>()
 					// Services
 					.AddSingleton<IWindowsRecentItemsService, WindowsRecentItemsService>()
 					.AddSingleton<IWindowsIniService, WindowsIniService>()

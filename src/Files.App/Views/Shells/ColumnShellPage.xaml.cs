@@ -229,6 +229,11 @@ namespace Files.App.Views.Shells
 			this.FindAscendant<ColumnsLayoutPage>()?.ParentShellPageInstance?.NavigateToReleaseNotes();
 		}
 
+		public override void NavigateToAvManager()
+		{
+			this.FindAscendant<ColumnsLayoutPage>()?.ParentShellPageInstance?.NavigateToAvManager();
+		}
+
 		public override void NavigateToSettings(string? selectItem = null)
 		{
 			this.FindAscendant<ColumnsLayoutPage>()?.ParentShellPageInstance?.NavigateToSettings(selectItem);

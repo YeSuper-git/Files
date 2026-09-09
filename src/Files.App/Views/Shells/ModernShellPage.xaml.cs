@@ -122,6 +122,10 @@ namespace Files.App.Views.Shells
 			{
 				NavigateToReleaseNotes();
 			}
+			else if (navParams.NavPath == "AvManager")
+			{
+				NavigateToAvManager();
+			}
 			else if (navParams.NavPath == "Settings")
 			{
 				NavigateToSettings(navParams.SelectItem);
@@ -297,6 +301,18 @@ namespace Files.App.Views.Shells
 				new NavigationArguments()
 				{
 					NavPathParam = "ReleaseNotes",
+					AssociatedTabInstance = this
+				},
+				new SuppressNavigationTransitionInfo());
+		}
+
+		public override void NavigateToAvManager()
+		{
+			ItemDisplayFrame.Navigate(
+				typeof(AvManager.AvManagerPage),
+				new NavigationArguments()
+				{
+					NavPathParam = "AvManager",
 					AssociatedTabInstance = this
 				},
 				new SuppressNavigationTransitionInfo());

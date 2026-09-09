@@ -23,6 +23,7 @@ namespace Files.App.Helpers
 			SectionType.Network => Resolve("Network"),
 			SectionType.WSL => Resolve("Wsl"),
 			SectionType.FileTag => Resolve("Tags"),
+			SectionType.AvManager => Resolve("Home"),
 			_ => null
 		};
 
