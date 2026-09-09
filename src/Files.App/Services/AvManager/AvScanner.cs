@@ -1,6 +1,7 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using System.IO;
 using Files.App.Data.Models.AvManager;
 using Microsoft.Extensions.Logging;
 

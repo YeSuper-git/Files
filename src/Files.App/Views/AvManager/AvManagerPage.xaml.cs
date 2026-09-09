@@ -93,7 +93,7 @@ public sealed partial class AvManagerPage : Page
             SummaryCards.Children.Clear();
             AddCard("资源总数", result.TotalFolders); AddCard("正常", result.NormalCount, Microsoft.UI.Colors.Green);
             AddCard("缺视频", result.MissingVideoCount, Microsoft.UI.Colors.Red); AddCard("缺海报", result.MissingPosterCount, Microsoft.UI.Colors.Orange);
-            AddCard("无中字", result.NoChineseSubCount); AddCard("重复番号", result.DuplicateCodeCount, Microsoft.UI.Colors.OrangeRed);
+            AddCard("无中字", result.NoChineseSubCount); AddCard("重复番号", result.DuplicateCodeCount, Windows.UI.Colors.OrangeRed);
             AddCard("散落视频", result.LooseVideoCount);
             ApplyFilter(); SetStatus($"扫描完成：共 {result.TotalFolders} 个资源，{result.ProblemCount} 个异常");
         }
@@ -101,7 +101,7 @@ public sealed partial class AvManagerPage : Page
         finally { ScanProgress.Visibility = Visibility.Collapsed; }
     }
 
-    private void AddCard(string label, int value, Microsoft.UI.Color? color = null)
+    private void AddCard(string label, int value, Windows.UI.Color? color = null)
     {
         var b = new Border { Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"], CornerRadius = new CornerRadius(8), Padding = new Thickness(16, 12, 16, 12) };
         var s = new StackPanel();
