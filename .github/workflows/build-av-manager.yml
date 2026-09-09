@@ -48,12 +48,15 @@ jobs:
           $cerPath = "${{ github.workspace }}\FilesAVManager.cer"
           Export-Certificate -Cert $cert -FilePath $cerPath -Type CERT
 
+          # Find signtool
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          Write-Host "signtool: $signtool"
+
           # Sign msix files
-          $kitsDir = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Directory | Sort-Object Name -Descending | Select-Object -First 1
-          $signtool = Join-Path $kitsDir.FullName "x64\signtool.exe"
           Get-ChildItem "artifacts\AppxPackages\**\*.msix" | ForEach-Object {
             Write-Host "Signing: $($_.Name)"
             & $signtool sign /f $pfxPath /p "FilesAV" /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $_.FullName
+            if ($LASTEXITCODE -ne 0) { Write-Warning "Sign failed for $($_.Name)" }
           }
           Remove-Item $pfxPath -Force
 
@@ -64,6 +67,7 @@ jobs:
           Copy-Item $cerPath $pkg
           Copy-Item "${{ github.workspace }}\install.bat" $pkg -Force
           Compress-Archive -Path "$pkg\*" -DestinationPath "${{ github.workspace }}\Files-AV-Manager.zip"
+          Get-ChildItem "${{ github.workspace }}\Files-AV-Manager.zip" | Select-Object Name, @{N="MB";E={[math]::Round($_.Length/1MB,1)}}
 
       - name: Upload
         uses: actions/upload-artifact@v4
