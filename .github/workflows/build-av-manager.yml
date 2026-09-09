@@ -4,8 +4,6 @@ on:
   push:
     branches: [main, feature/av-resource-manager]
     tags: ["v*"]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -21,8 +19,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -38,34 +34,64 @@ jobs:
       - name: Build
         run: msbuild ${{ env.APP_PROJECT_PATH }} -p:Configuration=Release -p:Platform=x64 -p:GenerateAppxPackageOnBuild=true -p:AppxBundle=Never -p:AppxPackageDir=${{ github.workspace }}\artifacts\AppxPackages\ -v:minimal
 
-      - name: Sign and Package
+      - name: Package
         shell: pwsh
         run: |
-          # Generate self-signed cert
-          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Files AV Manager" -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddYears(5) -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256
-          $pfxPath = "${{ github.workspace }}\sign.pfx"
-          Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password (ConvertTo-SecureString "FilesAV" -Force -AsPlainText)
-          $cerPath = "${{ github.workspace }}\FilesAVManager.cer"
-          Export-Certificate -Cert $cert -FilePath $cerPath -Type CERT
-
-          # Find signtool
-          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
-          Write-Host "signtool: $signtool"
-
-          # Sign msix files
-          Get-ChildItem "artifacts\AppxPackages\**\*.msix" | ForEach-Object {
-            Write-Host "Signing: $($_.Name)"
-            & $signtool sign /f $pfxPath /p "FilesAV" /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $_.FullName
-            if ($LASTEXITCODE -ne 0) { Write-Warning "Sign failed for $($_.Name)" }
-          }
-          Remove-Item $pfxPath -Force
-
-          # Package
-          $pkg = "${{ github.workspace }}\package"
+          $pkg = "${{ github.workspace }}\Files-AV-Manager"
           New-Item -ItemType Directory -Path $pkg -Force
-          Copy-Item "artifacts\AppxPackages\**\*.msix" $pkg -Force
-          Copy-Item $cerPath $pkg
-          Copy-Item "${{ github.workspace }}\install.bat" $pkg -Force
+
+          # Copy msix files
+          Get-ChildItem "artifacts\AppxPackages\**\*.msix" | ForEach-Object {
+            Copy-Item $_.FullName $pkg
+            Write-Host "Added: $($_.Name)"
+          }
+
+          # Create install script
+          $script = @'
+          $ErrorActionPreference = "Stop"
+          Write-Host ""
+          Write-Host "  Files AV Resource Manager 安装程序" -ForegroundColor Cyan
+          Write-Host "  =========================================" -ForegroundColor Cyan
+          Write-Host ""
+
+          $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+          # Install runtime
+          Write-Host "[1/2] 安装 Windows App Runtime..." -ForegroundColor Yellow
+          $runtime = Get-ChildItem $scriptDir -Filter "*.msix" | Where-Object { $_.Name -like "Microsoft*" } | Select-Object -First 1
+          if ($runtime) {
+            try { Add-AppxPackage -Path $runtime.FullName -ErrorAction Stop; Write-Host "  完成" -ForegroundColor Green }
+            catch { Write-Host "  已安装或跳过" -ForegroundColor Gray }
+          }
+
+          # Install app
+          Write-Host ""
+          Write-Host "[2/2] 安装 Files AV Manager..." -ForegroundColor Yellow
+          $app = Get-ChildItem $scriptDir -Filter "Files.App_*.msix" | Select-Object -First 1
+          if ($app) {
+            Add-AppxPackage -Path $app.FullName -AllowUnsigned
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host ""
+              Write-Host "  =========================================" -ForegroundColor Green
+              Write-Host "  安装完成! 开始菜单搜索 Files 打开" -ForegroundColor Green
+              Write-Host "  =========================================" -ForegroundColor Green
+            } else {
+              Write-Host "  安装失败，请开启开发者模式" -ForegroundColor Red
+              Write-Host "  设置 -> 开发者选项 -> 开发人员模式" -ForegroundColor Red
+            }
+          }
+
+          Write-Host ""
+          Read-Host "按回车退出"
+          '@
+          Set-Content -Path "$pkg\安装.ps1" -Value $script -Encoding UTF8
+
+          # Create shortcut bat
+          $bat = '@echo off
+          powershell -ExecutionPolicy Bypass -File "%~dp0安装.ps1"'
+          Set-Content -Path "$pkg\安装.bat" -Value $bat -Encoding Default
+
+          # Zip
           Compress-Archive -Path "$pkg\*" -DestinationPath "${{ github.workspace }}\Files-AV-Manager.zip"
           Get-ChildItem "${{ github.workspace }}\Files-AV-Manager.zip" | Select-Object Name, @{N="MB";E={[math]::Round($_.Length/1MB,1)}}
 
@@ -86,8 +112,8 @@ jobs:
 
             ### 安装方法
             1. 下载 zip 解压
-            2. 右键 安装.bat -> 以管理员身份运行
-            3. 等待完成，开始菜单搜索 Files 打开
+            2. 双击 `安装.bat`
+            3. 完成后开始菜单搜索 Files 打开
 
             ### 功能
             - Files App 完整文件管理器
