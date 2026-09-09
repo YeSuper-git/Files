@@ -12,8 +12,8 @@ permissions:
   contents: write
 
 env:
-  SOLUTION_PATH: "${{ github.workspace }}\\Files.slnx"
-  APP_PROJECT_PATH: "${{ github.workspace }}\\src\\Files.App\\Files.App.csproj"
+  SOLUTION_PATH: ${{ github.workspace }}\Files.slnx
+  APP_PROJECT_PATH: ${{ github.workspace }}\src\Files.App\Files.App.csproj
 
 jobs:
   build:
@@ -36,77 +36,34 @@ jobs:
         run: msbuild ${{ env.SOLUTION_PATH }} -t:Restore -p:Configuration=Release -p:Platform=x64
 
       - name: Build
-        run: msbuild ${{ env.APP_PROJECT_PATH }} -p:Configuration=Release -p:Platform=x64 -p:GenerateAppxPackageOnBuild=true -p:AppxBundle=Never -p:AppxPackageDir="${{ github.workspace }}\\artifacts\\AppxPackages\\" -v:minimal
+        run: msbuild ${{ env.APP_PROJECT_PATH }} -p:Configuration=Release -p:Platform=x64 -p:GenerateAppxPackageOnBuild=true -p:AppxBundle=Never -p:AppxPackageDir=${{ github.workspace }}\artifacts\AppxPackages\ -v:minimal
 
       - name: Sign and Package
         shell: pwsh
         run: |
-          # 生成自签名证书
-          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Files AV Resource Manager" -CertStoreLocation "Cert:\CurrentUser\My" -NotAfter (Get-Date).AddYears(5) -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256
-          $pfxPath = "${{ github.workspace }}\\sign.pfx"
+          # Generate self-signed cert
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Files AV Manager" -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddYears(5) -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256
+          $pfxPath = "${{ github.workspace }}\sign.pfx"
           Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password (ConvertTo-SecureString "FilesAV" -Force -AsPlainText)
-          $cerPath = "${{ github.workspace }}\\FilesAVManager.cer"
+          $cerPath = "${{ github.workspace }}\FilesAVManager.cer"
           Export-Certificate -Cert $cert -FilePath $cerPath -Type CERT
 
-          # 签名 msix
+          # Sign msix files
           $kitsDir = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Directory | Sort-Object Name -Descending | Select-Object -First 1
           $signtool = Join-Path $kitsDir.FullName "x64\signtool.exe"
-          Get-ChildItem "artifacts/AppxPackages/**/*.msix" | ForEach-Object {
+          Get-ChildItem "artifacts\AppxPackages\**\*.msix" | ForEach-Object {
             Write-Host "Signing: $($_.Name)"
             & $signtool sign /f $pfxPath /p "FilesAV" /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $_.FullName
           }
           Remove-Item $pfxPath -Force
 
-          # 打包
-          $pkg = "${{ github.workspace }}\\package"
+          # Package
+          $pkg = "${{ github.workspace }}\package"
           New-Item -ItemType Directory -Path $pkg -Force
-          Copy-Item "artifacts/AppxPackages/**/*.msix" $pkg -Force
+          Copy-Item "artifacts\AppxPackages\**\*.msix" $pkg -Force
           Copy-Item $cerPath $pkg
-
-          # 创建安装脚本（带中文）
-          $bat = @"
-@echo off
-chcp 65001 >nul
-title Files AV Resource Manager
-echo.
-echo  ==========================================
-echo   Files AV Resource Manager 安装程序
-echo  ==========================================
-echo.
-net session >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [提示] 需要管理员权限，正在请求提升...
-    powershell -Command "Start-Process '%~f0' -Verb RunAs"
-    exit /b
-)
-echo [1/3] 安装签名证书...
-powershell -Command "Import-Certificate -FilePath '%~dp0FilesAVManager.cer' -CertStoreLocation Cert:\LocalMachine\Root" >nul 2>&1
-echo       完成
-echo.
-echo [2/3] 安装 Windows App Runtime...
-powershell -Command "Add-AppxPackage -Path '%~dp0Microsoft.WindowsAppRuntime.2.msix'" 2>nul
-echo       完成
-echo.
-echo [3/3] 安装 Files AV Resource Manager...
-powershell -Command "Add-AppxPackage -Path (Get-ChildItem '%~dp0Files.App_*.msix' | Select-Object -First 1).FullName"
-if %errorlevel% equ 0 (
-    echo.
-    echo  ==========================================
-    echo   安装完成! 在开始菜单搜索 Files 打开
-    echo  ==========================================
-) else (
-    echo.
-    echo  [错误] 安装失败
-    echo  请确保已开启旁加载或开发者模式
-    echo  设置 - 开发者选项 - 开发人员模式
-)
-echo.
-pause
-"@
-          [System.IO.File]::WriteAllText("$pkg\安装.bat", $bat, [System.Text.Encoding]::GetEncoding("GB2312"))
-
+          Copy-Item "${{ github.workspace }}\install.bat" $pkg -Force
           Compress-Archive -Path "$pkg\*" -DestinationPath "${{ github.workspace }}\Files-AV-Manager.zip"
-          Get-ChildItem "${{ github.workspace }}\Files-AV-Manager.zip" | Select-Object Name, @{N="MB";E={[math]::Round($_.Length/1MB,1)}}
 
       - name: Upload
         uses: actions/upload-artifact@v4
