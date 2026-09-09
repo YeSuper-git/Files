@@ -70,6 +70,7 @@ namespace Files.App.Data.Contracts
 		/// Navigates to the release notes page
 		/// </summary>
 		public void NavigateToReleaseNotes();
+		public void NavigateToAvManager();
 
 		/// <summary>
 		/// Navigates to the settings page

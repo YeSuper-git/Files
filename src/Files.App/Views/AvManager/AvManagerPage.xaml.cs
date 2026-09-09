@@ -3,6 +3,7 @@
 
 using CommunityToolkit.Mvvm.DependencyInjection;
 using Microsoft.UI;
+using Microsoft.UI.Xaml.Shapes;
 using Files.App.Data.Models.AvManager;
 using Files.App.Services.AvManager;
 using Files.App.ViewModels.AvManager;
@@ -70,7 +71,7 @@ public sealed partial class AvManagerPage : Page
     private async void OnChooseLibrary(object s, RoutedEventArgs e)
     {
         var picker = new Windows.Storage.Pickers.FolderPicker();
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.AppModel?.MainWindow);
+        var hwnd = MainWindow.Instance.WindowHandle;
         WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
         picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Desktop;
         picker.FileTypeFilter.Add("*");
