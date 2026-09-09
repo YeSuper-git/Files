@@ -1,0 +1,73 @@
+# AV Resource Manager - Build workflow
+# Builds the Files App fork with AV Resource Manager feature
+
+name: Build AV Resource Manager
+
+on:
+  push:
+    branches: [main, feature/av-resource-manager]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  SOLUTION_PATH: "${{ github.workspace }}\\Files.slnx"
+  APP_PROJECT_PATH: "${{ github.workspace }}\\src\\Files.App\\Files.App.csproj"
+
+jobs:
+  build:
+    runs-on: windows-2025
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore dependencies
+        run: msbuild ${{ env.SOLUTION_PATH }} -t:Restore -p:Configuration=Release -p:Platform=x64
+
+      - name: Build
+        run: msbuild ${{ env.APP_PROJECT_PATH }} -p:Configuration=Release -p:Platform=x64 -p:GenerateAppxPackageOnBuild=true -p:AppxBundle=Never -p:AppxPackageDir="${{ github.workspace }}\\artifacts\\AppxPackages\\" -v:minimal
+
+      - name: Upload MSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Files-AV-Manager-x64
+          path: artifacts/AppxPackages/**/*.msix
+          if-no-files-found: warn
+
+      - name: Create Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/AppxPackages/**/*.msix
+          draft: true
+          generate_release_notes: true
+          body: |
+            ## Files AV Resource Manager ${{ github.ref_name }}
+            
+            ### 安装说明
+            1. 下载 `.msix` 文件
+            2. 双击安装（需要开启旁加载或开发者模式）
+            
+            ### 功能
+            - 📂 基于 Files App 的完整文件管理器
+            - 🔍 AV 资源番号自动识别
+            - 📊 资源健康检查
+            - ✏️ 批量重命名
+            - 🏷️ 无字幕分类
+            - ↩️ 操作历史与撤销
