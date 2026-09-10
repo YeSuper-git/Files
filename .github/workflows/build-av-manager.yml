@@ -99,6 +99,21 @@ jobs:
           # Use Microsoft's official runtime installer. On x64 Windows it
           # installs the complete runtime set, including the x86 Framework and
           # DDLM packages required by the Windows App SDK deployment model.
+          # Files also requires the two Microsoft Visual C++ UWP framework
+          # packages. The official Files offline-install instructions install
+          # these before Windows App Runtime.
+          $vclibPackages = @(
+            @{ Name = "Microsoft.VCLibs.x64.14.00.Desktop.appx"; Url = "https://cdn.files.community/files/stable/Files.Package/Dependencies/x64/Microsoft.VCLibs.x64.14.00.Desktop.appx" },
+            @{ Name = "Microsoft.VCLibs.x64.14.00.appx"; Url = "https://cdn.files.community/files/stable/Files.Package/Dependencies/x64/Microsoft.VCLibs.x64.14.00.appx" }
+          )
+          foreach ($vclib in $vclibPackages) {
+            $vclibPath = Join-Path $instDir $vclib.Name
+            Invoke-WebRequest -Uri $vclib.Url -OutFile $vclibPath -UseBasicParsing
+            if (-not (Test-Path -LiteralPath $vclibPath)) {
+              throw "VCLibs dependency download failed: $($vclib.Name)"
+            }
+          }
+
           $runtimeInstallerUrl = "https://aka.ms/windowsappsdk/2.4/2.4.0/windowsappruntimeinstall-x64.exe"
           $runtimeInstallerPath = Join-Path $instDir "WindowsAppRuntimeInstall-x64.exe"
           Invoke-WebRequest -Uri $runtimeInstallerUrl -OutFile $runtimeInstallerPath -UseBasicParsing
@@ -109,6 +124,9 @@ jobs:
           Copy-Item $appMsix.FullName $instDir
 
           $appName = $appMsix.Name
+          $vclibFileDirectives = ($vclibPackages | ForEach-Object {
+            "    File `"$(Join-Path $instDir $_.Name)`""
+          }) -join "`n"
           $runtimeFileDirective = "    File `"$runtimeInstallerPath`""
 
           # Use a script file so paths with spaces never pass through nested
@@ -133,6 +151,28 @@ jobs:
 
               if (-not $app) {
                   throw 'Application MSIX package was not found.'
+              }
+
+              $vclibPackages = @(
+                  @{ Name = 'Microsoft.VCLibs.140.00.UWPDesktop'; File = (Join-Path $PSScriptRoot 'Microsoft.VCLibs.x64.14.00.Desktop.appx') },
+                  @{ Name = 'Microsoft.VCLibs.140.00'; File = (Join-Path $PSScriptRoot 'Microsoft.VCLibs.x64.14.00.appx') }
+              )
+
+              foreach ($vclib in $vclibPackages) {
+                  if (-not (Test-Path -LiteralPath $vclib.File)) {
+                      throw "VCLibs dependency was not found: $($vclib.File)"
+                  }
+
+                  $installedVclib = Get-AppxPackage -Name $vclib.Name -ErrorAction SilentlyContinue |
+                      Where-Object { $_.Architecture -eq 'X64' } |
+                      Select-Object -First 1
+                  if ($installedVclib) {
+                      Write-InstallLog "VCLibs already installed: $($vclib.Name) $($installedVclib.Version)"
+                      continue
+                  }
+
+                  Write-InstallLog "Installing VCLibs: $($vclib.Name)"
+                  Add-AppxPackage -Path $vclib.File -ErrorAction Stop
               }
 
               Write-InstallLog 'Installing Windows App Runtime 2.4.0'
@@ -192,6 +232,7 @@ jobs:
             SetOutPath "`$INSTDIR"
             File "$instDir\FilesAVManager.cer"
             File "$instDir\Install-App.ps1"
+          $vclibFileDirectives
           $runtimeFileDirective
             File "$instDir\$appName"
 
