@@ -9,10 +9,6 @@ on:
 permissions:
   contents: write
 
-env:
-  SOLUTION_PATH: ${{ github.workspace }}\Files.slnx
-  APP_PROJECT_PATH: ${{ github.workspace }}\src\Files.App\Files.App.csproj
-
 jobs:
   build:
     runs-on: windows-2025
@@ -29,69 +25,111 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Restore
-        run: msbuild ${{ env.SOLUTION_PATH }} -t:Restore -p:Configuration=Release -p:Platform=x64
+        run: msbuild ${{ github.workspace }}\Files.slnx -t:Restore -p:Configuration=Release -p:Platform=x64
 
       - name: Build
-        run: msbuild ${{ env.APP_PROJECT_PATH }} -p:Configuration=Release -p:Platform=x64 -p:GenerateAppxPackageOnBuild=true -p:AppxBundle=Never -p:AppxPackageDir=${{ github.workspace }}\artifacts\AppxPackages\ -v:minimal
+        run: msbuild ${{ github.workspace }}\src\Files.App\Files.App.csproj -p:Configuration=Release -p:Platform=x64 -p:GenerateAppxPackageOnBuild=true -p:AppxBundle=Never -p:AppxPackageDir=${{ github.workspace }}\artifacts\AppxPackages\ -v:minimal
 
-      - name: Package
+      - name: Sign and Package
         shell: pwsh
         run: |
-          $pkg = "${{ github.workspace }}\Files-AV-Manager"
-          New-Item -ItemType Directory -Path $pkg -Force
+          # Create self-signed cert with correct EKU for code signing
+          $cert = New-SelfSignedCertificate `
+            -Type Custom `
+            -Subject "CN=Files AV Manager, O=Files Community" `
+            -CertStoreLocation "Cert:\CurrentUser\My" `
+            -NotAfter (Get-Date).AddYears(5) `
+            -KeyUsage DigitalSignature `
+            -FriendlyName "Files AV Manager Code Signing" `
+            -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3")
 
-          # Copy msix files
+          # Export PFX
+          $pfxPath = "${{ github.workspace }}\sign.pfx"
+          Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password (ConvertTo-SecureString "FilesAV2026" -Force -AsPlainText)
+
+          # Export CER for users to trust
+          $cerPath = "${{ github.workspace }}\FilesAVManager.cer"
+          Export-Certificate -Cert $cert -FilePath $cerPath -Type CERT
+
+          # Find signtool
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          Write-Host "signtool: $signtool"
+
+          # Sign each msix
+          $signed = $true
           Get-ChildItem "artifacts\AppxPackages\**\*.msix" | ForEach-Object {
-            Copy-Item $_.FullName $pkg
-            Write-Host "Added: $($_.Name)"
-          }
-
-          # Create install script
-          $script = @'
-          $ErrorActionPreference = "Stop"
-          Write-Host ""
-          Write-Host "  Files AV Resource Manager 安装程序" -ForegroundColor Cyan
-          Write-Host "  =========================================" -ForegroundColor Cyan
-          Write-Host ""
-
-          $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-
-          # Install runtime
-          Write-Host "[1/2] 安装 Windows App Runtime..." -ForegroundColor Yellow
-          $runtime = Get-ChildItem $scriptDir -Filter "*.msix" | Where-Object { $_.Name -like "Microsoft*" } | Select-Object -First 1
-          if ($runtime) {
-            try { Add-AppxPackage -Path $runtime.FullName -ErrorAction Stop; Write-Host "  完成" -ForegroundColor Green }
-            catch { Write-Host "  已安装或跳过" -ForegroundColor Gray }
-          }
-
-          # Install app
-          Write-Host ""
-          Write-Host "[2/2] 安装 Files AV Manager..." -ForegroundColor Yellow
-          $app = Get-ChildItem $scriptDir -Filter "Files.App_*.msix" | Select-Object -First 1
-          if ($app) {
-            Add-AppxPackage -Path $app.FullName -AllowUnsigned
-            if ($LASTEXITCODE -eq 0) {
-              Write-Host ""
-              Write-Host "  =========================================" -ForegroundColor Green
-              Write-Host "  安装完成! 开始菜单搜索 Files 打开" -ForegroundColor Green
-              Write-Host "  =========================================" -ForegroundColor Green
+            Write-Host "Signing: $($_.Name)"
+            & $signtool sign /f $pfxPath /p "FilesAV2026" /fd SHA256 $_.FullName
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "FAILED to sign $($_.Name)" -ForegroundColor Red
+              $signed = $false
             } else {
-              Write-Host "  安装失败，请开启开发者模式" -ForegroundColor Red
-              Write-Host "  设置 -> 开发者选项 -> 开发人员模式" -ForegroundColor Red
+              Write-Host "OK" -ForegroundColor Green
             }
           }
 
-          Write-Host ""
-          Read-Host "按回车退出"
-          '@
-          Set-Content -Path "$pkg\安装.ps1" -Value $script -Encoding UTF8
+          if (-not $signed) { throw "Signing failed" }
 
-          # Create shortcut bat
+          # Cleanup
+          Remove-Item $pfxPath -Force
+
+          # Package
+          $pkg = "${{ github.workspace }}\Files-AV-Manager"
+          New-Item -ItemType Directory -Path $pkg -Force
+          Copy-Item "artifacts\AppxPackages\**\*.msix" $pkg -Force
+          Copy-Item $cerPath $pkg
+
+          # Install script
+          $script = @'
+$ErrorActionPreference = "Stop"
+Write-Host ""
+Write-Host "  Files AV Resource Manager" -ForegroundColor Cyan
+Write-Host "  ========================" -ForegroundColor Cyan
+Write-Host ""
+
+$dir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+# 1. Trust certificate
+Write-Host "[1/3] Installing certificate..." -ForegroundColor Yellow
+$cer = Join-Path $dir "FilesAVManager.cer"
+Import-Certificate -FilePath $cer -CertStoreLocation Cert:\LocalMachine\Root -Confirm:$false | Out-Null
+Write-Host "  Done" -ForegroundColor Green
+
+# 2. Install runtime
+Write-Host ""
+Write-Host "[2/3] Installing Windows App Runtime..." -ForegroundColor Yellow
+$rt = Get-ChildItem $dir -Filter "Microsoft*.msix" | Select-Object -First 1
+if ($rt) {
+  try { Add-AppxPackage -Path $rt.FullName -ErrorAction Stop; Write-Host "  Done" -ForegroundColor Green }
+  catch { Write-Host "  Already installed or skipped" -ForegroundColor Gray }
+}
+
+# 3. Install app
+Write-Host ""
+Write-Host "[3/3] Installing Files AV Manager..." -ForegroundColor Yellow
+$app = Get-ChildItem $dir -Filter "Files.App_*.msix" | Select-Object -First 1
+if ($app) {
+  Add-AppxPackage -Path $app.FullName
+  if ($LASTEXITCODE -eq 0) {
+    Write-Host ""
+    Write-Host "  ========================" -ForegroundColor Green
+    Write-Host "  Done! Search Files in Start Menu" -ForegroundColor Green
+    Write-Host "  ========================" -ForegroundColor Green
+  } else {
+    Write-Host "  Failed. Enable Developer Mode first:" -ForegroundColor Red
+    Write-Host "  Settings > Developer options > Developer mode" -ForegroundColor Red
+  }
+}
+
+Write-Host ""
+Read-Host "Press Enter to exit"
+'@
+          Set-Content -Path "$pkg\Install.ps1" -Value $script -Encoding UTF8
+
           $bat = '@echo off
-          powershell -ExecutionPolicy Bypass -File "%~dp0安装.ps1"'
-          Set-Content -Path "$pkg\安装.bat" -Value $bat -Encoding Default
+powershell -ExecutionPolicy Bypass -File "%~dp0Install.ps1"'
+          Set-Content -Path "$pkg\Install.bat" -Value $bat -Encoding Default
 
-          # Zip
           Compress-Archive -Path "$pkg\*" -DestinationPath "${{ github.workspace }}\Files-AV-Manager.zip"
           Get-ChildItem "${{ github.workspace }}\Files-AV-Manager.zip" | Select-Object Name, @{N="MB";E={[math]::Round($_.Length/1MB,1)}}
 
@@ -110,13 +148,13 @@ jobs:
           body: |
             ## Files AV Resource Manager
 
-            ### 安装方法
-            1. 下载 zip 解压
-            2. 双击 `安装.bat`
-            3. 完成后开始菜单搜索 Files 打开
+            ### Install
+            1. Download and extract zip
+            2. Run Install.bat as Administrator
+            3. Search Files in Start Menu
 
-            ### 功能
-            - Files App 完整文件管理器
-            - AV 资源番号自动识别
-            - 资源健康检查 / 批量重命名
-            - 无字幕分类 / 操作撤销
+            ### Features
+            - Full Files App file manager
+            - AV resource code detection
+            - Health check / batch rename
+            - Subtitle classification / undo
