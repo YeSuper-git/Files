@@ -74,7 +74,6 @@ jobs:
             -p:RuntimeIdentifier=win-x64 `
             -p:SelfContained=true `
             -p:WindowsPackageType=None `
-            -p:WindowsAppSDKSelfContained=true `
             -p:FilesExternalLocationBuild=true `
             -p:FilesAvManagerBuild=false `
             -p:GenerateAppxPackageOnBuild=false `
