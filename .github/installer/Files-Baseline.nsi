@@ -2,7 +2,6 @@ Unicode True
 ManifestSupportedOS win10
 RequestExecutionLevel admin
 SetCompressor /SOLID lzma
-SetRegView 64
 InstallDir "$PROGRAMFILES64\Files"
 InstallDirRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "InstallLocation"
 
@@ -27,6 +26,7 @@ Var IdentityPackage
 
 Section "Install"
     SetShellVarContext all
+    SetRegView 64
     SetOutPath "$INSTDIR"
 
     File /r "${PAYLOAD_DIR}\*"
@@ -62,6 +62,7 @@ SectionEnd
 
 Section "Uninstall"
     SetShellVarContext all
+    SetRegView 64
     StrCpy $InstallScript "$INSTDIR\Install-App.ps1"
     StrCpy $IdentityPackage "$INSTDIR\Files.Identity.msix"
 
