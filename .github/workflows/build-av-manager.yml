@@ -91,15 +91,33 @@ jobs:
           New-Item -ItemType Directory -Path $instDir -Force
 
           Copy-Item $cerPath $instDir
-          $rtMsix = Get-ChildItem "artifacts\AppxPackages\**\Microsoft*.msix" | Select-Object -First 1
           $appMsix = Get-ChildItem "artifacts\AppxPackages\**\Files.App_*.msix" | Select-Object -First 1
           if (-not $appMsix) {
             throw "Application MSIX package not found for the installer"
           }
-          if ($rtMsix) { Copy-Item $rtMsix.FullName $instDir }
+
+          # The packaged app is framework-dependent on Windows App Runtime.
+          # The SDK restore contains the signed x64 runtime MSIX files, so ship
+          # all of them in the installer instead of relying on a preinstalled
+          # runtime on the target machine.
+          $nugetRoot = if ([string]::IsNullOrWhiteSpace($env:NUGET_PACKAGES)) {
+            Join-Path $env:USERPROFILE ".nuget\packages"
+          } else {
+            $env:NUGET_PACKAGES
+          }
+          $runtimePackageDir = Join-Path $nugetRoot "microsoft.windowsappsdk.runtime\2.4.0\tools\MSIX\win10-x64"
+          $runtimePackages = @(Get-ChildItem -LiteralPath $runtimePackageDir -Filter "Microsoft.WindowsAppRuntime*.msix" -File)
+          if ($runtimePackages.Count -lt 4) {
+            throw "Windows App Runtime x64 packages were not found in $runtimePackageDir"
+          }
+          $runtimePackages | ForEach-Object { Copy-Item $_.FullName $instDir }
+
           Copy-Item $appMsix.FullName $instDir
 
           $appName = $appMsix.Name
+          $runtimeFileDirectives = ($runtimePackages | ForEach-Object {
+            "    File `"$instDir\$($_.Name)`""
+          }) -join [Environment]::NewLine
 
           # Use a script file so paths with spaces never pass through nested
           # NSIS/PowerShell command-line quoting.
@@ -107,18 +125,34 @@ jobs:
           $ErrorActionPreference = 'Stop'
 
           try {
-              $runtime = Get-ChildItem -LiteralPath $PSScriptRoot -Filter 'Microsoft*.msix' -File |
+              $runtimePackages = @(Get-ChildItem -LiteralPath $PSScriptRoot -Filter 'Microsoft.WindowsAppRuntime*.msix' -File)
+              $runtimeFramework = $runtimePackages |
+                  Where-Object { $_.Name -eq 'Microsoft.WindowsAppRuntime.2.msix' } |
                   Select-Object -First 1
               $app = Get-ChildItem -LiteralPath $PSScriptRoot -Filter 'Files.App_*.msix' -File |
                   Select-Object -First 1
+
+              if (-not $runtimeFramework) {
+                  throw 'Windows App Runtime framework package was not found.'
+              }
 
               if (-not $app) {
                   throw 'Application MSIX package was not found.'
               }
 
-              if ($runtime) {
-                  Write-Host "Installing Windows App Runtime: $($runtime.Name)"
-                  Add-AppxPackage -Path $runtime.FullName
+              $requiredRuntimeVersion = [version]'2.4.0.0'
+              $installedRuntime = Get-AppxPackage -Name 'Microsoft.WindowsAppRuntime.2' -ErrorAction SilentlyContinue |
+                  Where-Object { [version]$_.Version -ge $requiredRuntimeVersion } |
+                  Select-Object -First 1
+
+              if (-not $installedRuntime) {
+                  $runtimeDependencies = @($runtimePackages |
+                      Where-Object { $_.FullName -ne $runtimeFramework.FullName } |
+                      Select-Object -ExpandProperty FullName)
+                  Write-Host "Installing Windows App Runtime 2.4.0"
+                  Add-AppxPackage -Path $runtimeFramework.FullName -DependencyPath $runtimeDependencies
+              } else {
+                  Write-Host "Windows App Runtime 2.4.0 or newer is already installed"
               }
 
               Write-Host "Installing Files AV Manager: $($app.Name)"
@@ -146,6 +180,7 @@ jobs:
             SetOutPath "`$INSTDIR"
             File "$instDir\FilesAVManager.cer"
             File "$instDir\Install-App.ps1"
+          $runtimeFileDirectives
             File "$instDir\$appName"
 
             # Trust certificate
