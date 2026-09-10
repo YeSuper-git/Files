@@ -117,6 +117,11 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $logPath = Join-Path $env:TEMP 'Files-AV-Manager-install.log'
 
+          function Write-InstallLog {
+              param([string]$Message)
+              Add-Content -Path $logPath -Value "[$(Get-Date -Format s)] $Message" -Encoding UTF8
+          }
+
           try {
               $runtimeInstaller = Join-Path $PSScriptRoot 'WindowsAppRuntimeInstall-x64.exe'
               $app = Get-ChildItem -LiteralPath $PSScriptRoot -Filter 'Files.App_*.msix' -File |
@@ -130,14 +135,36 @@ jobs:
                   throw 'Application MSIX package was not found.'
               }
 
-              Write-Host 'Installing Windows App Runtime 2.4.0'
-              $runtimeProcess = Start-Process -FilePath $runtimeInstaller -ArgumentList '--quiet' -Wait -PassThru -WindowStyle Hidden
+              Write-InstallLog 'Installing Windows App Runtime 2.4.0'
+
+              # Run the official installer without a visible console and bound
+              # the wait time. A hung runtime installer must not leave NSIS
+              # looking frozen forever.
+              $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+              $startInfo.FileName = $runtimeInstaller
+              $startInfo.Arguments = '--quiet --force'
+              $startInfo.WorkingDirectory = $PSScriptRoot
+              $startInfo.UseShellExecute = $false
+              $startInfo.CreateNoWindow = $true
+              $runtimeProcess = [System.Diagnostics.Process]::Start($startInfo)
+
+              if (-not $runtimeProcess.WaitForExit(300000)) {
+                  try {
+                      Stop-Process -Id $runtimeProcess.Id -Force -ErrorAction SilentlyContinue
+                  } catch {
+                  }
+                  throw 'Windows App Runtime installer timed out after 5 minutes.'
+              }
+
+              $runtimeProcess.Refresh()
+              Write-InstallLog "Windows App Runtime installer exited with code $($runtimeProcess.ExitCode)"
               if ($runtimeProcess.ExitCode -ne 0) {
                   throw "Windows App Runtime installer failed with exit code 0x$('{0:X8}' -f $runtimeProcess.ExitCode)"
               }
 
-              Write-Host "Installing Files AV Manager: $($app.Name)"
+              Write-InstallLog "Installing Files AV Manager: $($app.Name)"
               Add-AppxPackage -Path $app.FullName
+              Write-InstallLog 'Files AV Manager installation completed.'
               exit 0
           }
           catch {
