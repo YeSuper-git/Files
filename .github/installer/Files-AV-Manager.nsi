@@ -1,7 +1,7 @@
 Unicode True
 ManifestSupportedOS win10
 RequestExecutionLevel admin
-SetCompressor /SOLID lzma2
+SetCompressor /SOLID lzma
 SetRegView 64
 InstallDir "$PROGRAMFILES64\Files AV Resource Manager"
 InstallDirRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files AV Resource Manager" "InstallLocation"
