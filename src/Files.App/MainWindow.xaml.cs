@@ -61,19 +61,20 @@ namespace Files.App
 			// Reuse the existing backdrop on resume; rebuilding the Mica controller leaves the window on the fallback color for ~1s
 			SystemBackdrop ??= new AppSystemBackdrop();
 
-			switch (activatedEventArgs)
+				switch (activatedEventArgs)
 			{
 				case ILaunchActivatedEventArgs launchArgs:
-					var launchExecutable = launchArgs.Arguments is null
+					var launchArguments = launchArgs.Arguments;
+					var launchExecutable = launchArguments is null
 						? null
-						: CommandLineParser.SplitArguments(launchArgs.Arguments, true).FirstOrDefault();
+						: CommandLineParser.SplitArguments(launchArguments, true).FirstOrDefault();
 					if (launchExecutable is not null &&
 						(launchExecutable.EndsWith($"files-dev.exe", StringComparison.OrdinalIgnoreCase)
 						|| launchExecutable.EndsWith($"files-dev", StringComparison.OrdinalIgnoreCase)
 						|| launchExecutable.Equals(Path.Join(AppPathHelper.InstallDirectory, "Files.exe"), StringComparison.OrdinalIgnoreCase)))
 					{
 						// WINUI3: When launching from commandline the argument is not ICommandLineActivatedEventArgs (#10370)
-						var ppm = CommandLineParser.ParseUntrustedCommands(launchArgs.Arguments);
+						var ppm = CommandLineParser.ParseUntrustedCommands(launchArguments!);
 						if (ppm.IsEmpty())
 							rootFrame.Navigate(typeof(MainPage), null, new SuppressNavigationTransitionInfo());
 						else
