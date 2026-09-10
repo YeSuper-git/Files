@@ -108,12 +108,6 @@
                     <uap:Protocol ReturnResults="none" Name="files-dev" />
                 </uap:Extension>
 
-                <uap5:Extension Category="windows.appExecutionAlias">
-                    <uap5:AppExecutionAlias>
-                        <uap5:ExecutionAlias Alias="files-dev.exe" />
-                    </uap5:AppExecutionAlias>
-                </uap5:Extension>
-
                 <uap5:Extension Category="windows.startupTask">
                     <uap5:StartupTask
                         TaskId="3AA55462-A5FA-4933-88C4-712D0B6CDEBB"
