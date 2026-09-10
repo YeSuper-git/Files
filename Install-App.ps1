@@ -97,10 +97,17 @@ try {
 
     $certificate = Join-Path $root $CertificateFileName
     if (Test-Path -LiteralPath $certificate) {
-        try {
-            Import-Certificate -FilePath $certificate -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' -Confirm:$false | Out-Null
-        } catch {
-            Import-Certificate -FilePath $certificate -CertStoreLocation 'Cert:\CurrentUser\TrustedPeople' -Confirm:$false | Out-Null
+        $certUtil = Join-Path $env:SystemRoot 'System32\certutil.exe'
+        if (-not (Test-Path -LiteralPath $certUtil)) {
+            throw "Windows certificate utility was not found: $certUtil"
+        }
+
+        Write-InstallLog "Trusting identity certificate with certutil: $certificate"
+        $certificateExitCode = Invoke-ProcessChecked `
+            -FileName $certUtil `
+            -Arguments "-addstore -f TrustedPeople `"$certificate`""
+        if ($certificateExitCode -ne 0) {
+            throw "Identity certificate import failed with exit code $certificateExitCode"
         }
     }
 
