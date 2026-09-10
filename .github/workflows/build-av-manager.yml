@@ -153,6 +153,15 @@ jobs:
           $identityManifest.Package.Identity.Version = $appVersion
           $identityManifest.Save($identityManifestPath)
 
+          $identityAssetDir = Join-Path $identityDir 'Assets\AppTiles\Dev'
+          New-Item -ItemType Directory -Path $identityAssetDir -Force | Out-Null
+          Copy-Item "$workspace\src\Files.App\Assets\AppTiles\Dev\StoreLogo.scale-100.png" $identityAssetDir -Force
+          Copy-Item "$workspace\src\Files.App\Assets\AppTiles\Dev\Square150x150Logo.scale-100.png" $identityAssetDir -Force
+          Copy-Item "$workspace\src\Files.App\Assets\AppTiles\Dev\Square44x44Logo.scale-100.png" $identityAssetDir -Force
+          $archiveAssetDir = Join-Path $identityDir 'Assets\archives'
+          New-Item -ItemType Directory -Path $archiveAssetDir -Force | Out-Null
+          Copy-Item "$workspace\src\Files.App\Assets\archives\ExtensionIcon.png" $archiveAssetDir -Force
+
           $makeAppx = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\makeappx.exe' |
             Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
           $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe' |
@@ -229,6 +238,10 @@ jobs:
 
           $installerProcess = Start-Process -FilePath $setupPath -ArgumentList '/S' -Wait -PassThru
           if ($installerProcess.ExitCode -ne 0) {
+            $installLog = Join-Path $env:TEMP 'Files-AV-Manager-install.log'
+            if (Test-Path -LiteralPath $installLog) {
+              Get-Content -LiteralPath $installLog
+            }
             throw "Silent installer failed with exit code $($installerProcess.ExitCode)."
           }
           if (-not (Test-Path -LiteralPath $installedExe)) {
