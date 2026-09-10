@@ -99,23 +99,38 @@ jobs:
           if ($rtMsix) { Copy-Item $rtMsix.FullName $instDir }
           Copy-Item $appMsix.FullName $instDir
 
-          $rtName = if ($rtMsix) { $rtMsix.Name } else { "runtime.msix" }
           $appName = $appMsix.Name
 
-          $rtFileDirective = if ($rtMsix) {
-            "          File `"$instDir\$rtName`""
-          } else {
-            ""
-          }
+          # Use a script file so paths with spaces never pass through nested
+          # NSIS/PowerShell command-line quoting.
+          $installScript = @'
+          $ErrorActionPreference = 'Stop'
 
-          $rtInstallDirective = if ($rtMsix) {
-            @(
-              '            DetailPrint "Installing Windows App Runtime..."'
-              "            nsExec::ExecToLog 'powershell -NoProfile -Command `"Add-AppxPackage -Path ''`$INSTDIR\$rtName'' -ErrorAction SilentlyContinue`"'"
-            ) -join [Environment]::NewLine
-          } else {
-            '            DetailPrint "Windows App Runtime package not included; skipping runtime installation."'
+          try {
+              $runtime = Get-ChildItem -LiteralPath $PSScriptRoot -Filter 'Microsoft*.msix' -File |
+                  Select-Object -First 1
+              $app = Get-ChildItem -LiteralPath $PSScriptRoot -Filter 'Files.App_*.msix' -File |
+                  Select-Object -First 1
+
+              if (-not $app) {
+                  throw 'Application MSIX package was not found.'
+              }
+
+              if ($runtime) {
+                  Write-Host "Installing Windows App Runtime: $($runtime.Name)"
+                  Add-AppxPackage -Path $runtime.FullName
+              }
+
+              Write-Host "Installing Files AV Manager: $($app.Name)"
+              Add-AppxPackage -Path $app.FullName
+              exit 0
           }
+          catch {
+              Write-Error $_
+              exit 1
+          }
+          '@
+          Set-Content -Path "$instDir\Install-App.ps1" -Value $installScript -Encoding UTF8
 
           # NSIS script
           $nsis = @"
@@ -130,22 +145,26 @@ jobs:
           Section "Install"
             SetOutPath "`$INSTDIR"
             File "$instDir\FilesAVManager.cer"
-          $rtFileDirective
+            File "$instDir\Install-App.ps1"
             File "$instDir\$appName"
 
             # Trust certificate
             DetailPrint "Installing certificate..."
-            nsExec::ExecToLog 'certutil -addstore TrustedPeople "`$INSTDIR\FilesAVManager.cer"'
+            ExecWait '"`$SYSDIR\certutil.exe" -addstore TrustedPeople "`$INSTDIR\FilesAVManager.cer"' `$0
+            StrCmp `$0 "0" certificate_ok
+            Abort "Certificate installation failed."
+          certificate_ok:
 
             # Enable sideloading
             WriteRegDWORD HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Appx" "AllowAllTrustedApps" 1
 
-            # Install runtime when the build produced a local runtime package
-          $rtInstallDirective
-
-            # Install app
+            # Install the runtime dependency, when present, and the app.
             DetailPrint "Installing Files AV Manager..."
-            nsExec::ExecToLog 'powershell -NoProfile -Command "Add-AppxPackage -Path ''`$INSTDIR\$appName''"'
+            ExecWait '"`$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "`$INSTDIR\Install-App.ps1"' `$0
+            StrCmp `$0 "0" app_install_ok
+            DetailPrint "Files AV Manager installation failed with exit code `$0."
+            Abort "Files AV Manager installation failed."
+          app_install_ok:
 
             RMDir /r "`$INSTDIR"
           SectionEnd
