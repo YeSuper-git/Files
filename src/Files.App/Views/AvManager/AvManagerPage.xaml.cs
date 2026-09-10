@@ -306,7 +306,7 @@ public sealed partial class AvManagerPage : Page
             Value = _vm.Settings.PosterQualityKb,
             Minimum = 1,
             Maximum = 1024 * 1024,
-            SpinButtonPlacementMode = SpinButtonPlacementMode.Inline
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline
         };
         var content = new StackPanel { Spacing = 12, Width = 440 };
         content.Children.Add(videoExtensions);

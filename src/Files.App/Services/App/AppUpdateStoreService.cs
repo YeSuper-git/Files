@@ -9,6 +9,7 @@ using System.Net.Http;
 using System.Text;
 using Windows.Foundation.Metadata;
 using Windows.Services.Store;
+using Windows.Storage;
 using WinRT.Interop;
 
 namespace Files.App.Services

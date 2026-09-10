@@ -9,6 +9,7 @@ using Files.App.Helpers;
 using System.IO;
 using System.Net.Http;
 using System.Security.Cryptography;
+using Microsoft.Extensions.Logging;
 using Windows.Storage;
 
 namespace Files.App.Services

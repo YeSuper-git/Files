@@ -9,6 +9,7 @@ using System.Xml.Linq;
 using Files.App.Helpers;
 using Windows.ApplicationModel;
 using Windows.Management.Deployment;
+using Windows.Storage;
 using Windows.Win32;
 using Windows.Win32.System.Recovery;
 
