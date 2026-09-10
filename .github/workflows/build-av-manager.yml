@@ -258,6 +258,17 @@ jobs:
           $appProcess = Start-Process -FilePath $installedExe -WorkingDirectory $installDir -PassThru
           Start-Sleep -Seconds 5
           if ($appProcess.HasExited) {
+            $localStateDir = Join-Path $env:LOCALAPPDATA "Packages\$($identity.PackageFamilyName)\LocalState"
+            $debugLog = Join-Path $localStateDir 'debug.log'
+            if (Test-Path -LiteralPath $debugLog) {
+              Write-Host 'Files debug.log:'
+              Get-Content -LiteralPath $debugLog
+            } else {
+              Write-Host "Files debug.log was not found at '$debugLog'."
+              Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA 'Packages') -Directory -Filter 'FilesDev_*' -ErrorAction SilentlyContinue |
+                ForEach-Object { Get-ChildItem -Path $_.FullName -Recurse -Filter 'debug.log' -File -ErrorAction SilentlyContinue } |
+                ForEach-Object { Write-Host "Candidate log: $($_.FullName)"; Get-Content -LiteralPath $_.FullName }
+            }
             throw "Files exited during startup with code $($appProcess.ExitCode)."
           }
           Write-Host "Startup smoke test passed with process id $($appProcess.Id)."
