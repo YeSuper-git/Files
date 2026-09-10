@@ -93,11 +93,29 @@ jobs:
           Copy-Item $cerPath $instDir
           $rtMsix = Get-ChildItem "artifacts\AppxPackages\**\Microsoft*.msix" | Select-Object -First 1
           $appMsix = Get-ChildItem "artifacts\AppxPackages\**\Files.App_*.msix" | Select-Object -First 1
+          if (-not $appMsix) {
+            throw "Application MSIX package not found for the installer"
+          }
           if ($rtMsix) { Copy-Item $rtMsix.FullName $instDir }
-          if ($appMsix) { Copy-Item $appMsix.FullName $instDir }
+          Copy-Item $appMsix.FullName $instDir
 
           $rtName = if ($rtMsix) { $rtMsix.Name } else { "runtime.msix" }
-          $appName = if ($appMsix) { $appMsix.Name } else { "app.msix" }
+          $appName = $appMsix.Name
+
+          $rtFileDirective = if ($rtMsix) {
+            "          File `"$instDir\$rtName`""
+          } else {
+            ""
+          }
+
+          $rtInstallDirective = if ($rtMsix) {
+            @(
+              '            DetailPrint "Installing Windows App Runtime..."'
+              "            nsExec::ExecToLog 'powershell -NoProfile -Command `"Add-AppxPackage -Path ''`$INSTDIR\$rtName'' -ErrorAction SilentlyContinue`"'"
+            ) -join [Environment]::NewLine
+          } else {
+            '            DetailPrint "Windows App Runtime package not included; skipping runtime installation."'
+          }
 
           # NSIS script
           $nsis = @"
@@ -112,7 +130,7 @@ jobs:
           Section "Install"
             SetOutPath "`$INSTDIR"
             File "$instDir\FilesAVManager.cer"
-            File "$instDir\$rtName"
+          $rtFileDirective
             File "$instDir\$appName"
 
             # Trust certificate
@@ -122,9 +140,8 @@ jobs:
             # Enable sideloading
             WriteRegDWORD HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Appx" "AllowAllTrustedApps" 1
 
-            # Install runtime
-            DetailPrint "Installing Windows App Runtime..."
-            nsExec::ExecToLog 'powershell -NoProfile -Command "Add-AppxPackage -Path ''`$INSTDIR\$rtName'' -ErrorAction SilentlyContinue"'
+            # Install runtime when the build produced a local runtime package
+          $rtInstallDirective
 
             # Install app
             DetailPrint "Installing Files AV Manager..."
