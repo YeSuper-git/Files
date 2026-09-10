@@ -19,6 +19,10 @@
              global MSBuild property also affects class-library references,
              which Windows App SDK rejects. -->
         <WindowsAppSDKSelfContained Condition="'$(WindowsPackageType)' == 'None'">true</WindowsAppSDKSelfContained>
+        <!-- Sparse/external-location apps discover the module PRI through the
+             conventional resources.pri name once package identity is present.
+             Keep the normal Files.pri name for full MSIX builds. -->
+        <ProjectPriFileName Condition="'$(FilesExternalLocationBuild)' == 'true'">resources.pri</ProjectPriFileName>
         <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
         <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
         <GenerateTestArtifacts>False</GenerateTestArtifacts>

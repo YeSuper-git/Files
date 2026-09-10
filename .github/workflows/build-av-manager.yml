@@ -81,8 +81,8 @@ jobs:
           if ($runtimeFiles.Count -eq 0) {
             throw 'Windows App SDK self-contained runtime was not copied to the publish output.'
           }
-          if (-not (Test-Path -LiteralPath (Join-Path $publishDir 'Files.pri'))) {
-            throw 'Files.pri was not copied to the publish output.'
+          if (-not (Test-Path -LiteralPath (Join-Path $publishDir 'resources.pri'))) {
+            throw 'resources.pri was not copied to the publish output.'
           }
           if (-not (Test-Path -LiteralPath (Join-Path $publishDir 'Assets'))) {
             throw 'Application assets were not copied to the publish output.'
