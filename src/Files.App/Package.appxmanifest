@@ -15,7 +15,7 @@
 
     <Identity
         Name="FilesDev"
-        Publisher="CN=Files"
+        Publisher="CN=Files AV Manager"
         Version="4.2.31.0" />
 
     <Properties>

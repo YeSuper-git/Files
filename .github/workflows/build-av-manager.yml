@@ -35,34 +35,51 @@ jobs:
 
       - name: Sign and Build Installer
         shell: pwsh
+        env:
+          MSIX_PFX_BASE64: ${{ secrets.MSIX_PFX_BASE64 }}
+          MSIX_PFX_PASSWORD: ${{ secrets.MSIX_PFX_PASSWORD }}
         run: |
-          # Create self-signed cert for MSIX (needs code signing EKU)
-          $cert = New-SelfSignedCertificate `
-            -Type CodeSigningCert `
-            -Subject "CN=Files AV Manager" `
-            -CertStoreLocation "Cert:\CurrentUser\My" `
-            -NotAfter (Get-Date).AddYears(5) `
-            -KeyAlgorithm RSA `
-            -KeyLength 2048 `
-            -HashAlgorithm SHA256
+          $ErrorActionPreference = "Stop"
+          $publisher = "CN=Files AV Manager"
 
-          # Install cert to trusted root so MSIX validates
+          if ([string]::IsNullOrWhiteSpace($env:MSIX_PFX_BASE64) -or
+              [string]::IsNullOrWhiteSpace($env:MSIX_PFX_PASSWORD)) {
+            throw "MSIX_PFX_BASE64 and MSIX_PFX_PASSWORD GitHub Secrets are required"
+          }
+
+          # Reuse one long-lived certificate for stable package updates.
+          $pfxPath = "${{ github.workspace }}\sign.pfx"
+          [IO.File]::WriteAllBytes(
+            $pfxPath,
+            [Convert]::FromBase64String($env:MSIX_PFX_BASE64)
+          )
+          $pfxPassword = ConvertTo-SecureString $env:MSIX_PFX_PASSWORD -AsPlainText -Force
+          $cert = Import-PfxCertificate `
+            -FilePath $pfxPath `
+            -CertStoreLocation "Cert:\CurrentUser\My" `
+            -Password $pfxPassword
+
+          if ($cert.Subject -ne $publisher) {
+            throw "Certificate subject '$($cert.Subject)' does not match package publisher '$publisher'"
+          }
+
+          # AppX/MSIX checks the publisher identity and trusts this store for sideloading.
           $cerPath = "${{ github.workspace }}\FilesAVManager.cer"
           Export-Certificate -Cert $cert -FilePath $cerPath -Type CERT
-          Import-Certificate -FilePath $cerPath -CertStoreLocation Cert:\LocalMachine\Root -Confirm:$false | Out-Null
           Import-Certificate -FilePath $cerPath -CertStoreLocation Cert:\LocalMachine\TrustedPeople -Confirm:$false | Out-Null
 
-          # Export PFX
-          $pfxPath = "${{ github.workspace }}\sign.pfx"
-          Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password (ConvertTo-SecureString "FAV2026" -Force -AsPlainText)
-
-          # Sign MSIX with AppX-compatible parameters
+          # Sign only the application package. Runtime dependencies are already Microsoft-signed.
           $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
           Write-Host "Using: $signtool"
 
-          Get-ChildItem "artifacts\AppxPackages\**\*.msix" | ForEach-Object {
+          $appPackages = @(Get-ChildItem "artifacts\AppxPackages" -Filter "Files.App_*.msix" -Recurse)
+          if ($appPackages.Count -eq 0) {
+            throw "Application MSIX package not found"
+          }
+
+          $appPackages | ForEach-Object {
             Write-Host "Signing: $($_.Name)"
-            & $signtool sign /a /f $pfxPath /p "FAV2026" /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $_.FullName
+            & $signtool sign /f $pfxPath /p $env:MSIX_PFX_PASSWORD /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $_.FullName
             if ($LASTEXITCODE -eq 0) { Write-Host "  OK" -ForegroundColor Green }
             else { Write-Host "  FAILED (exit $LASTEXITCODE)" -ForegroundColor Red; throw "Sign failed" }
           }
@@ -100,7 +117,6 @@ jobs:
 
             # Trust certificate
             DetailPrint "Installing certificate..."
-            nsExec::ExecToLog 'certutil -addstore Root "`$INSTDIR\FilesAVManager.cer"'
             nsExec::ExecToLog 'certutil -addstore TrustedPeople "`$INSTDIR\FilesAVManager.cer"'
 
             # Enable sideloading
