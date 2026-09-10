@@ -64,10 +64,13 @@ namespace Files.App
 			switch (activatedEventArgs)
 			{
 				case ILaunchActivatedEventArgs launchArgs:
-					if (launchArgs.Arguments is not null &&
-						(CommandLineParser.SplitArguments(launchArgs.Arguments, true)[0].EndsWith($"files-dev.exe", StringComparison.OrdinalIgnoreCase)
-						|| CommandLineParser.SplitArguments(launchArgs.Arguments, true)[0].EndsWith($"files-dev", StringComparison.OrdinalIgnoreCase)
-						|| CommandLineParser.SplitArguments(launchArgs.Arguments, true)[0].Equals(Path.Join(AppPathHelper.InstallDirectory, "Files.exe"), StringComparison.OrdinalIgnoreCase)))
+					var launchExecutable = launchArgs.Arguments is null
+						? null
+						: CommandLineParser.SplitArguments(launchArgs.Arguments, true).FirstOrDefault();
+					if (launchExecutable is not null &&
+						(launchExecutable.EndsWith($"files-dev.exe", StringComparison.OrdinalIgnoreCase)
+						|| launchExecutable.EndsWith($"files-dev", StringComparison.OrdinalIgnoreCase)
+						|| launchExecutable.Equals(Path.Join(AppPathHelper.InstallDirectory, "Files.exe"), StringComparison.OrdinalIgnoreCase)))
 					{
 						// WINUI3: When launching from commandline the argument is not ICommandLineActivatedEventArgs (#10370)
 						var ppm = CommandLineParser.ParseUntrustedCommands(launchArgs.Arguments);
