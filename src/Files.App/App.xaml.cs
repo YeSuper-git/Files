@@ -76,7 +76,7 @@ namespace Files.App
 			// Constructed on the UI thread: the ctor subscribes the UI-thread-only Clipboard.ContentChanged
 			AppModel = new AppModel();
 
-			_ = ActivateAsync();
+			_ = ObserveStartupTaskAsync(ActivateAsync(), "App.ActivateAsync");
 
 			async Task ActivateAsync()
 			{
@@ -209,7 +209,9 @@ namespace Files.App
 							SystemTrayIcon.Show();
 					});
 
-					_ = MainWindow.Instance.InitializeApplicationAsync(appActivationArguments.Data);
+					_ = ObserveStartupTaskAsync(
+						MainWindow.Instance.InitializeApplicationAsync(appActivationArguments.Data),
+						"MainWindow.InitializeApplicationAsync");
 				}
 				else
 				{
@@ -236,6 +238,18 @@ namespace Files.App
 				}
 
 				await AppLifecycleHelper.InitializeAppComponentsAsync();
+			}
+
+			static async Task ObserveStartupTaskAsync(Task task, string operation)
+			{
+				try
+				{
+					await task;
+				}
+				catch (Exception ex)
+				{
+					AppLifecycleHelper.HandleAppUnhandledException(ex, false, operation);
+				}
 			}
 		}
 

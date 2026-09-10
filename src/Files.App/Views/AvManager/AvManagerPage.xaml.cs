@@ -147,9 +147,64 @@ public sealed partial class AvManagerPage : Page
     private async void OnPreviewRename(object s, RoutedEventArgs e) { if (string.IsNullOrEmpty(_vm.LibraryPath)) return; SetStatus("正在预览重命名..."); try { _pendingOps = await _ops.PreviewRenameVideosAsync(_vm.LibraryPath); ShowPending(); SetStatus($"预览完成：{_pendingOps.Count(o => o.Status == "ready")} 项就绪"); } catch (Exception ex) { SetStatus($"预览失败：{ex.Message}"); } }
     private async void OnPreviewClassifySubs(object s, RoutedEventArgs e) { if (string.IsNullOrEmpty(_vm.LibraryPath)) return; SetStatus("正在预览字幕分类..."); try { _pendingOps = await _ops.PreviewClassifySubtitlesAsync(_vm.LibraryPath, _vm.Settings); ShowPending(); SetStatus($"预览完成：{_pendingOps.Count} 项待分类"); } catch (Exception ex) { SetStatus($"预览失败：{ex.Message}"); } }
     private void ShowPending() { PendingBar.Visibility = _pendingOps.Count > 0 ? Visibility.Visible : Visibility.Collapsed; PendingCountText.Text = $"待执行：{_pendingOps.Count} 项操作"; }
-    private async void OnExecutePending(object s, RoutedEventArgs e) { if (_pendingOps.Count == 0) return; SetStatus("正在执行..."); try { var r = await _ops.ExecuteOperationsAsync(_vm.LibraryPath, _pendingOps); SetStatus($"执行完成：{r.Count(x => x.Status == "done")} 项成功"); _pendingOps.Clear(); PendingBar.Visibility = Visibility.Collapsed; await RefreshAsync(); } catch (Exception ex) { SetStatus($"执行失败：{ex.Message}"); } }
+    private async void OnExecutePending(object s, RoutedEventArgs e)
+    {
+        if (_pendingOps.Count == 0) return;
+        SetStatus("正在执行...");
+        try
+        {
+            var results = await _ops.ExecuteOperationsAsync(_vm.LibraryPath, _pendingOps);
+            var failed = results.Where(x => x.Status is "failed" or "conflict").ToList();
+            var succeeded = results.Count(x => x.Status == "done");
+            _pendingOps = failed;
+            ShowPending();
+            SetStatus(failed.Count == 0
+                ? $"执行完成：{succeeded} 项成功"
+                : $"执行完成：{succeeded} 项成功，{failed.Count} 项失败或冲突，请检查后重试");
+            await RefreshAsync();
+        }
+        catch (Exception ex) { SetStatus($"执行失败：{ex.Message}"); }
+    }
     private void OnCancelPending(object s, RoutedEventArgs e) { _pendingOps.Clear(); PendingBar.Visibility = Visibility.Collapsed; SetStatus("已取消"); }
     private void OnResolveConflict(object s, RoutedEventArgs e) { if (s is Button b && b.Tag is string st) { _pendingOps = _ops.ApplyConflictStrategy(_pendingOps, st); ShowPending(); } }
     private async void OnUndo(object s, RoutedEventArgs e) { if (string.IsNullOrEmpty(_vm.LibraryPath)) return; SetStatus("正在撤销..."); try { var r = await _ops.UndoLastOperationAsync(_vm.LibraryPath); SetStatus($"撤销完成：{r.Count(x => x.Status == "done")} 项已恢复"); await RefreshAsync(); } catch (Exception ex) { SetStatus($"撤销失败：{ex.Message}"); } }
-    private async void OnHistory(object s, RoutedEventArgs e) { if (string.IsNullOrEmpty(_vm.LibraryPath)) return; try { await _vm.LoadHistoryCommand.ExecuteAsync(null); } catch { } }
+    private async void OnHistory(object s, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_vm.LibraryPath)) return;
+        try
+        {
+            await _vm.LoadHistoryCommand.ExecuteAsync(null);
+            if (_vm.OperationHistory.Count == 0)
+            {
+                SetStatus("没有操作历史记录");
+                return;
+            }
+
+            var historyText = string.Join(
+                Environment.NewLine + Environment.NewLine,
+                _vm.OperationHistory.Select(batch =>
+                    $"{batch.CreatedDateTime:yyyy-MM-dd HH:mm:ss}  {batch.Summary}{Environment.NewLine}" +
+                    string.Join(Environment.NewLine, batch.Operations.Select(op => $"  {op.Source} -> {op.Target}"))));
+
+            if (XamlRoot is null)
+            {
+                SetStatus($"已加载 {_vm.OperationHistory.Count} 批操作记录");
+                return;
+            }
+
+            var dialog = new ContentDialog
+            {
+                Title = "操作历史",
+                Content = new ScrollViewer
+                {
+                    MaxHeight = 480,
+                    Content = new TextBlock { Text = historyText, TextWrapping = TextWrapping.Wrap }
+                },
+                CloseButtonText = "关闭",
+                XamlRoot = XamlRoot
+            };
+            await dialog.ShowAsync();
+        }
+        catch (Exception ex) { SetStatus($"加载历史失败：{ex.Message}"); }
+    }
 }

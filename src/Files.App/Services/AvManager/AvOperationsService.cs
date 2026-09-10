@@ -73,15 +73,36 @@ public sealed class AvOperationsService : IAvOperationsService
         foreach (var op in ops)
         {
             if (op.Status != "conflict" || string.IsNullOrEmpty(op.Target)) { resolved.Add(op); continue; }
+            var isDirectory = Directory.Exists(op.Source) || op.Operation.StartsWith("classify", StringComparison.OrdinalIgnoreCase);
             switch (strategy)
             {
-                case "skip": resolved.Add(new AvFileOperation { Operation = op.Operation, Source = op.Source, Target = op.Target, Code = op.Code, Status = "skip" }); break;
+                case "skip":
+                    resolved.Add(new AvFileOperation { Operation = op.Operation, Source = op.Source, Target = op.Target, Code = op.Code, Status = "skip", Reason = "按策略跳过冲突" });
+                    break;
                 case "keep_both":
                     var dir = Path.GetDirectoryName(op.Target) ?? ".";
-                    var stem = Path.GetFileNameWithoutExtension(op.Target);
-                    var ext = new FileInfo(op.Target).Extension.TrimStart('.');
-                    for (int i = 2; i < 100; i++) { var c = Path.Combine(dir, $"{stem}-{i:D2}.{ext}"); if (!File.Exists(c)) { resolved.Add(new AvFileOperation { Operation = op.Operation, Source = op.Source, Target = c, Code = op.Code, Status = "ready" }); break; } } break;
-                case "overwrite": resolved.Add(new AvFileOperation { Operation = op.Operation, Source = op.Source, Target = op.Target, Code = op.Code, Status = "ready_overwrite" }); break;
+                    var stem = isDirectory ? Path.GetFileName(op.Target) : Path.GetFileNameWithoutExtension(op.Target);
+                    var extension = isDirectory ? string.Empty : Path.GetExtension(op.Target);
+                    var found = false;
+                    for (int i = 2; i < 100; i++)
+                    {
+                        var candidate = Path.Combine(dir, $"{stem}-{i:D2}{extension}");
+                        if (!PathExists(candidate))
+                        {
+                            resolved.Add(new AvFileOperation { Operation = op.Operation, Source = op.Source, Target = candidate, Code = op.Code, Status = "ready" });
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if (!found)
+                        resolved.Add(new AvFileOperation { Operation = op.Operation, Source = op.Source, Target = op.Target, Code = op.Code, Status = "conflict", Reason = "没有可用的备用名称" });
+                    break;
+                case "overwrite":
+                    resolved.Add(isDirectory
+                        ? new AvFileOperation { Operation = op.Operation, Source = op.Source, Target = op.Target, Code = op.Code, Status = "conflict", Reason = "为避免数据丢失，文件夹不支持自动覆盖" }
+                        : new AvFileOperation { Operation = op.Operation, Source = op.Source, Target = op.Target, Code = op.Code, Status = "ready_overwrite" });
+                    break;
                 default: resolved.Add(op); break;
             }
         }
@@ -101,10 +122,46 @@ public sealed class AvOperationsService : IAvOperationsService
                 try
                 {
                     var overwrite = op.Status == "ready_overwrite";
-                    if (File.Exists(op.Target) && !overwrite) { results.Add(new AvFileOperation { Operation = op.Operation, Source = op.Source, Target = op.Target, Code = op.Code, Status = "conflict", Reason = "目标文件已存在" }); continue; }
-                    if (overwrite && File.Exists(op.Target)) File.Delete(op.Target);
+                    var sourceIsFile = File.Exists(op.Source);
+                    var sourceIsDirectory = Directory.Exists(op.Source);
+                    if (!sourceIsFile && !sourceIsDirectory)
+                    {
+                        results.Add(new AvFileOperation { Operation = op.Operation, Source = op.Source, Target = op.Target, Code = op.Code, Status = "failed", Reason = "源文件或文件夹不存在" });
+                        continue;
+                    }
+
+                    if (PathExists(op.Target) && !overwrite)
+                    {
+                        results.Add(new AvFileOperation { Operation = op.Operation, Source = op.Source, Target = op.Target, Code = op.Code, Status = "conflict", Reason = "目标文件或文件夹已存在" });
+                        continue;
+                    }
+
                     var p = Path.GetDirectoryName(op.Target); if (p is not null) Directory.CreateDirectory(p);
-                    File.Move(op.Source, op.Target);
+                    if (sourceIsDirectory)
+                    {
+                        // Directory.Move cannot replace an existing directory safely.
+                        // Refuse that case instead of deleting the user's folder.
+                        if (PathExists(op.Target))
+                        {
+                            results.Add(new AvFileOperation { Operation = op.Operation, Source = op.Source, Target = op.Target, Code = op.Code, Status = "conflict", Reason = "为避免数据丢失，文件夹不支持自动覆盖" });
+                            continue;
+                        }
+
+                        Directory.Move(op.Source, op.Target);
+                    }
+                    else
+                    {
+                        if (Directory.Exists(op.Target))
+                        {
+                            results.Add(new AvFileOperation { Operation = op.Operation, Source = op.Source, Target = op.Target, Code = op.Code, Status = "conflict", Reason = "目标是文件夹" });
+                            continue;
+                        }
+
+                        // File.Move with overwrite is atomic on the same volume and
+                        // does not remove the target before the source is movable.
+                        File.Move(op.Source, op.Target, overwrite);
+                    }
+
                     results.Add(new AvFileOperation { Operation = op.Operation, Source = op.Source, Target = op.Target, Code = op.Code, Status = "done" });
                 }
                 catch (Exception ex) { results.Add(new AvFileOperation { Operation = op.Operation, Source = op.Source, Target = op.Target, Code = op.Code, Status = "failed", Reason = ex.Message }); }
@@ -128,19 +185,35 @@ public sealed class AvOperationsService : IAvOperationsService
             if (history.Count == 0) return new List<AvFileOperation>();
             var batch = history[^1]; history.RemoveAt(history.Count - 1);
             var reversed = new List<AvFileOperation>();
-            foreach (var op in batch.Operations.AsEnumerable().Reverse())
+            foreach (var op in batch.Operations.AsEnumerable().Reverse().ToList())
             {
                 ct.ThrowIfCancellationRequested();
                 var undo = new AvFileOperation { Operation = $"undo_{op.Operation}", Source = op.Target, Target = op.Source, Code = op.Code, Status = "ready" };
-                if (!File.Exists(undo.Source) || File.Exists(undo.Target)) { undo.Status = "conflict"; undo.Reason = "撤销源不存在或原路径已被占用"; reversed.Add(undo); continue; }
-                try { File.Move(undo.Source, undo.Target); undo.Status = "done"; } catch (Exception ex) { undo.Status = "failed"; undo.Reason = ex.Message; }
+                if (!PathExists(undo.Source) || PathExists(undo.Target)) { undo.Status = "conflict"; undo.Reason = "撤销源不存在或原路径已被占用"; reversed.Add(undo); continue; }
+                try
+                {
+                    var parent = Path.GetDirectoryName(undo.Target);
+                    if (parent is not null) Directory.CreateDirectory(parent);
+
+                    if (Directory.Exists(undo.Source))
+                        Directory.Move(undo.Source, undo.Target);
+                    else
+                        File.Move(undo.Source, undo.Target);
+
+                    undo.Status = "done";
+                    batch.Operations.Remove(op);
+                }
+                catch (Exception ex) { undo.Status = "failed"; undo.Reason = ex.Message; }
                 reversed.Add(undo);
             }
-            try { File.WriteAllText(HistoryPath(root), JsonSerializer.Serialize(history, new JsonSerializerOptions { WriteIndented = true })); } catch { }
+            if (batch.Operations.Count > 0)
+                history.Add(batch);
+            try { File.WriteAllText(HistoryPath(root), JsonSerializer.Serialize(history, new JsonSerializerOptions { WriteIndented = true })); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to update operation history after undo"); }
             return reversed;
         }, ct);
     }
 
+    private static bool PathExists(string path) => File.Exists(path) || Directory.Exists(path);
     private static string HistoryPath(string root) => Path.Combine(root, ".av-resource-manager-history.json");
     private void AppendHistory(string root, List<AvFileOperation> done) { try { var h = new List<AvOperationBatch>(); var p = HistoryPath(root); if (File.Exists(p)) h = JsonSerializer.Deserialize<List<AvOperationBatch>>(File.ReadAllText(p)) ?? []; var now = (ulong)DateTimeOffset.UtcNow.ToUnixTimeSeconds(); h.Add(new AvOperationBatch { Id = $"batch-{now}", CreatedAt = now, Summary = $"完成 {done.Count} 项文件操作", Operations = done }); File.WriteAllText(p, JsonSerializer.Serialize(h, new JsonSerializerOptions { WriteIndented = true })); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to append history"); } }
     private static bool IsVideoFile(FileInfo f) => f.Extension.TrimStart('.').ToLowerInvariant() is "mp4" or "mkv" or "avi" or "mov" or "wmv" or "flv" or "m4v" or "ts";
