@@ -14,7 +14,9 @@ public sealed partial class AvManagerViewModel : ObservableObject
 {
     private readonly IAvScanner _scanner;
     private readonly IAvOperationsService _operations;
+    private readonly IAvWorkspaceService _workspace;
     private readonly ILogger<AvManagerViewModel> _logger;
+    private CancellationTokenSource? _operationCancellation;
 
     [ObservableProperty] private string _libraryPath = string.Empty;
     [ObservableProperty] private bool _isScanning;
@@ -31,26 +33,70 @@ public sealed partial class AvManagerViewModel : ObservableObject
     public ObservableCollection<AvFileOperation> PendingOperations { get; } = [];
     public ObservableCollection<AvOperationBatch> OperationHistory { get; } = [];
 
-    public AvManagerViewModel(IAvScanner scanner, IAvOperationsService operations, ILogger<AvManagerViewModel> logger)
+    public AvManagerViewModel(IAvScanner scanner, IAvOperationsService operations, IAvWorkspaceService workspace, ILogger<AvManagerViewModel> logger)
     {
         _scanner = scanner;
         _operations = operations;
+        _workspace = workspace;
         _logger = logger;
+        _libraryPath = workspace.LibraryPath;
+        _settings = workspace.Settings.Clone();
+    }
+
+    public void SetLibraryPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        LibraryPath = path;
+        _workspace.SetLibraryPath(path);
+    }
+
+    public void SaveSettings(AvSettings settings)
+    {
+        settings.Normalize();
+        Settings = settings.Clone();
+        _workspace.UpdateSettings(Settings);
+    }
+
+    public void CancelCurrentOperation()
+    {
+        _operationCancellation?.Cancel();
+    }
+
+    private CancellationTokenSource BeginOperation()
+    {
+        _operationCancellation?.Cancel();
+        _operationCancellation?.Dispose();
+        _operationCancellation = new CancellationTokenSource();
+        return _operationCancellation;
+    }
+
+    private void EndOperation(CancellationTokenSource operation)
+    {
+        if (ReferenceEquals(_operationCancellation, operation))
+        {
+            _operationCancellation = null;
+            operation.Dispose();
+        }
     }
 
     [RelayCommand]
     private async Task RefreshAsync()
     {
         if (string.IsNullOrEmpty(LibraryPath)) return;
+        using var operation = BeginOperation();
+        var ct = operation.Token;
         IsScanning = true; StatusMessage = "正在扫描..."; SelectedFolder = null;
         try
         {
-            ScanResult = await _scanner.AnalyzeLibraryAsync(LibraryPath, Settings);
+            ScanResult = await _scanner.AnalyzeLibraryAsync(LibraryPath, Settings, ct);
             StatusMessage = $"扫描完成：共 {ScanResult.TotalFolders} 个资源，{ScanResult.ProblemCount} 个异常";
             ApplyFilter();
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { StatusMessage = "已停止扫描"; }
         catch (Exception ex) { StatusMessage = $"扫描失败：{ex.Message}"; }
-        finally { IsScanning = false; }
+        finally { IsScanning = false; EndOperation(operation); }
     }
 
     [RelayCommand]
@@ -82,30 +128,39 @@ public sealed partial class AvManagerViewModel : ObservableObject
     private async Task PreviewRenameAsync()
     {
         if (string.IsNullOrEmpty(LibraryPath)) return;
+        using var operation = BeginOperation();
+        var ct = operation.Token;
         IsOperating = true; StatusMessage = "正在预览重命名...";
-        try { var ops = await _operations.PreviewRenameVideosAsync(LibraryPath); PendingOperations.Clear(); foreach (var op in ops) PendingOperations.Add(op); HasPendingOps = PendingOperations.Count > 0; StatusMessage = $"预览完成：{ops.Count(o => o.Status == "ready")} 项就绪"; }
+        try { var ops = await _operations.PreviewRenameVideosAsync(LibraryPath, Settings, ct); PendingOperations.Clear(); foreach (var op in ops) PendingOperations.Add(op); HasPendingOps = PendingOperations.Count > 0; StatusMessage = $"预览完成：{ops.Count(o => o.Status == "ready")} 项就绪"; }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { StatusMessage = "已停止预览"; }
         catch (Exception ex) { StatusMessage = $"预览失败：{ex.Message}"; }
-        finally { IsOperating = false; }
+        finally { IsOperating = false; EndOperation(operation); }
     }
 
     [RelayCommand]
     private async Task PreviewClassifySubsAsync()
     {
         if (string.IsNullOrEmpty(LibraryPath)) return;
+        using var operation = BeginOperation();
+        var ct = operation.Token;
         IsOperating = true; StatusMessage = "正在预览字幕分类...";
-        try { var ops = await _operations.PreviewClassifySubtitlesAsync(LibraryPath, Settings); PendingOperations.Clear(); foreach (var op in ops) PendingOperations.Add(op); HasPendingOps = PendingOperations.Count > 0; StatusMessage = $"预览完成：{ops.Count} 项待分类"; }
+        try { var ops = await _operations.PreviewClassifySubtitlesAsync(LibraryPath, Settings, ct); PendingOperations.Clear(); foreach (var op in ops) PendingOperations.Add(op); HasPendingOps = PendingOperations.Count > 0; StatusMessage = $"预览完成：{ops.Count} 项待分类"; }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { StatusMessage = "已停止预览"; }
         catch (Exception ex) { StatusMessage = $"预览失败：{ex.Message}"; }
-        finally { IsOperating = false; }
+        finally { IsOperating = false; EndOperation(operation); }
     }
 
     [RelayCommand]
     private async Task ExecutePendingAsync()
     {
         if (!HasPendingOps || string.IsNullOrEmpty(LibraryPath)) return;
+        using var operation = BeginOperation();
+        var ct = operation.Token;
         IsOperating = true; StatusMessage = "正在执行...";
-        try { var results = await _operations.ExecuteOperationsAsync(LibraryPath, PendingOperations.ToList()); StatusMessage = $"执行完成：{results.Count(r => r.Status == "done")} 项成功"; PendingOperations.Clear(); HasPendingOps = false; await RefreshAsync(); }
+        try { var results = await _operations.ExecuteOperationsAsync(LibraryPath, PendingOperations.ToList(), ct); StatusMessage = $"执行完成：{results.Count(r => r.Status == "done")} 项成功"; PendingOperations.Clear(); HasPendingOps = false; }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { StatusMessage = "已停止执行"; }
         catch (Exception ex) { StatusMessage = $"执行失败：{ex.Message}"; }
-        finally { IsOperating = false; }
+        finally { IsOperating = false; EndOperation(operation); }
     }
 
     [RelayCommand] private void CancelPending() { PendingOperations.Clear(); HasPendingOps = false; StatusMessage = "已取消"; }
@@ -117,10 +172,13 @@ public sealed partial class AvManagerViewModel : ObservableObject
     private async Task UndoLastAsync()
     {
         if (string.IsNullOrEmpty(LibraryPath)) return;
+        using var operation = BeginOperation();
+        var ct = operation.Token;
         IsOperating = true; StatusMessage = "正在撤销...";
-        try { var results = await _operations.UndoLastOperationAsync(LibraryPath); StatusMessage = $"撤销完成：{results.Count(r => r.Status == "done")} 项已恢复"; await RefreshAsync(); }
+        try { var results = await _operations.UndoLastOperationAsync(LibraryPath, ct); StatusMessage = $"撤销完成：{results.Count(r => r.Status == "done")} 项已恢复"; }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { StatusMessage = "已停止撤销"; }
         catch (Exception ex) { StatusMessage = $"撤销失败：{ex.Message}"; }
-        finally { IsOperating = false; }
+        finally { IsOperating = false; EndOperation(operation); }
     }
 
     [RelayCommand]

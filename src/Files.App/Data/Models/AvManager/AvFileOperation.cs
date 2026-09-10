@@ -11,4 +11,5 @@ public sealed class AvFileOperation
     public string? Code { get; init; }
     public string Status { get; set; } = string.Empty;
     public string? Reason { get; set; }
+    public string? Backup { get; init; }
 }

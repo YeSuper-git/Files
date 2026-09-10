@@ -84,8 +84,10 @@ namespace Files.App.ViewModels.UserControls
 				SectionType.CloudDrives,
 				SectionType.Network,
 				SectionType.WSL,
-				SectionType.FileTag,
-				SectionType.AvManager
+				SectionType.FileTag
+#if FILES_AV_MANAGER
+				, SectionType.AvManager
+#endif
 			];
 
 		public bool IsSidebarCompactSize
@@ -317,7 +319,9 @@ namespace Files.App.ViewModels.UserControls
 			Manager_DataChanged(SectionType.Network, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
 			Manager_DataChanged(SectionType.WSL, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
 			Manager_DataChanged(SectionType.FileTag, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+#if FILES_AV_MANAGER
 			Manager_DataChanged(SectionType.AvManager, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+#endif
 
 			App.QuickAccessManager.Model.DataChanged += Manager_DataChanged;
 			App.LibraryManager.DataChanged += Manager_DataChanged;
@@ -610,11 +614,13 @@ namespace Files.App.ViewModels.UserControls
 					section.IsHeader = true;
 					break;
 
+#if FILES_AV_MANAGER
 				case SectionType.AvManager:
 					section = BuildSection("AV 资源管理", sectionType, new ContextMenuOptions { IsLocationItem = true }, true);
 					section.Path = "AvManager";
 					section.IsHeader = true;
 					break;
+#endif
 			}
 
 			if (section is not null)
@@ -662,7 +668,9 @@ namespace Files.App.ViewModels.UserControls
 					SectionType.FileTag when generalSettingsService.ShowFileTagsSection => App.FileTagsManager.UpdateFileTagsAsync,
 					SectionType.Library => App.LibraryManager.UpdateLibrariesAsync,
 					SectionType.Pinned => App.QuickAccessManager.Model.AddAllItemsToSidebarAsync,
+#if FILES_AV_MANAGER
 					SectionType.AvManager => () => Task.CompletedTask,
+#endif
 					_ => () => Task.CompletedTask
 				};
 

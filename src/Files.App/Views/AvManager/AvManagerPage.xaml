@@ -23,6 +23,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -36,6 +37,8 @@
                 <Button Content="字幕分类" Click="OnPreviewClassifySubs" />
                 <Button Content="撤销" Click="OnUndo" />
                 <Button Content="历史" Click="OnHistory" />
+                <Button Content="设置" Click="OnSettings" />
+                <Button Content="停止" Click="OnStop" />
                 <AutoSuggestBox x:Name="SearchBox" PlaceholderText="搜索名称或番号..."  HorizontalAlignment="Stretch" Width="200" Margin="12,0,0,0" TextChanged="OnSearchChanged" />
             </StackPanel>
 
@@ -48,7 +51,7 @@
             </ScrollViewer>
 
             <!-- Filters -->
-            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom" Margin="0,60,0,0">
+            <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                 <RadioButton Content="全部" IsChecked="True" Checked="OnFilterChecked" Tag="全部" />
                 <RadioButton Content="异常" Checked="OnFilterChecked" Tag="异常" />
                 <RadioButton Content="缺视频" Checked="OnFilterChecked" Tag="缺视频" />
@@ -58,7 +61,7 @@
             </StackPanel>
 
             <!-- Body -->
-            <Grid Grid.Row="3" Margin="0,12,0,0">
+            <Grid Grid.Row="4" Margin="0,12,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="300" />
@@ -70,7 +73,7 @@
             </Grid>
 
             <!-- Pending ops -->
-            <Border x:Name="PendingBar" Grid.Row="4" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="12" Margin="0,12,0,0" Visibility="Collapsed">
+            <Border x:Name="PendingBar" Grid.Row="5" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="12" Margin="0,12,0,0" Visibility="Collapsed">
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
@@ -86,7 +89,7 @@
                 </Grid>
             </Border>
 
-            <TextBlock x:Name="StatusText" Grid.Row="5" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" Margin="0,8,0,0" />
+            <TextBlock x:Name="StatusText" Grid.Row="6" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" Margin="0,8,0,0" />
         </Grid>
     </Grid>
 </Page>

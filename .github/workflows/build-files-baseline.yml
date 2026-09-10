@@ -1,9 +1,15 @@
-name: Build Files AV Resource Manager
+name: Build Files Baseline
 
 on:
   push:
-    branches: [main, feature/av-resource-manager, "codex/**"]
-    tags: ["v*"]
+    branches: [main]
+    tags: ["files-v*"]
+    paths:
+      - 'src/**'
+      - 'Directory.Build.targets'
+      - 'Install-App.ps1'
+      - '.github/installer/**'
+      - '.github/workflows/build-files-baseline.yml'
   workflow_dispatch:
 
 permissions:
@@ -44,6 +50,7 @@ jobs:
       - name: Build launcher
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           msbuild "$env:GITHUB_WORKSPACE\src\Files.App.Launcher\Files.App.Launcher.vcxproj" `
             -t:Build `
             -p:Configuration=Release `
@@ -53,7 +60,7 @@ jobs:
             throw 'Files.App.Launcher.exe was not produced.'
           }
 
-      - name: Publish unpackaged application
+      - name: Publish non-AV Files application
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -69,17 +76,15 @@ jobs:
             -p:WindowsPackageType=None `
             -p:WindowsAppSDKSelfContained=true `
             -p:FilesExternalLocationBuild=true `
-            -p:FilesAvManagerBuild=true `
+            -p:FilesAvManagerBuild=false `
             -p:GenerateAppxPackageOnBuild=false `
             "-p:PublishDir=$publishDir\" `
             -v:minimal
 
           if (-not (Test-Path -LiteralPath (Join-Path $publishDir 'Files.exe'))) {
-            throw 'Unpackaged Files.exe was not produced.'
+            throw 'Baseline Files.exe was not produced.'
           }
-
-          $runtimeFiles = @(Get-ChildItem -LiteralPath $publishDir -Filter 'Microsoft.WindowsAppRuntime*.dll' -File)
-          if ($runtimeFiles.Count -eq 0) {
+          if ((Get-ChildItem -LiteralPath $publishDir -Filter 'Microsoft.WindowsAppRuntime*.dll' -File).Count -eq 0) {
             throw 'Windows App SDK self-contained runtime was not copied to the publish output.'
           }
           if (-not (Test-Path -LiteralPath (Join-Path $publishDir 'Files.pri'))) {
@@ -118,9 +123,15 @@ jobs:
           $serverPayloadDir = Join-Path $publishDir 'Files.App.Server'
           New-Item -ItemType Directory -Path $serverPayloadDir -Force | Out-Null
           Copy-Item -Path (Join-Path $serverPublishDir '*') -Destination $serverPayloadDir -Recurse -Force
-          Write-Host "Self-contained runtime files: $($runtimeFiles.Name -join ', ')"
 
-      - name: Build external-location identity package and installer
+          # The baseline must not expose AV implementation files in its publish
+          # directory. The compile-time switch is the source of truth; this
+          # check catches an accidental reintroduction of a copied AV payload.
+          if (Get-ChildItem -LiteralPath $publishDir -Recurse -File | Where-Object { $_.Name -match 'AvManager|av-resource' }) {
+            throw 'The non-AV baseline publish output contains AV implementation files.'
+          }
+
+      - name: Build identity package and traditional installer
         shell: pwsh
         env:
           MSIX_PFX_BASE64: ${{ secrets.MSIX_PFX_BASE64 }}
@@ -131,7 +142,7 @@ jobs:
           $publishDir = Join-Path $workspace 'artifacts\publish'
           $identityDir = Join-Path $workspace 'artifacts\identity'
           $identityPackage = Join-Path $workspace 'artifacts\Files.Identity.msix'
-          $certificatePath = Join-Path $workspace 'artifacts\FilesAVManager.cer'
+          $certificatePath = Join-Path $workspace 'artifacts\Files.cer'
           $vcRedistPath = Join-Path $workspace 'artifacts\VC_redist.x64.exe'
           $pfxPath = Join-Path $workspace 'artifacts\sign.pfx'
 
@@ -149,7 +160,7 @@ jobs:
 
           New-Item -ItemType Directory -Path $identityDir -Force | Out-Null
           $identityManifestPath = Join-Path $identityDir 'AppxManifest.xml'
-          Copy-Item "$workspace\.github\installer\ExternalLocation.AppxManifest" $identityManifestPath -Force
+          Copy-Item "$workspace\.github\installer\ExternalLocation.Files.AppxManifest" $identityManifestPath -Force
           [xml]$identityManifest = Get-Content -LiteralPath $identityManifestPath
           $identityManifest.Package.Identity.Version = $appVersion
           $identityManifest.Save($identityManifestPath)
@@ -167,10 +178,7 @@ jobs:
             throw "Identity package creation failed with exit code $LASTEXITCODE."
           }
 
-          [IO.File]::WriteAllBytes(
-            $pfxPath,
-            [Convert]::FromBase64String($env:MSIX_PFX_BASE64)
-          )
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:MSIX_PFX_BASE64))
           $pfxPassword = ConvertTo-SecureString $env:MSIX_PFX_PASSWORD -AsPlainText -Force
           $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation 'Cert:\CurrentUser\My' -Password $pfxPassword
           if ($cert.Subject -ne 'CN=Files AV Manager') {
@@ -183,16 +191,13 @@ jobs:
             throw "Identity package signing failed with exit code $LASTEXITCODE."
           }
 
-          Invoke-WebRequest `
-            -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' `
-            -OutFile $vcRedistPath `
-            -UseBasicParsing
+          Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile $vcRedistPath -UseBasicParsing
           if (-not (Test-Path -LiteralPath $vcRedistPath) -or (Get-Item $vcRedistPath).Length -lt 1MB) {
             throw 'Microsoft Visual C++ Redistributable download failed.'
           }
 
-          $setupPath = Join-Path $workspace 'Files-AV-Manager-Setup.exe'
-          $nsis = Join-Path $workspace '.github\installer\Files-AV-Manager.nsi'
+          $setupPath = Join-Path $workspace 'Files-Setup.exe'
+          $nsis = Join-Path $workspace '.github\installer\Files-Baseline.nsi'
           $installScript = Join-Path $workspace 'Install-App.ps1'
           & 'C:\Program Files (x86)\NSIS\makensis.exe' `
             "/DAPP_VERSION=$appVersion" `
@@ -204,86 +209,36 @@ jobs:
             "/DOUTPUT_EXE=$setupPath" `
             $nsis
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $setupPath)) {
-            throw 'NSIS installer build failed.'
+            throw 'Files baseline NSIS installer build failed.'
           }
 
           & $signtool sign /f $pfxPath /p $env:MSIX_PFX_PASSWORD /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $setupPath
           if ($LASTEXITCODE -ne 0) {
             throw "Installer signing failed with exit code $LASTEXITCODE."
           }
-          $metadataPath = Join-Path $workspace 'Files-AV-Manager-Setup.version.json'
+          $metadataPath = Join-Path $workspace 'Files-Setup.version.json'
           $sha256 = (Get-FileHash -LiteralPath $setupPath -Algorithm SHA256).Hash
-          @{ version = $appVersion; product = 'Files AV Resource Manager'; installer = 'Files-AV-Manager-Setup.exe'; sha256 = $sha256 } |
+          @{ version = $appVersion; product = 'Files'; installer = 'Files-Setup.exe'; sha256 = $sha256 } |
             ConvertTo-Json | Set-Content -LiteralPath $metadataPath -Encoding UTF8
           Remove-Item -LiteralPath $pfxPath -Force
 
-          Get-ChildItem -LiteralPath $setupPath |
-            Select-Object Name, @{N = 'MB'; E = { [math]::Round($_.Length / 1MB, 1) }}
-
-      - name: Smoke test install, startup, and uninstall
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $setupPath = Join-Path $env:GITHUB_WORKSPACE 'Files-AV-Manager-Setup.exe'
-          $installDir = Join-Path $env:ProgramFiles 'Files AV Resource Manager'
-          $installedExe = Join-Path $installDir 'Files.exe'
-
-          $installerProcess = Start-Process -FilePath $setupPath -ArgumentList '/S' -Wait -PassThru
-          if ($installerProcess.ExitCode -ne 0) {
-            throw "Silent installer failed with exit code $($installerProcess.ExitCode)."
-          }
-          if (-not (Test-Path -LiteralPath $installedExe)) {
-            throw "Files.exe was not installed to '$installDir'."
-          }
-
-          $identity = Get-AppxPackage -Name 'FilesDev' -ErrorAction SilentlyContinue |
-            Where-Object { $_.Publisher -eq 'CN=Files AV Manager' -and $_.Status -eq 'Ok' } |
-            Select-Object -First 1
-          if (-not $identity) {
-            throw 'External-location identity was not registered.'
-          }
-
-          $appProcess = Start-Process -FilePath $installedExe -WorkingDirectory $installDir -PassThru
-          Start-Sleep -Seconds 5
-          if ($appProcess.HasExited) {
-            throw "Files exited during startup with code $($appProcess.ExitCode)."
-          }
-          Write-Host "Startup smoke test passed with process id $($appProcess.Id)."
-          Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
-
-          $uninstaller = Join-Path $installDir 'Uninstall.exe'
-          $uninstallerProcess = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
-          if ($uninstallerProcess.ExitCode -ne 0) {
-            throw "Silent uninstaller failed with exit code $($uninstallerProcess.ExitCode)."
-          }
-          $remainingIdentity = Get-AppxPackage -Name 'FilesDev' -ErrorAction SilentlyContinue |
-            Where-Object { $_.Publisher -eq 'CN=Files AV Manager' }
-          if ($remainingIdentity) {
-            throw 'External-location identity remained registered after uninstall.'
-          }
-
-      - name: Upload
+      - name: Upload baseline installer
         uses: actions/upload-artifact@v4
         with:
-          name: Files-AV-Manager
+          name: Files-Baseline
           path: |
-            Files-AV-Manager-Setup.exe
-            Files-AV-Manager-Setup.version.json
+            Files-Setup.exe
+            Files-Setup.version.json
 
-      - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Release baseline installer
+        if: startsWith(github.ref, 'refs/tags/files-v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            Files-AV-Manager-Setup.exe
-            Files-AV-Manager-Setup.version.json
+            Files-Setup.exe
+            Files-Setup.version.json
           draft: false
           body: |
-            ## Files AV Resource Manager
+            ## Files
 
-            Traditional installer for Windows 10/11. Files is installed as a normal desktop application under Program Files.
-
-            - Full Files App file manager
-            - AV resource code detection
-            - Health check / batch rename
-            - Subtitle classification / undo
+            Traditional Windows installer for the non-AV Files baseline.

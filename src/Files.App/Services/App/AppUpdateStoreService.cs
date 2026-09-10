@@ -3,12 +3,12 @@
 
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Controls;
+using Files.App.Helpers;
 using System.IO;
 using System.Net.Http;
 using System.Text;
 using Windows.Foundation.Metadata;
 using Windows.Services.Store;
-using Windows.Storage;
 using WinRT.Interop;
 
 namespace Files.App.Services
@@ -254,10 +254,11 @@ namespace Files.App.Services
 
 			try
 			{
-				var srcExeFile = await StorageFile.GetFileFromApplicationUriAsync(new Uri("ms-appx:///Assets/FilesOpenDialog/Files.App.Launcher.exe"));
-				var destFolder = await StorageFolder.GetFolderFromPathAsync(destFolderPath);
+				var srcExeFilePath = AppPathHelper.GetInstallPath("Assets", "FilesOpenDialog", "Files.App.Launcher.exe");
+				if (!File.Exists(srcExeFilePath))
+					return;
 
-				await srcExeFile.CopyAsync(destFolder, "Files.App.Launcher.exe", NameCollisionOption.ReplaceExisting);
+				File.Copy(srcExeFilePath, destExeFilePath, overwrite: true);
 
 				App.Logger.LogInformation("Files.App.Launcher updated.");
 			}

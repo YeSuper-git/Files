@@ -876,7 +876,9 @@ namespace Files.App.Views.Shells
 		public abstract void NavigateHome();
 
 		public abstract void NavigateToReleaseNotes();
+#if FILES_AV_MANAGER
 		public abstract void NavigateToAvManager();
+#endif
 
 		public abstract void NavigateToSettings(string? selectItem = null);
 

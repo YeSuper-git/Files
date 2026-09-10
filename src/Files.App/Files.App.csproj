@@ -2,6 +2,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
+        <!-- Keep the existing AV build as the default for the fork. The baseline
+             installer explicitly passes FilesAvManagerBuild=false. -->
+        <FilesAvManagerBuild Condition="'$(FilesAvManagerBuild)' == ''">true</FilesAvManagerBuild>
         <EnableMsixTooling>true</EnableMsixTooling>
         <PublishProfile>Properties\PublishProfiles\win-$(Platform).pubxml</PublishProfile>
         <TargetFramework>$(WindowsTargetFramework)</TargetFramework>
@@ -22,6 +25,7 @@
         <Nullable>Enable</Nullable>
         <NoWarn>$(NoWarn);CS8305</NoWarn>
         <ApplicationManifest>app.manifest</ApplicationManifest>
+        <ApplicationManifest Condition="'$(FilesExternalLocationBuild)' == 'true'">app.external.manifest</ApplicationManifest>
         <Platforms>x86;x64;arm64</Platforms>
         <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
         <UseWinUI>true</UseWinUI>
@@ -43,6 +47,14 @@
 
     <PropertyGroup>
         <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(FilesExternalLocationBuild)' == 'true'">
+        <DefineConstants>$(DefineConstants);FILES_EXTERNAL_LOCATION_BUILD</DefineConstants>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(FilesAvManagerBuild)' == 'true'">
+        <DefineConstants>$(DefineConstants);FILES_AV_MANAGER</DefineConstants>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(SENTRY_AUTH_TOKEN)' != ''">
@@ -71,7 +83,21 @@
     </ItemGroup>
   
     <ItemGroup>
-        <Manifest Include="app.manifest" />
+        <!-- The baseline Files build must not carry the AV manager feature code. -->
+        <Compile Remove="Data\Models\AvManager\**\*.cs" Condition="'$(FilesAvManagerBuild)' != 'true'" />
+        <Compile Remove="Services\AvManager\**\*.cs" Condition="'$(FilesAvManagerBuild)' != 'true'" />
+        <Compile Remove="ViewModels\AvManager\**\*.cs" Condition="'$(FilesAvManagerBuild)' != 'true'" />
+        <Compile Remove="Views\AvManager\**\*.xaml.cs" Condition="'$(FilesAvManagerBuild)' != 'true'" />
+        <Page Remove="Views\AvManager\**\*.xaml" Condition="'$(FilesAvManagerBuild)' != 'true'" />
+        <Manifest Include="$(ApplicationManifest)" />
+        <!-- External-location builds still resolve ms-appx resources from the
+             real install directory, so publish the complete asset tree. -->
+        <Content Include="Assets\**">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+        <Content Include="..\.github\NOTICE.md" Link="NOTICE.md">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
         <Content Update="Assets\Resources\**">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>

@@ -349,7 +349,7 @@ namespace Files.App
 
 				try
 				{
-					return p.MainModule?.FileName.StartsWith(Package.Current.EffectivePath, StringComparison.OrdinalIgnoreCase) ?? false;
+					return p.MainModule?.FileName.StartsWith(AppPathHelper.InstallDirectory, StringComparison.OrdinalIgnoreCase) ?? false;
 				}
 				catch
 				{

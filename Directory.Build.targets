@@ -1,0 +1,22 @@
+<!-- Copyright (c) Files Community. Licensed under the MIT License. -->
+<Project>
+  <!--
+    Windows App SDK currently generates the app PRI for unpackaged builds but
+    does not always add it to the dotnet publish item list. Without the PRI,
+    WinUI resource dictionaries can fail during startup. Keep this target
+    scoped to external-location/unpackaged builds; it can be removed after the
+    SDK's unpackaged publish path wires the file itself.
+  -->
+  <Target Name="FilesAddProjectPriToResolvedFileToPublish"
+          Condition="'$(WindowsPackageType)' == 'None'"
+          BeforeTargets="ComputeResolvedFilesToPublishList"
+          DependsOnTargets="$(GenerateProjectPriFile)">
+    <ItemGroup>
+      <ResolvedFileToPublish Include="$(ProjectPriFullPath)"
+                             Condition="'$(ProjectPriFullPath)' != '' and Exists('$(ProjectPriFullPath)')">
+        <RelativePath>$(ProjectPriFileName)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+</Project>

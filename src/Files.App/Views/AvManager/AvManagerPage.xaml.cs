@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using CommunityToolkit.Mvvm.DependencyInjection;
+using System.IO;
 using Microsoft.UI;
 using Microsoft.UI.Xaml.Shapes;
 using Files.App.Data.Models.AvManager;
@@ -18,13 +19,53 @@ public sealed partial class AvManagerPage : Page
     private readonly AvManagerViewModel _vm = Ioc.Default.GetRequiredService<AvManagerViewModel>();
     private readonly IAvOperationsService _ops = Ioc.Default.GetRequiredService<IAvOperationsService>();
     private readonly IAvScanner _scanner = Ioc.Default.GetRequiredService<IAvScanner>();
-    private readonly IAvCodeParser _parser = Ioc.Default.GetRequiredService<IAvCodeParser>();
 
     private List<AvResourceFolder> _allFolders = [];
     private List<AvFileOperation> _pendingOps = [];
     private string _filter = "全部";
+    private CancellationTokenSource? _operationCancellation;
 
-    public AvManagerPage() { InitializeComponent(); }
+    public AvManagerPage()
+    {
+        InitializeComponent();
+        Loaded += OnPageLoaded;
+        Unloaded += OnPageUnloaded;
+        UpdateUI();
+    }
+
+    private async void OnPageLoaded(object sender, RoutedEventArgs e)
+    {
+        Loaded -= OnPageLoaded;
+        UpdateUI();
+        if (string.IsNullOrWhiteSpace(_vm.LibraryPath))
+            return;
+        if (!Directory.Exists(_vm.LibraryPath))
+        {
+            SetStatus("上次资源库路径不可用，请重新选择文件夹");
+            return;
+        }
+
+        await RefreshAsync();
+    }
+
+    private void OnPageUnloaded(object sender, RoutedEventArgs e) => _operationCancellation?.Cancel();
+
+    private CancellationTokenSource BeginOperation()
+    {
+        _operationCancellation?.Cancel();
+        _operationCancellation?.Dispose();
+        _operationCancellation = new CancellationTokenSource();
+        return _operationCancellation;
+    }
+
+    private void EndOperation(CancellationTokenSource operation)
+    {
+        if (ReferenceEquals(_operationCancellation, operation))
+        {
+            _operationCancellation = null;
+            operation.Dispose();
+        }
+    }
 
     private void UpdateUI()
     {
@@ -77,7 +118,7 @@ public sealed partial class AvManagerPage : Page
         picker.FileTypeFilter.Add("*");
         var folder = await picker.PickSingleFolderAsync();
         if (folder is null) return;
-        _vm.LibraryPath = folder.Path;
+        _vm.SetLibraryPath(folder.Path);
         UpdateUI();
         await RefreshAsync();
     }
@@ -87,20 +128,24 @@ public sealed partial class AvManagerPage : Page
     private async Task RefreshAsync()
     {
         if (string.IsNullOrEmpty(_vm.LibraryPath)) return;
+        using var operation = BeginOperation();
+        var ct = operation.Token;
         ScanProgress.Visibility = Visibility.Visible; SetStatus("正在扫描...");
         try
         {
-            var result = await _scanner.AnalyzeLibraryAsync(_vm.LibraryPath, _vm.Settings);
+            var result = await _scanner.AnalyzeLibraryAsync(_vm.LibraryPath, _vm.Settings, ct);
             _allFolders = result.Folders; _vm.ScanResult = result;
             SummaryCards.Children.Clear();
             AddCard("资源总数", result.TotalFolders); AddCard("正常", result.NormalCount, Microsoft.UI.Colors.Green);
             AddCard("缺视频", result.MissingVideoCount, Microsoft.UI.Colors.Red); AddCard("缺海报", result.MissingPosterCount, Microsoft.UI.Colors.Orange);
+            AddCard("低质海报", result.LowQualityPosterCount, Microsoft.UI.Colors.Orange);
             AddCard("无中字", result.NoChineseSubCount); AddCard("重复番号", result.DuplicateCodeCount, Microsoft.UI.Colors.OrangeRed);
             AddCard("散落视频", result.LooseVideoCount);
             ApplyFilter(); SetStatus($"扫描完成：共 {result.TotalFolders} 个资源，{result.ProblemCount} 个异常");
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { SetStatus("已停止扫描"); }
         catch (Exception ex) { SetStatus($"扫描失败：{ex.Message}"); }
-        finally { ScanProgress.Visibility = Visibility.Collapsed; }
+        finally { ScanProgress.Visibility = Visibility.Collapsed; EndOperation(operation); }
     }
 
     private void AddCard(string label, int value, Windows.UI.Color? color = null)
@@ -144,16 +189,56 @@ public sealed partial class AvManagerPage : Page
 
     private void AddStatusCell(Grid g, int c, int r, string l, string v) { var s = new StackPanel(); s.Children.Add(new TextBlock { Text = l, FontSize = 12, Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"] }); s.Children.Add(new TextBlock { Text = v, FontSize = 15, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold }); Grid.SetColumn(s, c); Grid.SetRow(s, r); g.Children.Add(s); }
 
-    private async void OnPreviewRename(object s, RoutedEventArgs e) { if (string.IsNullOrEmpty(_vm.LibraryPath)) return; SetStatus("正在预览重命名..."); try { _pendingOps = await _ops.PreviewRenameVideosAsync(_vm.LibraryPath); ShowPending(); SetStatus($"预览完成：{_pendingOps.Count(o => o.Status == "ready")} 项就绪"); } catch (Exception ex) { SetStatus($"预览失败：{ex.Message}"); } }
-    private async void OnPreviewClassifySubs(object s, RoutedEventArgs e) { if (string.IsNullOrEmpty(_vm.LibraryPath)) return; SetStatus("正在预览字幕分类..."); try { _pendingOps = await _ops.PreviewClassifySubtitlesAsync(_vm.LibraryPath, _vm.Settings); ShowPending(); SetStatus($"预览完成：{_pendingOps.Count} 项待分类"); } catch (Exception ex) { SetStatus($"预览失败：{ex.Message}"); } }
+    private async void OnPreviewRename(object s, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_vm.LibraryPath)) return;
+        using var operation = BeginOperation();
+        var ct = operation.Token;
+        SetStatus("正在预览重命名...");
+        try
+        {
+            _pendingOps = await _ops.PreviewRenameVideosAsync(_vm.LibraryPath, _vm.Settings, ct);
+            ShowPending();
+            SetStatus($"预览完成：{_pendingOps.Count(o => o.Status == "ready")} 项就绪");
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { SetStatus("已停止预览"); }
+        catch (Exception ex) { SetStatus($"预览失败：{ex.Message}"); }
+        finally { EndOperation(operation); }
+    }
+
+    private async void OnPreviewClassifySubs(object s, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_vm.LibraryPath)) return;
+        using var operation = BeginOperation();
+        var ct = operation.Token;
+        SetStatus("正在预览字幕分类...");
+        try
+        {
+            _pendingOps = await _ops.PreviewClassifySubtitlesAsync(_vm.LibraryPath, _vm.Settings, ct);
+            ShowPending();
+            SetStatus($"预览完成：{_pendingOps.Count} 项待分类");
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { SetStatus("已停止预览"); }
+        catch (Exception ex) { SetStatus($"预览失败：{ex.Message}"); }
+        finally { EndOperation(operation); }
+    }
+
+    private void OnStop(object s, RoutedEventArgs e)
+    {
+        _operationCancellation?.Cancel();
+        _vm.CancelCurrentOperation();
+        SetStatus("正在停止当前任务...");
+    }
     private void ShowPending() { PendingBar.Visibility = _pendingOps.Count > 0 ? Visibility.Visible : Visibility.Collapsed; PendingCountText.Text = $"待执行：{_pendingOps.Count} 项操作"; }
     private async void OnExecutePending(object s, RoutedEventArgs e)
     {
         if (_pendingOps.Count == 0) return;
+        using var operation = BeginOperation();
+        var ct = operation.Token;
         SetStatus("正在执行...");
         try
         {
-            var results = await _ops.ExecuteOperationsAsync(_vm.LibraryPath, _pendingOps);
+            var results = await _ops.ExecuteOperationsAsync(_vm.LibraryPath, _pendingOps.ToList(), ct);
             var failed = results.Where(x => x.Status is "failed" or "conflict").ToList();
             var succeeded = results.Count(x => x.Status == "done");
             _pendingOps = failed;
@@ -163,11 +248,102 @@ public sealed partial class AvManagerPage : Page
                 : $"执行完成：{succeeded} 项成功，{failed.Count} 项失败或冲突，请检查后重试");
             await RefreshAsync();
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { SetStatus("已停止执行，未完成的项目仍保留在待处理列表"); }
         catch (Exception ex) { SetStatus($"执行失败：{ex.Message}"); }
+        finally { EndOperation(operation); }
     }
-    private void OnCancelPending(object s, RoutedEventArgs e) { _pendingOps.Clear(); PendingBar.Visibility = Visibility.Collapsed; SetStatus("已取消"); }
+    private void OnCancelPending(object s, RoutedEventArgs e)
+    {
+        _operationCancellation?.Cancel();
+        _pendingOps.Clear();
+        PendingBar.Visibility = Visibility.Collapsed;
+        SetStatus("已取消");
+    }
     private void OnResolveConflict(object s, RoutedEventArgs e) { if (s is Button b && b.Tag is string st) { _pendingOps = _ops.ApplyConflictStrategy(_pendingOps, st); ShowPending(); } }
-    private async void OnUndo(object s, RoutedEventArgs e) { if (string.IsNullOrEmpty(_vm.LibraryPath)) return; SetStatus("正在撤销..."); try { var r = await _ops.UndoLastOperationAsync(_vm.LibraryPath); SetStatus($"撤销完成：{r.Count(x => x.Status == "done")} 项已恢复"); await RefreshAsync(); } catch (Exception ex) { SetStatus($"撤销失败：{ex.Message}"); } }
+    private async void OnUndo(object s, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_vm.LibraryPath)) return;
+        using var operation = BeginOperation();
+        var ct = operation.Token;
+        SetStatus("正在撤销...");
+        try
+        {
+            var r = await _ops.UndoLastOperationAsync(_vm.LibraryPath, ct);
+            SetStatus($"撤销完成：{r.Count(x => x.Status == "done")} 项已恢复");
+            await RefreshAsync();
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { SetStatus("已停止撤销"); }
+        catch (Exception ex) { SetStatus($"撤销失败：{ex.Message}"); }
+        finally { EndOperation(operation); }
+    }
+
+    private async void OnSettings(object s, RoutedEventArgs e)
+    {
+        if (XamlRoot is null)
+            return;
+
+        var videoExtensions = new TextBox
+        {
+            Header = "视频扩展名（逗号分隔）",
+            Text = string.Join(", ", _vm.Settings.VideoExtensions),
+            PlaceholderText = "例如：mp4, mkv, avi"
+        };
+        var imageExtensions = new TextBox
+        {
+            Header = "海报扩展名（逗号分隔）",
+            Text = string.Join(", ", _vm.Settings.ImageExtensions),
+            PlaceholderText = "例如：jpg, png, webp"
+        };
+        var subtitleKeywords = new TextBox
+        {
+            Header = "中文字幕关键词（逗号分隔）",
+            Text = string.Join(", ", _vm.Settings.SubtitleKeywords),
+            PlaceholderText = "例如：中文字幕, chs, cht"
+        };
+        var posterQuality = new NumberBox
+        {
+            Header = "海报最低质量（KB）",
+            Value = _vm.Settings.PosterQualityKb,
+            Minimum = 1,
+            Maximum = 1024 * 1024,
+            SpinButtonPlacementMode = SpinButtonPlacementMode.Inline
+        };
+        var content = new StackPanel { Spacing = 12, Width = 440 };
+        content.Children.Add(videoExtensions);
+        content.Children.Add(imageExtensions);
+        content.Children.Add(subtitleKeywords);
+        content.Children.Add(posterQuality);
+
+        var dialog = new ContentDialog
+        {
+            Title = "AV 资源规则",
+            Content = new ScrollViewer { MaxHeight = 520, Content = content },
+            PrimaryButtonText = "保存",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = XamlRoot
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+            return;
+
+        var settings = new AvSettings
+        {
+            VideoExtensions = ParseList(videoExtensions.Text),
+            ImageExtensions = ParseList(imageExtensions.Text),
+            SubtitleKeywords = ParseList(subtitleKeywords.Text),
+            PosterQualityKb = double.IsNaN(posterQuality.Value) ? _vm.Settings.PosterQualityKb : (int)Math.Round(posterQuality.Value)
+        };
+        _vm.SaveSettings(settings);
+        SetStatus("AV 资源规则已保存");
+        if (!string.IsNullOrEmpty(_vm.LibraryPath))
+            await RefreshAsync();
+    }
+
+    private static List<string> ParseList(string text) => text
+        .Split([',', ';', '，', '；', '\r', '\n', ' '], StringSplitOptions.RemoveEmptyEntries)
+        .Select(x => x.Trim())
+        .Where(x => x.Length > 0)
+        .ToList();
     private async void OnHistory(object s, RoutedEventArgs e)
     {
         if (string.IsNullOrEmpty(_vm.LibraryPath)) return;

@@ -87,7 +87,7 @@ namespace Files.App.Helpers
 		/// Gets application icon path.
 		/// </summary>
 		public static string AppIconPath { get; } =
-			SystemIO.Path.Combine(Package.Current.InstalledLocation.Path, AppEnvironment switch
+			SystemIO.Path.Combine(AppPathHelper.InstallDirectory, AppEnvironment switch
 			{
 				AppEnvironment.Dev => Constants.AssetPaths.DevLogo,
 				AppEnvironment.SideloadPreview or AppEnvironment.StorePreview => Constants.AssetPaths.PreviewLogo,
@@ -330,11 +330,14 @@ namespace Files.App.Helpers
 					.AddSingleton<ITagsContext, TagsContext>()
 					.AddSingleton<ISidebarContext, SidebarContext>()
 					.AddSingleton<IShelfContext, ShelfContext>()
+#if FILES_AV_MANAGER
 					// AV Resource Manager
+					.AddSingleton<Files.App.Services.AvManager.IAvWorkspaceService, Files.App.Services.AvManager.AvWorkspaceService>()
 					.AddSingleton<Files.App.Services.AvManager.IAvCodeParser, Files.App.Services.AvManager.AvCodeParser>()
 					.AddSingleton<Files.App.Services.AvManager.IAvScanner, Files.App.Services.AvManager.AvScanner>()
 					.AddSingleton<Files.App.Services.AvManager.IAvOperationsService, Files.App.Services.AvManager.AvOperationsService>()
 					.AddTransient<Files.App.ViewModels.AvManager.AvManagerViewModel>()
+#endif
 					// Services
 					.AddSingleton<IWindowsRecentItemsService, WindowsRecentItemsService>()
 					.AddSingleton<IWindowsIniService, WindowsIniService>()
@@ -393,13 +396,18 @@ namespace Files.App.Helpers
 					.AddSingleton<LibraryManager>()
 					.AddSingleton(appModel);
 
-			// Conditional DI
+			// External-location builds are updated by their traditional installer.
+#if FILES_EXTERNAL_LOCATION_BUILD
+			services.AddSingleton<IUpdateService, InstallerUpdateService>();
+#else
+			// Conditional DI for the original packaged distributions
 			if (AppEnvironment is AppEnvironment.SideloadPreview or AppEnvironment.SideloadStable)
 				services.AddSingleton<IUpdateService, SideloadUpdateService>();
 			else if (AppEnvironment is AppEnvironment.StorePreview or AppEnvironment.StoreStable)
 				services.AddSingleton<IUpdateService, StoreUpdateService>();
 			else
 				services.AddSingleton<IUpdateService, DummyUpdateService>();
+#endif
 
 			return services.BuildServiceProvider();
 		}

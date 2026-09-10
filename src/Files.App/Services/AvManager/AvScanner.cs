@@ -22,26 +22,36 @@ public sealed class AvScanner : IAvScanner
     {
         return await Task.Run(() =>
         {
+            var effectiveSettings = settings.Clone();
+            effectiveSettings.Normalize();
             var rootDir = new DirectoryInfo(root);
             var folders = new List<AvResourceFolder>();
+
+            if (!rootDir.Exists)
+            {
+                return new AvScanResult { Root = root };
+            }
 
             try
             {
                 foreach (var entry in rootDir.GetDirectories())
                 {
                     ct.ThrowIfCancellationRequested();
+                    if (ShouldSkipDirectory(entry))
+                        continue;
                     if (entry.Name.StartsWith('_'))
-                        CollectWorkFolders(entry, folders, settings, ct);
+                        CollectWorkFolders(entry, folders, effectiveSettings, ct);
                     else if (_codeParser.ParseCode(entry.Name) is not null)
-                        folders.Add(AnalyzeWorkFolder(entry, settings, ct));
+                        folders.Add(AnalyzeWorkFolder(entry, effectiveSettings, ct));
                     else
-                        CollectWorkFolders(entry, folders, settings, ct);
+                        CollectWorkFolders(entry, folders, effectiveSettings, ct);
                 }
             }
+            catch (OperationCanceledException) { throw; }
             catch (Exception ex) { _logger.LogError(ex, "Error analyzing library"); }
 
             MarkDuplicateCodes(folders);
-            var looseVideoCount = CountLooseVideos(rootDir, settings);
+            var looseVideoCount = CountLooseVideos(rootDir, effectiveSettings, ct);
 
             return new AvScanResult
             {
@@ -67,9 +77,12 @@ public sealed class AvScanner : IAvScanner
             foreach (var dir in parent.GetDirectories())
             {
                 ct.ThrowIfCancellationRequested();
+                if (ShouldSkipDirectory(dir))
+                    continue;
                 out_.Add(AnalyzeWorkFolder(dir, settings, ct));
             }
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex) { _logger.LogWarning(ex, "Error collecting folders from {Path}", parent.FullName); }
     }
 
@@ -107,7 +120,7 @@ public sealed class AvScanner : IAvScanner
                 ct.ThrowIfCancellationRequested();
                 if (entry is DirectoryInfo sub)
                 {
-                    if (sub.Name.StartsWith('.') || sub.Name == "@eaDir") continue;
+                    if (ShouldSkipDirectory(sub)) continue;
                     ScanFolderFast(sub, depth + 1, s, ref vc, ref pc, ref lq, ref hasSub, ct);
                 }
                 else if (entry is FileInfo f)
@@ -118,13 +131,41 @@ public sealed class AvScanner : IAvScanner
                 }
             }
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex) { _logger.LogWarning(ex, "Error scanning {Path}", dir.FullName); }
     }
 
-    private int CountLooseVideos(DirectoryInfo root, AvSettings s)
+    private int CountLooseVideos(DirectoryInfo root, AvSettings s, CancellationToken ct)
     {
-        try { return root.GetFiles().Count(f => s.VideoExtensions.Contains(f.Extension.TrimStart('.').ToLowerInvariant())); }
+        try
+        {
+            var extensions = s.VideoExtensions.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var count = 0;
+            foreach (var file in root.GetFiles())
+            {
+                ct.ThrowIfCancellationRequested();
+                if (extensions.Contains(file.Extension.TrimStart('.')))
+                    count++;
+            }
+            return count;
+        }
+        catch (OperationCanceledException) { throw; }
         catch { return 0; }
+    }
+
+    private static bool ShouldSkipDirectory(DirectoryInfo directory)
+    {
+        if (directory.Name.StartsWith('.') || directory.Name.Equals("@eaDir", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        try
+        {
+            return directory.Attributes.HasFlag(FileAttributes.ReparsePoint);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void MarkDuplicateCodes(List<AvResourceFolder> folders)

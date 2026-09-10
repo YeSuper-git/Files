@@ -58,7 +58,7 @@ namespace Files.App.ViewModels.Settings
 			var destFolder = Path.Combine(ApplicationData.Current.LocalFolder.Path, "FilesOpenDialog");
 			Directory.CreateDirectory(destFolder);
 
-			foreach (var file in Directory.GetFiles(Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "FilesOpenDialog")))
+			foreach (var file in Directory.GetFiles(AppPathHelper.GetInstallPath("Assets", "FilesOpenDialog")))
 			{
 				if (!SafetyExtensions.IgnoreExceptions(() => File.Copy(file, Path.Combine(destFolder, Path.GetFileName(file)), true), App.Logger))
 				{
@@ -121,7 +121,7 @@ namespace Files.App.ViewModels.Settings
 
 			var destFolder = Path.Combine(ApplicationData.Current.LocalFolder.Path, "FilesOpenDialog");
 			Directory.CreateDirectory(destFolder);
-			foreach (var file in Directory.GetFiles(Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "FilesOpenDialog")))
+			foreach (var file in Directory.GetFiles(AppPathHelper.GetInstallPath("Assets", "FilesOpenDialog")))
 			{
 				if (!SafetyExtensions.IgnoreExceptions(() => File.Copy(file, Path.Combine(destFolder, Path.GetFileName(file)), true), App.Logger))
 				{

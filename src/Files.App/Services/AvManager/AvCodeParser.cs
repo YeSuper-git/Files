@@ -30,6 +30,6 @@ public sealed partial class AvCodeParser : IAvCodeParser
     {
         if (string.IsNullOrWhiteSpace(name)) return false;
         var lower = name.ToLowerInvariant();
-        return keywords.Any(k => lower.Contains(k.ToLowerInvariant()));
+        return (keywords ?? []).Any(k => !string.IsNullOrWhiteSpace(k) && lower.Contains(k, StringComparison.OrdinalIgnoreCase));
     }
 }

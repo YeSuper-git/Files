@@ -122,10 +122,12 @@ namespace Files.App.Views.Shells
 			{
 				NavigateToReleaseNotes();
 			}
+#if FILES_AV_MANAGER
 			else if (navParams.NavPath == "AvManager")
 			{
 				NavigateToAvManager();
 			}
+#endif
 			else if (navParams.NavPath == "Settings")
 			{
 				NavigateToSettings(navParams.SelectItem);
@@ -306,6 +308,7 @@ namespace Files.App.Views.Shells
 				new SuppressNavigationTransitionInfo());
 		}
 
+#if FILES_AV_MANAGER
 		public override void NavigateToAvManager()
 		{
 			ItemDisplayFrame.Navigate(
@@ -317,6 +320,7 @@ namespace Files.App.Views.Shells
 				},
 				new SuppressNavigationTransitionInfo());
 		}
+#endif
 
 		public override void NavigateToSettings(string? selectItem = null)
 		{

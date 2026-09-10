@@ -41,8 +41,10 @@ namespace Files.App.Data.Contracts
 		CloudDrives,
 		Network,
 		WSL,
-		FileTag,
-		AvManager
+		FileTag
+#if FILES_AV_MANAGER
+		, AvManager
+#endif
 	}
 
 	public sealed class ContextMenuOptions

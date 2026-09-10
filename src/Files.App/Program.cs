@@ -92,7 +92,7 @@ namespace Files.App
 				try
 				{
 					return p.MainModule?.FileName
-						.StartsWith(Windows.ApplicationModel.Package.Current.EffectivePath, StringComparison.OrdinalIgnoreCase) ?? false;
+						.StartsWith(AppPathHelper.InstallDirectory, StringComparison.OrdinalIgnoreCase) ?? false;
 				}
 				catch
 				{

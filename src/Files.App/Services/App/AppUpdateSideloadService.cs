@@ -6,9 +6,9 @@ using System.IO;
 using System.Net.Http;
 using System.Text;
 using System.Xml.Linq;
+using Files.App.Helpers;
 using Windows.ApplicationModel;
 using Windows.Management.Deployment;
-using Windows.Storage;
 using Windows.Win32;
 using Windows.Win32.System.Recovery;
 
@@ -16,6 +16,15 @@ namespace Files.App.Services
 {
 	public sealed partial class SideloadUpdateService : ObservableObject, IUpdateService, IDisposable
 	{
+		// External-location builds are updated by the traditional installer. The
+		// MSIX AppInstaller flow cannot replace binaries installed outside the
+		// identity package, so never start it from this deployment.
+#if FILES_EXTERNAL_LOCATION_BUILD
+		private const bool PackageUpdatesSupported = false;
+#else
+		private const bool PackageUpdatesSupported = true;
+#endif
+
 		private const string SIDELOAD_STABLE = "https://cdn.files.community/files/stable/Files.Package.appinstaller";
 		private const string SIDELOAD_PREVIEW = "https://cdn.files.community/files/preview/Files.Package.appinstaller";
 
@@ -82,6 +91,9 @@ namespace Files.App.Services
 
 		public async Task CheckForUpdatesAsync()
 		{
+			if (!PackageUpdatesSupported)
+				return;
+
 			IsUpdateAvailable = false;
 			try
 			{
@@ -163,10 +175,11 @@ namespace Files.App.Services
 					catch { }
 				}
 
-				var srcExeFile = await StorageFile.GetFileFromApplicationUriAsync(new Uri("ms-appx:///Assets/FilesOpenDialog/Files.App.Launcher.exe"));
-				var destFolder = await StorageFolder.GetFolderFromPathAsync(destFolderPath);
+				var srcExeFilePath = AppPathHelper.GetInstallPath("Assets", "FilesOpenDialog", "Files.App.Launcher.exe");
+				if (!File.Exists(srcExeFilePath))
+					return;
 
-				await srcExeFile.CopyAsync(destFolder, "Files.App.Launcher.exe", NameCollisionOption.ReplaceExisting);
+				File.Copy(srcExeFilePath, destExeFilePath, overwrite: true);
 
 				App.Logger.LogInformation("Files.App.Launcher updated.");
 			}
