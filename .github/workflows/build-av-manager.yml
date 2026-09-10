@@ -96,63 +96,44 @@ jobs:
             throw "Application MSIX package not found for the installer"
           }
 
-          # The packaged app is framework-dependent on Windows App Runtime.
-          # The SDK restore contains the signed x64 runtime MSIX files, so ship
-          # all of them in the installer instead of relying on a preinstalled
-          # runtime on the target machine.
-          $nugetRoot = if ([string]::IsNullOrWhiteSpace($env:NUGET_PACKAGES)) {
-            Join-Path $env:USERPROFILE ".nuget\packages"
-          } else {
-            $env:NUGET_PACKAGES
+          # Use Microsoft's official runtime installer. On x64 Windows it
+          # installs the complete runtime set, including the x86 Framework and
+          # DDLM packages required by the Windows App SDK deployment model.
+          $runtimeInstallerUrl = "https://aka.ms/windowsappsdk/2.4/2.4.0/windowsappruntimeinstall-x64.exe"
+          $runtimeInstallerPath = Join-Path $instDir "WindowsAppRuntimeInstall-x64.exe"
+          Invoke-WebRequest -Uri $runtimeInstallerUrl -OutFile $runtimeInstallerPath -UseBasicParsing
+          if (-not (Test-Path -LiteralPath $runtimeInstallerPath)) {
+            throw "Windows App Runtime installer download failed"
           }
-          $runtimePackageDir = Join-Path $nugetRoot "microsoft.windowsappsdk.runtime\2.4.0\tools\MSIX\win10-x64"
-          $runtimePackages = @(Get-ChildItem -LiteralPath $runtimePackageDir -Filter "Microsoft.WindowsAppRuntime*.msix" -File)
-          if ($runtimePackages.Count -lt 4) {
-            throw "Windows App Runtime x64 packages were not found in $runtimePackageDir"
-          }
-          $runtimePackages | ForEach-Object { Copy-Item $_.FullName $instDir }
 
           Copy-Item $appMsix.FullName $instDir
 
           $appName = $appMsix.Name
-          $runtimeFileDirectives = ($runtimePackages | ForEach-Object {
-            "    File `"$instDir\$($_.Name)`""
-          }) -join [Environment]::NewLine
+          $runtimeFileDirective = "    File `"$runtimeInstallerPath`""
 
           # Use a script file so paths with spaces never pass through nested
           # NSIS/PowerShell command-line quoting.
           $installScript = @'
           $ErrorActionPreference = 'Stop'
+          $logPath = Join-Path $env:TEMP 'Files-AV-Manager-install.log'
 
           try {
-              $runtimePackages = @(Get-ChildItem -LiteralPath $PSScriptRoot -Filter 'Microsoft.WindowsAppRuntime*.msix' -File)
-              $runtimeFramework = $runtimePackages |
-                  Where-Object { $_.Name -eq 'Microsoft.WindowsAppRuntime.2.msix' } |
-                  Select-Object -First 1
+              $runtimeInstaller = Join-Path $PSScriptRoot 'WindowsAppRuntimeInstall-x64.exe'
               $app = Get-ChildItem -LiteralPath $PSScriptRoot -Filter 'Files.App_*.msix' -File |
                   Select-Object -First 1
 
-              if (-not $runtimeFramework) {
-                  throw 'Windows App Runtime framework package was not found.'
+              if (-not (Test-Path -LiteralPath $runtimeInstaller)) {
+                  throw 'Windows App Runtime installer was not found.'
               }
 
               if (-not $app) {
                   throw 'Application MSIX package was not found.'
               }
 
-              $requiredRuntimeVersion = [version]'2.4.0.0'
-              $installedRuntime = Get-AppxPackage -Name 'Microsoft.WindowsAppRuntime.2' -ErrorAction SilentlyContinue |
-                  Where-Object { [version]$_.Version -ge $requiredRuntimeVersion } |
-                  Select-Object -First 1
-
-              if (-not $installedRuntime) {
-                  $runtimeDependencies = @($runtimePackages |
-                      Where-Object { $_.FullName -ne $runtimeFramework.FullName } |
-                      Select-Object -ExpandProperty FullName)
-                  Write-Host "Installing Windows App Runtime 2.4.0"
-                  Add-AppxPackage -Path $runtimeFramework.FullName -DependencyPath $runtimeDependencies
-              } else {
-                  Write-Host "Windows App Runtime 2.4.0 or newer is already installed"
+              Write-Host 'Installing Windows App Runtime 2.4.0'
+              $runtimeProcess = Start-Process -FilePath $runtimeInstaller -ArgumentList '--quiet' -Wait -PassThru -WindowStyle Hidden
+              if ($runtimeProcess.ExitCode -ne 0) {
+                  throw "Windows App Runtime installer failed with exit code 0x$('{0:X8}' -f $runtimeProcess.ExitCode)"
               }
 
               Write-Host "Installing Files AV Manager: $($app.Name)"
@@ -160,7 +141,9 @@ jobs:
               exit 0
           }
           catch {
-              Write-Error $_
+              $details = $_ | Out-String
+              Set-Content -Path $logPath -Value $details -Encoding UTF8
+              Write-Error "$_ Details saved to $logPath"
               exit 1
           }
           '@
@@ -180,7 +163,7 @@ jobs:
             SetOutPath "`$INSTDIR"
             File "$instDir\FilesAVManager.cer"
             File "$instDir\Install-App.ps1"
-          $runtimeFileDirectives
+          $runtimeFileDirective
             File "$instDir\$appName"
 
             # Trust certificate
