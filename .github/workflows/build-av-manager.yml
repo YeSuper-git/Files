@@ -108,9 +108,25 @@ jobs:
           )
           foreach ($vclib in $vclibPackages) {
             $vclibPath = Join-Path $instDir $vclib.Name
-            Invoke-WebRequest -Uri $vclib.Url -OutFile $vclibPath -UseBasicParsing
-            if (-not (Test-Path -LiteralPath $vclibPath)) {
+            $curlArgs = @(
+              '--fail',
+              '--location',
+              '--retry', '5',
+              '--retry-delay', '3',
+              '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36',
+              '--output', $vclibPath,
+              $vclib.Url
+            )
+            & curl.exe @curlArgs
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $vclibPath)) {
               throw "VCLibs dependency download failed: $($vclib.Name)"
+            }
+
+            # Cloudflare may return a challenge page with HTTP 200. An AppX is
+            # a ZIP package and must start with the PK signature.
+            $header = [System.IO.File]::ReadAllBytes($vclibPath)
+            if ($header.Length -lt 2 -or $header[0] -ne 0x50 -or $header[1] -ne 0x4B) {
+              throw "VCLibs dependency is not a valid AppX package: $($vclib.Name)"
             }
           }
 
@@ -154,8 +170,8 @@ jobs:
               }
 
               $vclibPackages = @(
-                  @{ Name = 'Microsoft.VCLibs.140.00.UWPDesktop'; File = (Join-Path $PSScriptRoot 'Microsoft.VCLibs.x64.14.00.Desktop.appx') },
-                  @{ Name = 'Microsoft.VCLibs.140.00'; File = (Join-Path $PSScriptRoot 'Microsoft.VCLibs.x64.14.00.appx') }
+                  @{ Name = 'Microsoft.VCLibs.140.00.UWPDesktop'; MinimumVersion = [version]'14.0.30035.0'; File = (Join-Path $PSScriptRoot 'Microsoft.VCLibs.x64.14.00.Desktop.appx') },
+                  @{ Name = 'Microsoft.VCLibs.140.00'; MinimumVersion = [version]'14.0.30035.0'; File = (Join-Path $PSScriptRoot 'Microsoft.VCLibs.x64.14.00.appx') }
               )
 
               foreach ($vclib in $vclibPackages) {
@@ -166,13 +182,13 @@ jobs:
                   $installedVclib = Get-AppxPackage -Name $vclib.Name -ErrorAction SilentlyContinue |
                       Where-Object { $_.Architecture -eq 'X64' } |
                       Select-Object -First 1
-                  if ($installedVclib) {
+                  if ($installedVclib -and [version]$installedVclib.Version -ge $vclib.MinimumVersion) {
                       Write-InstallLog "VCLibs already installed: $($vclib.Name) $($installedVclib.Version)"
                       continue
                   }
 
                   Write-InstallLog "Installing VCLibs: $($vclib.Name)"
-                  Add-AppxPackage -Path $vclib.File -ErrorAction Stop
+                  Add-AppxPackage -Path $vclib.File -ForceUpdateFromAnyVersion -ErrorAction Stop
               }
 
               Write-InstallLog 'Installing Windows App Runtime 2.4.0'
