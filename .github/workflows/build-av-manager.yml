@@ -156,10 +156,12 @@ jobs:
           InstallDir "`$TEMP\FAVInstall"
           RequestExecutionLevel admin
           Unicode True
+          ShowInstDetails nevershow
 
           Page instfiles
 
           Section "Install"
+            SetDetailsPrint none
             SetOutPath "`$INSTDIR"
             File "$instDir\FilesAVManager.cer"
             File "$instDir\Install-App.ps1"
@@ -177,8 +179,8 @@ jobs:
             WriteRegDWORD HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Appx" "AllowAllTrustedApps" 1
 
             # Install the runtime dependency, when present, and the app.
-            DetailPrint "Installing Files AV Manager..."
-            ExecWait '"`$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "`$INSTDIR\Install-App.ps1"' `$0
+            nsExec::ExecToLog '"`$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "`$INSTDIR\Install-App.ps1"'
+            Pop `$0
             StrCmp `$0 "0" app_install_ok
             DetailPrint "Files AV Manager installation failed with exit code `$0."
             Abort "Files AV Manager installation failed."
