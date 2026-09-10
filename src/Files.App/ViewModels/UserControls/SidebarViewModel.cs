@@ -390,6 +390,10 @@ namespace Files.App.ViewModels.UserControls
 					SectionType.WSL => WSLDistroManager.Distros,
 					SectionType.Library => App.LibraryManager.Libraries,
 					SectionType.FileTag => App.FileTagsManager.FileTags,
+#if FILES_AV_MANAGER
+					// AV Manager is a standalone navigation item, not a collection-backed section.
+					SectionType.AvManager => Array.Empty<INavigationControlItem>(),
+#endif
 					_ => throw new ArgumentOutOfRangeException(nameof(sectionType), sectionType, "The sidebar section type is not supported.")
 				};
 				await SyncSidebarItemsAsync(section, getElements, e);
