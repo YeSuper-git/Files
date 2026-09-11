@@ -28,5 +28,12 @@ namespace Files.App.Data.EventArguments
 		public bool IsLayoutSwitch { get; set; } = false;
 
 		public IEnumerable<string>? SelectItems { get; set; }
+
+		/// <summary>
+		/// Keeps a native layout page inside the AV manager's configured library.
+		/// </summary>
+		public bool IsAvManagerMode { get; set; } = false;
+
+		public string? AvLibraryPath { get; set; }
 	}
 }

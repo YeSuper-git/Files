@@ -77,6 +77,8 @@ namespace Files.App.Views.Shells
 					SearchQuery = ColumnParams.SearchQuery,
 					NavPathParam = ColumnParams.NavPathParam,
 					SearchPathParam = ColumnParams.SearchPathParam,
+					IsAvManagerMode = ColumnParams.IsAvManagerMode,
+					AvLibraryPath = ColumnParams.AvLibraryPath,
 					AssociatedTabInstance = this,
 					SelectItems = ColumnParams.SelectItems
 				});
@@ -233,6 +235,11 @@ namespace Files.App.Views.Shells
 		public override void NavigateToAvManager()
 		{
 			this.FindAscendant<ColumnsLayoutPage>()?.ParentShellPageInstance?.NavigateToAvManager();
+		}
+
+		public override void NavigateToAvManagerTools()
+		{
+			this.FindAscendant<ColumnsLayoutPage>()?.ParentShellPageInstance?.NavigateToAvManagerTools();
 		}
 #endif
 

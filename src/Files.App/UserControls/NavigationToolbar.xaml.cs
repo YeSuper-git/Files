@@ -76,6 +76,13 @@ namespace Files.App.UserControls
 				args.Handled = true;
 		}
 
+		private void AvManagerButton_Click(object sender, RoutedEventArgs e)
+		{
+#if FILES_AV_MANAGER
+			ContentPageContext.ShellPage?.NavigateToAvManagerTools();
+#endif
+		}
+
 		private async void BackHistoryFlyout_Opening(object? sender, object e)
 		{
 			var shellPage = Ioc.Default.GetRequiredService<IContentPageContext>().ShellPage;

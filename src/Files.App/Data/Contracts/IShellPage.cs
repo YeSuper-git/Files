@@ -72,6 +72,7 @@ namespace Files.App.Data.Contracts
 		public void NavigateToReleaseNotes();
 #if FILES_AV_MANAGER
 		public void NavigateToAvManager();
+		public void NavigateToAvManagerTools();
 #endif
 
 		/// <summary>

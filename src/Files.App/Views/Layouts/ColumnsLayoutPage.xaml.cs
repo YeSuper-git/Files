@@ -77,7 +77,9 @@ namespace Files.App.Views.Layouts
 				frame.Navigate(typeof(ColumnShellPage), new ColumnParam
 				{
 					Column = ColumnHost.ActiveBlades.IndexOf(newblade),
-					NavPathParam = column.NavPathParam
+					NavPathParam = column.NavPathParam,
+					IsAvManagerMode = column.IsAvManagerMode,
+					AvLibraryPath = column.AvLibraryPath
 				});
 				var args = navigationArguments
 					?? throw new InvalidOperationException("The column navigation arguments are not available.");
@@ -147,6 +149,8 @@ namespace Files.App.Views.Layouts
 				IsSearchResultPage = args.IsSearchResultPage,
 				SearchQuery = args.SearchQuery,
 				SearchPathParam = args.SearchPathParam,
+				IsAvManagerMode = args.IsAvManagerMode,
+				AvLibraryPath = args.AvLibraryPath,
 				NavPathParam = path,
 				SelectItems = path == args.NavPathParam ? args.SelectItems : null
 			});
@@ -160,6 +164,8 @@ namespace Files.App.Views.Layouts
 					{
 						Column = ++index,
 						NavPathParam = path,
+						IsAvManagerMode = args.IsAvManagerMode,
+						AvLibraryPath = args.AvLibraryPath,
 						SelectItems = path == args.NavPathParam ? args.SelectItems : null
 					});
 			}
@@ -473,7 +479,9 @@ namespace Files.App.Views.Layouts
 					var columnParam = new ColumnParam
 					{
 						Column = ColumnHost.ActiveBlades.IndexOf(newblade),
-						NavPathParam = destComponents[ii].Path
+						NavPathParam = destComponents[ii].Path,
+						IsAvManagerMode = navArgs?.IsAvManagerMode ?? navigationArguments?.IsAvManagerMode ?? false,
+						AvLibraryPath = navArgs?.AvLibraryPath ?? navigationArguments?.AvLibraryPath
 					};
 
 					if (navArgs is not null)

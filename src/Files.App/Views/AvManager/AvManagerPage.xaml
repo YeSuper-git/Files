@@ -12,9 +12,10 @@
         <!-- Welcome -->
         <StackPanel x:Name="WelcomePanel" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
             <FontIcon Glyph="&#xE8B7;" FontSize="48" HorizontalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
-            <TextBlock Text="AV 资源管理工作台" Style="{StaticResource SubtitleTextBlockStyle}" HorizontalAlignment="Center" />
-            <TextBlock Text="选择一个本地文件夹作为资源库" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
-            <Button Content="打开资源库" Style="{StaticResource AccentButtonStyle}" Click="OnChooseLibrary" HorizontalAlignment="Center" Margin="0,8,0,0" />
+            <TextBlock Text="AV 资源库" Style="{StaticResource SubtitleTextBlockStyle}" HorizontalAlignment="Center" />
+            <TextBlock Text="选择一个本地文件夹作为资源库。配置后将进入 Files 原生文件浏览页，AV 功能只作用于该路径及其子目录。" TextWrapping="Wrap" MaxWidth="520" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" TextAlignment="Center" />
+            <TextBlock x:Name="LibraryPathText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" TextWrapping="Wrap" MaxWidth="520" />
+            <Button Content="选择资源库路径" Style="{StaticResource AccentButtonStyle}" Click="OnChooseLibrary" HorizontalAlignment="Center" Margin="0,8,0,0" />
         </StackPanel>
 
         <!-- Main -->
@@ -31,6 +32,7 @@
 
             <!-- Toolbar -->
             <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="4" Margin="0,0,0,12">
+                <Button Content="原生浏览" Click="OnOpenNativeBrowser" />
                 <Button Content="刷新" Click="OnRefresh" />
                 <Button Content="切换" Click="OnChooseLibrary" />
                 <Button Content="预览重命名" Click="OnPreviewRename" />

@@ -19,6 +19,7 @@ public sealed partial class AvManagerPage : Page
     private readonly AvManagerViewModel _vm = Ioc.Default.GetRequiredService<AvManagerViewModel>();
     private readonly IAvOperationsService _ops = Ioc.Default.GetRequiredService<IAvOperationsService>();
     private readonly IAvScanner _scanner = Ioc.Default.GetRequiredService<IAvScanner>();
+    private readonly IContentPageContext _contentPageContext = Ioc.Default.GetRequiredService<IContentPageContext>();
 
     private List<AvResourceFolder> _allFolders = [];
     private List<AvFileOperation> _pendingOps = [];
@@ -69,9 +70,14 @@ public sealed partial class AvManagerPage : Page
 
     private void UpdateUI()
     {
-        var has = !string.IsNullOrEmpty(_vm.LibraryPath);
+        var has = !string.IsNullOrEmpty(_vm.LibraryPath) && Directory.Exists(_vm.LibraryPath);
         WelcomePanel.Visibility = has ? Visibility.Collapsed : Visibility.Visible;
         MainPanel.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
+        LibraryPathText.Text = string.IsNullOrWhiteSpace(_vm.LibraryPath)
+            ? "尚未配置资源库路径"
+            : Directory.Exists(_vm.LibraryPath)
+                ? _vm.LibraryPath
+                : $"路径不可用：{_vm.LibraryPath}";
     }
 
     private void SetStatus(string msg) => StatusText.Text = msg;
@@ -119,9 +125,11 @@ public sealed partial class AvManagerPage : Page
         var folder = await picker.PickSingleFolderAsync();
         if (folder is null) return;
         _vm.SetLibraryPath(folder.Path);
-        UpdateUI();
-        await RefreshAsync();
+        _contentPageContext.ShellPage?.NavigateToAvManager();
     }
+
+    private void OnOpenNativeBrowser(object s, RoutedEventArgs e)
+        => _contentPageContext.ShellPage?.NavigateToAvManager();
 
     private async void OnRefresh(object s, RoutedEventArgs e) => await RefreshAsync();
 

@@ -147,6 +147,20 @@ namespace Files.App.Data.Models
 			}
 		}
 
+		private bool isAvManagerMode;
+		public bool IsAvManagerMode
+		{
+			get => isAvManagerMode;
+			set => SetProperty(ref isAvManagerMode, value);
+		}
+
+		private string? avLibraryPath;
+		public string? AvLibraryPath
+		{
+			get => avLibraryPath;
+			set => SetProperty(ref avLibraryPath, value);
+		}
+
 		private string? zipEncodingName;
 		public string? ZipEncodingName
 		{
