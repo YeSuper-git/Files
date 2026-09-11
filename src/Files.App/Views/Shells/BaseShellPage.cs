@@ -535,6 +535,8 @@ namespace Files.App.Views.Shells
 				IsSearchResultPage = true,
 				SearchPathParam = shellViewModel.WorkingDirectory,
 				SearchQuery = query,
+				IsAvManagerMode = InstanceViewModel.IsAvManagerMode,
+				AvLibraryPath = InstanceViewModel.AvLibraryPath,
 			};
 
 			var layout = InstanceViewModel.FolderSettings.GetLayoutType(shellViewModel.WorkingDirectory);
