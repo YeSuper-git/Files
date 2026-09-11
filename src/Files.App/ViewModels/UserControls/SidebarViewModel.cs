@@ -847,13 +847,30 @@ namespace Files.App.ViewModels.UserControls
 		public async void HandleItemInvokedAsync(object item, PointerUpdateKind pointerUpdateKind)
 		{
 			if (item is not INavigationControlItem navigationControlItem) return;
-			var navigationPath = item as string;
+			var navigationPath = navigationControlItem.Path;
+			var ctrlPressed = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
+			var middleClickPressed = pointerUpdateKind == PointerUpdateKind.MiddleButtonReleased;
+
+#if FILES_AV_MANAGER
+			// AV Manager is an application page, not a filesystem path. Route it directly
+			// so the normal sidebar navigation pipeline does not treat "AvManager" as a folder.
+			if (string.Equals(navigationPath, "AvManager", StringComparison.OrdinalIgnoreCase))
+			{
+				if (ctrlPressed || middleClickPressed)
+				{
+					await NavigationHelpers.OpenAvManagerInNewTab();
+					return;
+				}
+
+				if (PaneHolder?.ActivePane is IShellPage avManagerShellPage)
+					avManagerShellPage.NavigateToAvManager();
+				return;
+			}
+#endif
 
 			if (await DriveHelpers.CheckEmptyDrive(navigationPath))
 				return;
 
-			var ctrlPressed = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
-			var middleClickPressed = pointerUpdateKind == PointerUpdateKind.MiddleButtonReleased;
 			if (string.Equals(navigationControlItem.Path, "Settings", StringComparison.OrdinalIgnoreCase))
 			{
 				if (ctrlPressed || middleClickPressed)

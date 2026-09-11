@@ -22,7 +22,12 @@ namespace Files.App.Actions
 			if (await DriveHelpers.CheckEmptyDrive(SidebarContext.RightClickedItem!.Path))
 				return;
 
-			await NavigationHelpers.OpenPathInNewTab(SidebarContext.RightClickedItem!.Path ?? string.Empty);
+#if FILES_AV_MANAGER
+			if (string.Equals(SidebarContext.RightClickedItem!.Path, "AvManager", StringComparison.OrdinalIgnoreCase))
+				await NavigationHelpers.OpenAvManagerInNewTab();
+			else
+#endif
+				await NavigationHelpers.OpenPathInNewTab(SidebarContext.RightClickedItem!.Path ?? string.Empty);
 		}
 
 		protected override void Context_PropertyChanged(object? sender, PropertyChangedEventArgs e)

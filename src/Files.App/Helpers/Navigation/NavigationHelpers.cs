@@ -44,6 +44,16 @@ namespace Files.App.Helpers
 			return AddNewTabByPathAsync(typeof(ShellPanesPage), path, GeneralSettingsService.AlwaysSwitchToNewlyOpenedTab);
 		}
 
+#if FILES_AV_MANAGER
+		public static Task OpenAvManagerInNewTab()
+		{
+			return AddNewTabByParamAsync(
+				typeof(ShellPanesPage),
+				new PaneNavigationArguments { LeftPaneNavPathParam = "AvManager" },
+				 switchToNewTab: GeneralSettingsService.AlwaysSwitchToNewlyOpenedTab);
+		}
+#endif
+
 		public static Task AddNewTabAsync()
 		{
 			return AddNewTabByPathAsync(typeof(ShellPanesPage), "Home", true);
@@ -276,6 +286,14 @@ namespace Files.App.Helpers
 				iconSource = new FontIconSource() { Glyph = "\uE713" };
 				toolTipText = Strings.Settings.GetLocalizedResource();
 			}
+#if FILES_AV_MANAGER
+			else if (currentPath.Equals("AvManager", StringComparison.OrdinalIgnoreCase))
+			{
+				tabLocationHeader = "AV 资源管理";
+				iconSource = new FontIconSource() { Glyph = "\uE8B7" };
+				toolTipText = tabLocationHeader;
+			}
+#endif
 			else if (currentPath.Equals(Constants.UserEnvironmentPaths.DesktopPath, StringComparison.OrdinalIgnoreCase))
 				tabLocationHeader = Strings.Desktop.GetLocalizedResource();
 			else if (currentPath.Equals(Constants.UserEnvironmentPaths.DownloadsPath, StringComparison.OrdinalIgnoreCase))
