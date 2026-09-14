@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <Bundle
+      Name="$(var.ProductName)"
+      Manufacturer="YeSuper"
+      Version="$(var.AppVersion)"
+      UpgradeCode="C28D12A9-6AE7-4CF5-AB83-4B48FC7A4E6A"
+      Compressed="yes">
+
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication
+          Theme="hyperlinkLicense"
+          LicenseUrl=""
+          SuppressOptionsUI="no"
+          SuppressRepair="no"
+          ShowVersion="yes"
+          LaunchTarget="[InstallFolder]\Files.exe"
+          LaunchWorkingFolder="[InstallFolder]" />
+    </BootstrapperApplication>
+
+    <!-- WixStdBA exposes this persisted variable on its Options page. The
+         selected value is explicitly passed to the MSI so both layers agree
+         on the same install directory. -->
+    <Variable
+        Name="InstallFolder"
+        Type="formatted"
+        Value="[ProgramFiles64Folder]Files AV Resource Manager"
+        bal:Overridable="yes"
+        Persisted="yes" />
+
+    <util:RegistrySearch
+        Id="VCRedistInstalled"
+        Root="HKLM"
+        Key="SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"
+        Value="Installed"
+        Variable="VCRedistInstalled"
+        Result="value"
+        Win64="yes" />
+
+    <Chain>
+      <ExePackage
+          Id="VCRedist"
+          DisplayName="Microsoft Visual C++ Redistributable"
+          SourceFile="$(var.VCRedistPath)"
+          InstallArguments="/install /quiet /norestart"
+          DetectCondition="VCRedistInstalled"
+          InstallCondition="VersionNT64"
+          PerMachine="yes"
+          Permanent="yes"
+          Vital="yes" />
+      <MsiPackage
+          Id="FilesAvManagerMsi"
+          DisplayName="Files AV Resource Manager"
+          SourceFile="$(var.MsiPath)"
+          Vital="yes">
+        <MsiProperty Name="INSTALLFOLDER" Value="[InstallFolder]" />
+      </MsiPackage>
+    </Chain>
+  </Bundle>
+</Wix>

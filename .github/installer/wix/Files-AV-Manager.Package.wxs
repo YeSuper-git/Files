@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <Package
+      Id="YeSuper.Files.AV.Resource.Manager"
+      Name="$(var.ProductName)"
+      Manufacturer="YeSuper"
+      Version="$(var.AppVersion)"
+      Scope="perMachine"
+      Compressed="yes">
+
+    <SummaryInformation Description="Files AV Resource Manager" Manufacturer="YeSuper" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Files AV Resource Manager is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <!-- Ask the user to close Files during repair, upgrade, or uninstall so
+         the installed binaries are not held open by the running app. -->
+    <util:CloseApplication
+        Id="CloseFilesApplication"
+        Target="Files.exe"
+        Description="Files is running. Close it before continuing."
+        PromptToContinue="yes"
+        RebootPrompt="no"
+        CloseMessage="yes"
+        ElevatedCloseMessage="yes"
+        Timeout="10" />
+
+    <Icon Id="FilesAvIcon" SourceFile="$(var.PayloadDir)\Assets\AppTiles\Dev\Logo.ico" />
+    <Property Id="ARPPRODUCTICON" Value="FilesAvIcon" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Files AV Resource Manager">
+        <Directory Id="INSTALLSUPPORT" Name="Installer" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="APPLICATIONPROGRAMSFOLDER" Name="Files AV Resource Manager" />
+    </StandardDirectory>
+
+    <!-- The entire self-contained Files publish directory is harvested into
+         deterministic MSI components. Support files are authored separately
+         because the identity registration custom actions need stable File ids. -->
+    <ComponentGroup Id="ApplicationFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.PayloadDir)\**" />
+    </ComponentGroup>
+
+    <DirectoryRef Id="INSTALLSUPPORT">
+      <Component Id="InstallerSupportFiles" Guid="E2600A42-10A0-4A04-B2AB-3DD40F14734B">
+        <File Id="InstallAppScript" Source="$(var.InstallScript)" KeyPath="yes" />
+        <File Id="IdentityPackageFile" Source="$(var.IdentityPackage)" />
+        <File Id="IdentityCertificateFile" Source="$(var.Certificate)" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="APPLICATIONPROGRAMSFOLDER">
+      <Component Id="StartMenuShortcut" Guid="B46A0D6F-4BB7-4B31-A6A6-ED0EF6B1A646">
+        <Shortcut
+            Id="FilesStartMenuShortcut"
+            Name="Files AV Resource Manager"
+            Target="[INSTALLFOLDER]Files.exe"
+            WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue
+            Root="HKLM"
+            Key="Software\YeSuper\Files AV Resource Manager"
+            Name="StartMenuShortcut"
+            Type="integer"
+            Value="1"
+            KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- Explorer integration is owned by MSI so repair, upgrade and uninstall
+         all use the same component model as the rest of the installation. -->
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="DirectoryShellIntegration" Guid="4206FBB8-4F61-4A9D-92BC-DA0E6C329B03">
+        <RemoveFile Id="RemoveLegacyNsisUninstaller" Name="Uninstall.exe" On="install" />
+        <RemoveFile Id="RemoveLegacyInstallScript" Name="Install-App.ps1" On="install" />
+        <RemoveFile Id="RemoveLegacyIdentityPackage" Name="Files.Identity.msix" On="install" />
+        <RemoveFile Id="RemoveLegacyCertificate" Name="FilesAVManager.cer" On="install" />
+        <RemoveFile Id="RemoveLegacyVCRedist" Name="VC_redist.x64.exe" On="install" />
+        <RegistryKey Root="HKLM" Key="Software\Classes\Directory\shell\FilesYeSuper">
+          <RegistryValue Name="MUIVerb" Value="Open in Files" Type="string" />
+          <RegistryValue Name="Icon" Value="[INSTALLFOLDER]Files.exe" Type="string" />
+          <RegistryKey Key="command">
+            <RegistryValue Value="&quot;[INSTALLFOLDER]Files.exe&quot; &quot;%1&quot;" Type="string" KeyPath="yes" />
+          </RegistryKey>
+        </RegistryKey>
+      </Component>
+
+      <Component Id="DriveShellIntegration" Guid="3ED18D14-8C7B-4D30-9E83-B0874D6DD9ED">
+        <RegistryKey Root="HKLM" Key="Software\Classes\Drive\shell\FilesYeSuper">
+          <RegistryValue Name="MUIVerb" Value="Open in Files" Type="string" />
+          <RegistryValue Name="Icon" Value="[INSTALLFOLDER]Files.exe" Type="string" />
+          <RegistryKey Key="command">
+            <RegistryValue Value="&quot;[INSTALLFOLDER]Files.exe&quot; &quot;%1&quot;" Type="string" KeyPath="yes" />
+          </RegistryKey>
+        </RegistryKey>
+      </Component>
+
+      <Component Id="DirectoryBackgroundShellIntegration" Guid="F8CFEE5D-52EC-4FEE-A2BB-C7FE5AE5B5D9">
+        <RegistryKey Root="HKLM" Key="Software\Classes\Directory\Background\shell\FilesYeSuper">
+          <RegistryValue Name="MUIVerb" Value="Open in Files" Type="string" />
+          <RegistryValue Name="Icon" Value="[INSTALLFOLDER]Files.exe" Type="string" />
+          <RegistryKey Key="command">
+            <RegistryValue Value="&quot;[INSTALLFOLDER]Files.exe&quot; &quot;%V&quot;" Type="string" KeyPath="yes" />
+          </RegistryKey>
+        </RegistryKey>
+      </Component>
+    </DirectoryRef>
+
+    <!-- PowerShell is still used for the Windows external-location identity,
+         but it is now invoked by a deferred WiX custom action. This action
+         deliberately impersonates the installing user: Add-AppxPackage
+         registers the external-location identity per user, so running it as
+         LocalSystem would register the package for the wrong account. -->
+    <SetProperty
+        Id="RegisterFilesIdentity"
+        Value="&quot;[SystemFolder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppScript]&quot; -Mode Install -InstallDirectory &quot;[INSTALLFOLDER]&quot; -IdentityPackagePath &quot;[#IdentityPackageFile]&quot; -PackageName &quot;FilesDev&quot; -Publisher &quot;CN=Files AV Manager&quot; -ProductName &quot;Files AV Resource Manager&quot; -CertificateFileName &quot;Installer\FilesAVManager.cer&quot; -LogFileName &quot;Files-AV-Manager-install.log&quot; -LegacyUninstallKeyName &quot;Files AV Resource Manager&quot;"
+        Before="RegisterFilesIdentity"
+        Sequence="execute"
+        Condition="NOT Installed OR REINSTALL~=&quot;ALL&quot;" />
+    <CustomAction
+        Id="RegisterFilesIdentity"
+        BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+        DllEntry="WixQuietExec"
+        Execute="deferred"
+        Impersonate="yes"
+        Return="check" />
+
+    <SetProperty
+        Id="UnregisterFilesIdentity"
+        Value="&quot;[SystemFolder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppScript]&quot; -Mode Uninstall -InstallDirectory &quot;[INSTALLFOLDER]&quot; -IdentityPackagePath &quot;[#IdentityPackageFile]&quot; -PackageName &quot;FilesDev&quot; -Publisher &quot;CN=Files AV Manager&quot; -ProductName &quot;Files AV Resource Manager&quot; -CertificateFileName &quot;Installer\FilesAVManager.cer&quot; -LogFileName &quot;Files-AV-Manager-install.log&quot; -LegacyUninstallKeyName &quot;Files AV Resource Manager&quot;"
+        Before="UnregisterFilesIdentity"
+        Sequence="execute"
+        Condition="REMOVE=&quot;ALL&quot;" />
+    <CustomAction
+        Id="UnregisterFilesIdentity"
+        BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+        DllEntry="WixQuietExec"
+        Execute="deferred"
+        Impersonate="yes"
+        Return="check" />
+
+    <InstallExecuteSequence>
+      <Custom Action="RegisterFilesIdentity" After="InstallFiles" Condition="NOT Installed OR REINSTALL~=&quot;ALL&quot;" />
+      <Custom Action="UnregisterFilesIdentity" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot;" />
+    </InstallExecuteSequence>
+
+    <Feature Id="MainFeature" Title="Files AV Resource Manager" Level="1">
+      <ComponentGroupRef Id="ApplicationFiles" />
+      <ComponentRef Id="InstallerSupportFiles" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="DirectoryShellIntegration" />
+      <ComponentRef Id="DriveShellIntegration" />
+      <ComponentRef Id="DirectoryBackgroundShellIntegration" />
+    </Feature>
+  </Package>
+</Wix>

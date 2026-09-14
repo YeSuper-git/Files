@@ -28,9 +28,6 @@ jobs:
       - name: Setup NuGet
         uses: NuGet/setup-nuget@v3
 
-      - name: Install NSIS
-        run: choco install nsis -y --no-progress
-
       - name: Restore
         run: msbuild ${{ github.workspace }}\Files.slnx -t:Restore -p:Configuration=Release -p:Platform=x64
 
@@ -200,20 +197,56 @@ jobs:
           }
 
           $setupPath = Join-Path $workspace 'Files-AV-Manager-Setup.exe'
-          $nsis = Join-Path $workspace '.github\installer\Files-AV-Manager.nsi'
+          $msiOutputDir = Join-Path $workspace 'artifacts\installer\msi'
+          $bundleOutputDir = Join-Path $workspace 'artifacts\installer\bundle'
           $installScript = Join-Path $workspace 'Install-App.ps1'
-          & 'C:\Program Files (x86)\NSIS\makensis.exe' `
-            "/DAPP_VERSION=$appVersion" `
-            "/DPAYLOAD_DIR=$publishDir" `
-            "/DIDENTITY_PACKAGE=$identityPackage" `
-            "/DINSTALL_SCRIPT=$installScript" `
-            "/DCERTIFICATE=$certificatePath" `
-            "/DVC_REDIST=$vcRedistPath" `
-            "/DOUTPUT_EXE=$setupPath" `
-            $nsis
-          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $setupPath)) {
-            throw 'NSIS installer build failed.'
+          $packageProject = Join-Path $workspace '.github\installer\wix\Files-AV-Manager.Package.wixproj'
+          $bundleProject = Join-Path $workspace '.github\installer\wix\Files-AV-Manager.Bundle.wixproj'
+
+          New-Item -ItemType Directory -Path $msiOutputDir, $bundleOutputDir -Force | Out-Null
+
+          dotnet build $packageProject `
+            --configuration Release `
+            "-p:AppVersion=$appVersion" `
+            "-p:ProductName=Files AV Resource Manager" `
+            "-p:PayloadDir=$publishDir" `
+            "-p:InstallScript=$installScript" `
+            "-p:IdentityPackage=$identityPackage" `
+            "-p:Certificate=$certificatePath" `
+            "-p:OutputPath=$msiOutputDir\" `
+            -v:minimal
+          if ($LASTEXITCODE -ne 0) {
+            throw 'WiX MSI build failed.'
           }
+
+          $msiPath = Join-Path $msiOutputDir 'Files-AV-Manager.msi'
+          if (-not (Test-Path -LiteralPath $msiPath)) {
+            throw "WiX MSI was not produced at '$msiPath'."
+          }
+
+          & $signtool sign /f $pfxPath /p $env:MSIX_PFX_PASSWORD /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $msiPath
+          if ($LASTEXITCODE -ne 0) {
+            throw "MSI signing failed with exit code $LASTEXITCODE."
+          }
+
+          dotnet build $bundleProject `
+            --configuration Release `
+            "-p:AppVersion=$appVersion" `
+            "-p:ProductName=Files AV Resource Manager" `
+            "-p:MsiPath=$msiPath" `
+            "-p:VCRedistPath=$vcRedistPath" `
+            "-p:OutputPath=$bundleOutputDir\" `
+            -v:minimal
+          if ($LASTEXITCODE -ne 0) {
+            throw 'WiX Burn bundle build failed.'
+          }
+
+          $builtBundlePath = Join-Path $bundleOutputDir 'Files-AV-Manager-Setup.exe'
+          if (-not (Test-Path -LiteralPath $builtBundlePath)) {
+            throw "WiX Burn bundle was not produced at '$builtBundlePath'."
+          }
+
+          Copy-Item -LiteralPath $builtBundlePath -Destination $setupPath -Force
 
           & $signtool sign /f $pfxPath /p $env:MSIX_PFX_PASSWORD /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $setupPath
           if ($LASTEXITCODE -ne 0) {
@@ -233,10 +266,11 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $setupPath = Join-Path $env:GITHUB_WORKSPACE 'Files-AV-Manager-Setup.exe'
-          $installDir = Join-Path $env:ProgramFiles 'Files AV Resource Manager'
+          $installDir = Join-Path $env:ProgramData 'Files AV Resource Manager Smoke'
           $installedExe = Join-Path $installDir 'Files.exe'
+          $installFolderArgument = 'InstallFolder="{0}"' -f $installDir
 
-          $installerProcess = Start-Process -FilePath $setupPath -ArgumentList '/S' -Wait -PassThru
+          $installerProcess = Start-Process -FilePath $setupPath -ArgumentList '/quiet', '/norestart', $installFolderArgument -Wait -PassThru
           if ($installerProcess.ExitCode -ne 0) {
             $installLog = Join-Path $env:TEMP 'Files-AV-Manager-install.log'
             if (Test-Path -LiteralPath $installLog) {
@@ -274,8 +308,36 @@ jobs:
           Write-Host "Startup smoke test passed with process id $($appProcess.Id)."
           Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
 
-          $uninstaller = Join-Path $installDir 'Uninstall.exe'
-          $uninstallerProcess = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
+          $repairProcess = Start-Process -FilePath $setupPath -ArgumentList '/repair', '/quiet', '/norestart' -Wait -PassThru
+          if ($repairProcess.ExitCode -ne 0) {
+            throw "Silent repair failed with exit code $($repairProcess.ExitCode)."
+          }
+          if (-not (Test-Path -LiteralPath $installedExe)) {
+            throw "Files.exe disappeared after repair from '$installDir'."
+          }
+
+          $uninstallEntries = @(
+            Get-ChildItem -Path @(
+              'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall',
+              'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
+            ) -ErrorAction SilentlyContinue |
+              ForEach-Object {
+                Get-ItemProperty -LiteralPath $_.PSPath -ErrorAction SilentlyContinue
+              } |
+              Where-Object { $_.DisplayName -eq 'Files AV Resource Manager' }
+          )
+          $uninstallEntry = $uninstallEntries | Select-Object -First 1
+          if (-not $uninstallEntry) {
+            throw 'Files AV Resource Manager was not registered in Add/Remove Programs.'
+          }
+          $uninstallCommand = $uninstallEntry.QuietUninstallString
+          if ([string]::IsNullOrWhiteSpace($uninstallCommand)) {
+            $uninstallCommand = $uninstallEntry.UninstallString
+          }
+          if ([string]::IsNullOrWhiteSpace($uninstallCommand)) {
+            throw 'The WiX bundle uninstall command was not registered.'
+          }
+          $uninstallerProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', $uninstallCommand -Wait -PassThru
           if ($uninstallerProcess.ExitCode -ne 0) {
             throw "Silent uninstaller failed with exit code $($uninstallerProcess.ExitCode)."
           }

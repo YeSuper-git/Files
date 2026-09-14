@@ -1,0 +1,34 @@
+<Project Sdk="WixToolset.Sdk/7.0.0">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <AcceptEula>wix7</AcceptEula>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <OutputName>Files-AV-Manager</OutputName>
+    <SuppressPdbOutput Condition="'$(Configuration)' == 'Release'">true</SuppressPdbOutput>
+
+    <!-- These paths are supplied by the Windows build workflow. Keeping them
+         as explicit properties prevents WiX from accidentally harvesting a
+         local bin/obj directory. -->
+    <PayloadDir Condition="'$(PayloadDir)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\publish</PayloadDir>
+    <InstallScript Condition="'$(InstallScript)' == ''">$(MSBuildThisFileDirectory)..\..\..\Install-App.ps1</InstallScript>
+    <IdentityPackage Condition="'$(IdentityPackage)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\Files.Identity.msix</IdentityPackage>
+    <Certificate Condition="'$(Certificate)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\FilesAVManager.cer</Certificate>
+    <AppVersion Condition="'$(AppVersion)' == ''">1.0.0.0</AppVersion>
+    <ProductName Condition="'$(ProductName)' == ''">Files AV Resource Manager</ProductName>
+
+    <DefineConstants>
+      $(DefineConstants);
+      AppVersion=$(AppVersion);
+      ProductName=$(ProductName);
+      PayloadDir=$(PayloadDir);
+      InstallScript=$(InstallScript);
+      IdentityPackage=$(IdentityPackage);
+      Certificate=$(Certificate)
+    </DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Files-AV-Manager.Bundle.wxs" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="7.0.0" />
+  </ItemGroup>
+</Project>

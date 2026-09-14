@@ -10,7 +10,8 @@ param(
     [string]$Publisher = 'CN=Files AV Manager',
     [string]$ProductName = 'Files AV Resource Manager',
     [string]$CertificateFileName = 'FilesAVManager.cer',
-    [string]$LogFileName = 'Files-AV-Manager-install.log'
+    [string]$LogFileName = 'Files-AV-Manager-install.log',
+    [string]$LegacyUninstallKeyName = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -135,6 +136,14 @@ try {
         Select-Object -First 1
     if (-not $installedApp) {
         throw 'Files identity package was not registered after installation.'
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($LegacyUninstallKeyName)) {
+        $legacyUninstallKey = Join-Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall' $LegacyUninstallKeyName
+        if (Test-Path -LiteralPath $legacyUninstallKey) {
+            Write-InstallLog "Removing legacy installer registration: $LegacyUninstallKeyName"
+            Remove-Item -LiteralPath $legacyUninstallKey -Recurse -Force -ErrorAction Stop
+        }
     }
 
     Write-InstallLog "Files external-location installation completed: $($installedApp.PackageFullName)"

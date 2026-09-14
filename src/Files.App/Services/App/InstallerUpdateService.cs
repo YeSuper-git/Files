@@ -171,7 +171,8 @@ namespace Files.App.Services
 
 				// Let the current process exit before Setup replaces Files.exe. The
 				// detached cmd process survives the application's shutdown.
-				var command = $"/c timeout /t 2 /nobreak >nul & start \"\" /wait \"{installerPath}\" /S";
+				var installDirectoryArgument = $"InstallFolder=\"{AppPathHelper.InstallDirectory}\"";
+				var command = $"/c timeout /t 2 /nobreak >nul & start \"\" /wait \"{installerPath}\" /quiet /norestart {installDirectoryArgument}";
 				Process.Start(new ProcessStartInfo
 				{
 					FileName = "cmd.exe",
