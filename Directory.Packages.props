@@ -55,5 +55,7 @@
     <PackageVersion Include="MSTest.TestFramework" Version="4.4.0" />
     <PackageVersion Include="Microsoft.Testing.Extensions.TrxReport" Version="2.4.0" />
     <PackageVersion Include="Dongle.GuidRVAGen" Version="1.0.5" />
+    <PackageVersion Include="WixToolset.BootstrapperApplications.wixext" Version="7.0.0" />
+    <PackageVersion Include="WixToolset.Util.wixext" Version="7.0.0" />
   </ItemGroup>
 </Project>

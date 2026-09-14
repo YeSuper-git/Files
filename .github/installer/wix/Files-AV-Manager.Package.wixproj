@@ -29,6 +29,6 @@
 
   <ItemGroup>
     <Compile Remove="Files-AV-Manager.Bundle.wxs" />
-    <PackageReference Include="WixToolset.Util.wixext" Version="7.0.0" />
+    <PackageReference Include="WixToolset.Util.wixext" />
   </ItemGroup>
 </Project>

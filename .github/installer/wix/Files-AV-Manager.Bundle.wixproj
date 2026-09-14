@@ -22,7 +22,7 @@
 
   <ItemGroup>
     <Compile Remove="Files-AV-Manager.Package.wxs" />
-    <PackageReference Include="WixToolset.BootstrapperApplications.wixext" Version="7.0.0" />
-    <PackageReference Include="WixToolset.Util.wixext" Version="7.0.0" />
+    <PackageReference Include="WixToolset.BootstrapperApplications.wixext" />
+    <PackageReference Include="WixToolset.Util.wixext" />
   </ItemGroup>
 </Project>
