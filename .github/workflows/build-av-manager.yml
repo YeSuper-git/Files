@@ -260,7 +260,32 @@ jobs:
             throw "WiX Burn bundle was not produced at '$builtBundlePath'."
           }
 
-          Copy-Item -LiteralPath $builtBundlePath -Destination $setupPath -Force
+          # Burn bundles must be signed in two stages. Signing the final EXE
+          # directly leaves the attached container offsets invalid, which
+          # makes Burn unable to extract the MSI or VC++ redistributable.
+          $wixTool = Join-Path $env:USERPROFILE '.nuget\packages\wix\7.0.0\tools\net8.0\any\wix.exe'
+          if (-not (Test-Path -LiteralPath $wixTool)) {
+            throw "WiX command-line tool was not found at '$wixTool'."
+          }
+          $enginePath = Join-Path $bundleOutputDir 'Files-AV-Manager-Engine.exe'
+          $reattachedBundlePath = Join-Path $bundleOutputDir 'Files-AV-Manager-Setup-signed.exe'
+
+          & $wixTool burn detach $builtBundlePath -engine $enginePath
+          if ($LASTEXITCODE -ne 0) {
+            throw "Burn engine detach failed with exit code $LASTEXITCODE."
+          }
+
+          & $signtool sign /f $pfxPath /p $env:MSIX_PFX_PASSWORD /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $enginePath
+          if ($LASTEXITCODE -ne 0) {
+            throw "Burn engine signing failed with exit code $LASTEXITCODE."
+          }
+
+          & $wixTool burn reattach $builtBundlePath -engine $enginePath -out $reattachedBundlePath
+          if ($LASTEXITCODE -ne 0) {
+            throw "Burn engine reattach failed with exit code $LASTEXITCODE."
+          }
+
+          Copy-Item -LiteralPath $reattachedBundlePath -Destination $setupPath -Force
 
           & $signtool sign /f $pfxPath /p $env:MSIX_PFX_PASSWORD /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $setupPath
           if ($LASTEXITCODE -ne 0) {
