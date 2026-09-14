@@ -263,9 +263,14 @@ jobs:
           # Burn bundles must be signed in two stages. Signing the final EXE
           # directly leaves the attached container offsets invalid, which
           # makes Burn unable to extract the MSI or VC++ redistributable.
-          $wixTool = Join-Path $env:USERPROFILE '.nuget\packages\wix\7.0.0\tools\net8.0\any\wix.exe'
+          $wixToolDir = Join-Path $workspace 'artifacts\wix-cli'
+          dotnet tool install wix --version 7.0.0 --tool-path $wixToolDir
+          if ($LASTEXITCODE -ne 0) {
+            throw 'WiX command-line tool installation failed.'
+          }
+          $wixTool = Join-Path $wixToolDir 'wix.exe'
           if (-not (Test-Path -LiteralPath $wixTool)) {
-            throw "WiX command-line tool was not found at '$wixTool'."
+            throw "WiX command-line tool was not installed at '$wixTool'."
           }
           $enginePath = Join-Path $bundleOutputDir 'Files-AV-Manager-Engine.exe'
           $reattachedBundlePath = Join-Path $bundleOutputDir 'Files-AV-Manager-Setup-signed.exe'
