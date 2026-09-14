@@ -621,6 +621,11 @@ namespace Files.App.ViewModels.UserControls
 #if FILES_RESOURCE_MANAGER
 				case SectionType.ResourceManager:
 					section = BuildSection("资源管理", sectionType, new ContextMenuOptions { IsLocationItem = true }, true);
+					// This is a navigable application page, not a collapsible sidebar group.
+					// BuildSection creates an empty child collection for normal sections;
+					// keeping it here makes SidebarView classify this row as a group header
+					// and suppress its ItemInvoked event.
+					section.ChildItems = null;
 					section.Path = "ResourceManager";
 					section.IsHeader = true;
 					break;
