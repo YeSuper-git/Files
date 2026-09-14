@@ -381,6 +381,13 @@ namespace Files.App.ViewModels.UserControls
 				if (section is null)
 					return;
 
+#if FILES_RESOURCE_MANAGER
+				// Resource Manager is a standalone navigation item, so it has no
+				// child collection to synchronize like the filesystem sections do.
+				if (sectionType == SectionType.ResourceManager)
+					return;
+#endif
+
 				Func<IReadOnlyList<INavigationControlItem>> getElements = () => sectionType switch
 				{
 					SectionType.Pinned => App.QuickAccessManager.Model.PinnedFolderItems,
