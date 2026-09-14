@@ -96,8 +96,9 @@ try {
 
         for ($attempt = 0; $attempt -lt 20; $attempt++) {
             $remainingPackages = @(Get-AppxPackage -Name $PackageName -ErrorAction SilentlyContinue)
-            if ($remainingPackages.Count -eq 0)
+            if ($remainingPackages.Count -eq 0) {
                 break
+            }
             Start-Sleep -Milliseconds 500
         }
         if ($remainingPackages.Count -gt 0) {
