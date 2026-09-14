@@ -37,7 +37,7 @@
         Value="Installed"
         Variable="VCRedistInstalled"
         Result="value"
-        Win64="yes" />
+        Bitness="always64" />
 
     <Chain>
       <ExePackage
