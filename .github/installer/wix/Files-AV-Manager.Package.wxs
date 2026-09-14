@@ -34,8 +34,18 @@
       </Directory>
     </StandardDirectory>
 
-    <StandardDirectory Id="ProgramMenuFolder">
-      <Directory Id="APPLICATIONPROGRAMSFOLDER" Name="Files AV Resource Manager" />
+    <!-- Use the common Start Menu so the per-machine MSI has a single,
+         all-users shortcut and does not mix HKLM data with a user profile. -->
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="CommonStartMenuMicrosoftFolder" Name="Microsoft">
+        <Directory Id="CommonStartMenuWindowsFolder" Name="Windows">
+          <Directory Id="CommonStartMenuFolder" Name="Start Menu">
+            <Directory Id="CommonProgramsFolder" Name="Programs">
+              <Directory Id="ApplicationProgramsFolder" Name="Files AV Resource Manager" />
+            </Directory>
+          </Directory>
+        </Directory>
+      </Directory>
     </StandardDirectory>
 
     <!-- The entire self-contained Files publish directory is harvested into
@@ -53,7 +63,7 @@
       </Component>
     </DirectoryRef>
 
-    <DirectoryRef Id="APPLICATIONPROGRAMSFOLDER">
+    <DirectoryRef Id="ApplicationProgramsFolder">
       <Component Id="StartMenuShortcut" Guid="B46A0D6F-4BB7-4B31-A6A6-ED0EF6B1A646">
         <Shortcut
             Id="FilesStartMenuShortcut"
@@ -117,7 +127,7 @@
          LocalSystem would register the package for the wrong account. -->
     <SetProperty
         Id="RegisterFilesIdentity"
-        Value="&quot;[SystemFolder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppScript]&quot; -Mode Install -InstallDirectory &quot;[INSTALLFOLDER]&quot; -IdentityPackagePath &quot;[#IdentityPackageFile]&quot; -PackageName &quot;FilesDev&quot; -Publisher &quot;CN=Files AV Manager&quot; -ProductName &quot;Files AV Resource Manager&quot; -CertificateFileName &quot;Installer\FilesAVManager.cer&quot; -LogFileName &quot;Files-AV-Manager-install.log&quot; -LegacyUninstallKeyName &quot;Files AV Resource Manager&quot;"
+        Value="&quot;[SystemFolder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppScript]&quot; -Mode Install -InstallDirectory &quot;[INSTALLFOLDER]&quot;"
         Before="RegisterFilesIdentity"
         Sequence="execute"
         Condition="NOT Installed OR REINSTALL~=&quot;ALL&quot;" />
@@ -131,7 +141,7 @@
 
     <SetProperty
         Id="UnregisterFilesIdentity"
-        Value="&quot;[SystemFolder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppScript]&quot; -Mode Uninstall -InstallDirectory &quot;[INSTALLFOLDER]&quot; -IdentityPackagePath &quot;[#IdentityPackageFile]&quot; -PackageName &quot;FilesDev&quot; -Publisher &quot;CN=Files AV Manager&quot; -ProductName &quot;Files AV Resource Manager&quot; -CertificateFileName &quot;Installer\FilesAVManager.cer&quot; -LogFileName &quot;Files-AV-Manager-install.log&quot; -LegacyUninstallKeyName &quot;Files AV Resource Manager&quot;"
+        Value="&quot;[SystemFolder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppScript]&quot; -Mode Uninstall"
         Before="UnregisterFilesIdentity"
         Sequence="execute"
         Condition="REMOVE=&quot;ALL&quot;" />

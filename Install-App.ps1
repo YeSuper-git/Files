@@ -11,7 +11,7 @@ param(
     [string]$ProductName = 'Files AV Resource Manager',
     [string]$CertificateFileName = 'FilesAVManager.cer',
     [string]$LogFileName = 'Files-AV-Manager-install.log',
-    [string]$LegacyUninstallKeyName = ''
+    [string]$LegacyUninstallKeyName = 'Files AV Resource Manager'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -73,6 +73,9 @@ function Get-IdentityPackageVersion {
 try {
     if ([string]::IsNullOrWhiteSpace($IdentityPackagePath)) {
         $IdentityPackagePath = Join-Path $root 'Files.Identity.msix'
+        if (-not (Test-Path -LiteralPath $IdentityPackagePath)) {
+            $IdentityPackagePath = Join-Path $root 'Installer\Files.Identity.msix'
+        }
     }
 
     if ($Mode -eq 'Uninstall') {
@@ -97,6 +100,12 @@ try {
     $identityVersion = Get-IdentityPackageVersion $IdentityPackagePath
 
     $certificate = Join-Path $root $CertificateFileName
+    if (-not (Test-Path -LiteralPath $certificate)) {
+        $installerCertificate = Join-Path $root "Installer\$CertificateFileName"
+        if (Test-Path -LiteralPath $installerCertificate) {
+            $certificate = $installerCertificate
+        }
+    }
     if (Test-Path -LiteralPath $certificate) {
         $certUtil = Join-Path $env:SystemRoot 'System32\certutil.exe'
         if (-not (Test-Path -LiteralPath $certUtil)) {

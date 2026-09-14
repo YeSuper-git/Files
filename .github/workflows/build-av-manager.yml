@@ -224,6 +224,20 @@ jobs:
             throw "WiX MSI was not produced at '$msiPath'."
           }
 
+          # WiX reads the VERSIONINFO language from every PE file. A small
+          # number of native .NET runtime files publish a non-numeric language
+          # string, which is not legal in the MSI File table. Keep the MSI
+          # valid and language-neutral for this non-localized application.
+          $msiDatabase = New-Object -ComObject WindowsInstaller.Installer
+          $msiTransaction = $msiDatabase.OpenDatabase($msiPath, 1)
+          $msiView = $msiTransaction.OpenView("UPDATE ``File`` SET ``Language`` = '0' WHERE ``Language`` IS NOT NULL")
+          $msiView.Execute()
+          $msiView.Close()
+          $msiTransaction.Commit()
+          [void][Runtime.InteropServices.Marshal]::ReleaseComObject($msiView)
+          [void][Runtime.InteropServices.Marshal]::ReleaseComObject($msiTransaction)
+          [void][Runtime.InteropServices.Marshal]::ReleaseComObject($msiDatabase)
+
           & $signtool sign /f $pfxPath /p $env:MSIX_PFX_PASSWORD /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $msiPath
           if ($LASTEXITCODE -ne 0) {
             throw "MSI signing failed with exit code $LASTEXITCODE."

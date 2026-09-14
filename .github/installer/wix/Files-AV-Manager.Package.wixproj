@@ -6,6 +6,12 @@
     <OutputName>Files-AV-Manager</OutputName>
     <SuppressPdbOutput Condition="'$(Configuration)' == 'Release'">true</SuppressPdbOutput>
 
+    <!-- The self-contained .NET publish contains a few native files whose
+         embedded language resource is not a valid Windows Installer language
+         id. The workflow normalizes this column to language-neutral after the
+         MSI is linked, while all other ICE validation remains enabled. -->
+    <SuppressIces>ICE03</SuppressIces>
+
     <!-- These paths are supplied by the Windows build workflow. Keeping them
          as explicit properties prevents WiX from accidentally harvesting a
          local bin/obj directory. -->
