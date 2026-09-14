@@ -323,7 +323,15 @@ jobs:
 
           $installerProcess = Start-Process -FilePath $setupPath -ArgumentList '/quiet', '/norestart', '/log', $installLog, $installFolderArgument -Wait -PassThru
           if ($installerProcess.ExitCode -ne 0) {
-            $diagnosticLogs = Get-ChildItem -Path $env:TEMP -Filter 'Files-AV-Manager-install*.log' -File -ErrorAction SilentlyContinue
+            # MSI deferred custom actions can inherit the Windows Installer
+            # service temp directory instead of the runner user's temp
+            # directory. Dump both locations so identity-registration errors
+            # are visible in the Actions log when an install rolls back.
+            $diagnosticRoots = @($env:TEMP, (Join-Path $env:SystemRoot 'Temp')) | Select-Object -Unique
+            $diagnosticLogs = foreach ($diagnosticRoot in $diagnosticRoots) {
+              Get-ChildItem -Path $diagnosticRoot -Filter 'Files-AV-Manager-install*.log' -File -ErrorAction SilentlyContinue
+            }
+            $diagnosticLogs = $diagnosticLogs | Sort-Object FullName -Unique
             foreach ($diagnosticLog in $diagnosticLogs) {
               Write-Host "Installer diagnostic log: $($diagnosticLog.FullName)"
               Get-Content -LiteralPath $diagnosticLog.FullName
