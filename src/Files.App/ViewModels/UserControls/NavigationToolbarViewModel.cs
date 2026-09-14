@@ -113,7 +113,7 @@ namespace Files.App.ViewModels.UserControls
 		public bool IsGridLayout => _InstanceViewModel?.FolderSettings.LayoutMode is FolderLayoutModes.GridView;
 		public bool IsDetailsLayout => _InstanceViewModel?.FolderSettings.LayoutMode is FolderLayoutModes.DetailsView;
 		public bool IsListLayout => _InstanceViewModel?.FolderSettings.LayoutMode is FolderLayoutModes.ListView;
-		public bool IsAvManagerMode => _InstanceViewModel?.IsAvManagerMode == true;
+		public bool IsResourceManagerMode => _InstanceViewModel?.IsResourceManagerMode == true;
 
 		public bool IsLayoutSizeCompact =>
 			(IsDetailsLayout && UserSettingsService.LayoutSettingsService.DetailsViewSize == DetailsViewSizeKind.Compact) ||
@@ -264,8 +264,8 @@ namespace Files.App.ViewModels.UserControls
 				OmnibarSearchModeText = string.Empty;
 			}
 
-			if (e.PropertyName is nameof(CurrentInstanceViewModel.IsAvManagerMode))
-				OnPropertyChanged(nameof(IsAvManagerMode));
+			if (e.PropertyName is nameof(CurrentInstanceViewModel.IsResourceManagerMode))
+				OnPropertyChanged(nameof(IsResourceManagerMode));
 		}
 
 		private List<ListedItem>? _SelectedItems;

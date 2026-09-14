@@ -10,7 +10,7 @@
     Files.exe remains in the normal install directory.
   -->
   <msix xmlns="urn:schemas-microsoft-com:msix.v1"
-        publisher="CN=Files AV Manager"
+        publisher="CN=Files"
         packageName="FilesDev"
         applicationId="App" />
 

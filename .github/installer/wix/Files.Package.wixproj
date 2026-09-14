@@ -3,7 +3,7 @@
     <OutputType>Package</OutputType>
     <AcceptEula>wix7</AcceptEula>
     <InstallerPlatform>x64</InstallerPlatform>
-    <OutputName>Files-AV-Manager</OutputName>
+    <OutputName>Files-Installer</OutputName>
     <SuppressPdbOutput Condition="'$(Configuration)' == 'Release'">true</SuppressPdbOutput>
 
     <!-- The self-contained .NET publish contains a few native files whose
@@ -18,9 +18,9 @@
     <PayloadDir Condition="'$(PayloadDir)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\publish</PayloadDir>
     <InstallScript Condition="'$(InstallScript)' == ''">$(MSBuildThisFileDirectory)..\..\..\Install-App.ps1</InstallScript>
     <IdentityPackage Condition="'$(IdentityPackage)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\Files.Identity.msix</IdentityPackage>
-    <Certificate Condition="'$(Certificate)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\FilesAVManager.cer</Certificate>
+    <Certificate Condition="'$(Certificate)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\Files.cer</Certificate>
     <AppVersion Condition="'$(AppVersion)' == ''">1.0.0.0</AppVersion>
-    <ProductName Condition="'$(ProductName)' == ''">Files AV Resource Manager</ProductName>
+    <ProductName Condition="'$(ProductName)' == ''">Files</ProductName>
 
     <DefineConstants>
       $(DefineConstants);
@@ -34,7 +34,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Files-AV-Manager.Bundle.wxs" />
+    <Compile Remove="Files.Bundle.wxs" />
     <PackageReference Include="WixToolset.Util.wixext" />
   </ItemGroup>
 </Project>

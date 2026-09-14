@@ -30,10 +30,10 @@ namespace Files.App.Data.EventArguments
 		public IEnumerable<string>? SelectItems { get; set; }
 
 		/// <summary>
-		/// Keeps a native layout page inside the AV manager's configured library.
+		/// Keeps a native layout page inside the resource manager's configured library.
 		/// </summary>
-		public bool IsAvManagerMode { get; set; } = false;
+		public bool IsResourceManagerMode { get; set; } = false;
 
-		public string? AvLibraryPath { get; set; }
+		public string? ResourceLibraryPath { get; set; }
 	}
 }

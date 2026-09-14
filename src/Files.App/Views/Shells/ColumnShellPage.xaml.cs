@@ -77,8 +77,8 @@ namespace Files.App.Views.Shells
 					SearchQuery = ColumnParams.SearchQuery,
 					NavPathParam = ColumnParams.NavPathParam,
 					SearchPathParam = ColumnParams.SearchPathParam,
-					IsAvManagerMode = ColumnParams.IsAvManagerMode,
-					AvLibraryPath = ColumnParams.AvLibraryPath,
+					IsResourceManagerMode = ColumnParams.IsResourceManagerMode,
+					ResourceLibraryPath = ColumnParams.ResourceLibraryPath,
 					AssociatedTabInstance = this,
 					SelectItems = ColumnParams.SelectItems
 				});
@@ -231,15 +231,15 @@ namespace Files.App.Views.Shells
 			this.FindAscendant<ColumnsLayoutPage>()?.ParentShellPageInstance?.NavigateToReleaseNotes();
 		}
 
-#if FILES_AV_MANAGER
-		public override void NavigateToAvManager()
+#if FILES_RESOURCE_MANAGER
+		public override void NavigateToResourceManager()
 		{
-			this.FindAscendant<ColumnsLayoutPage>()?.ParentShellPageInstance?.NavigateToAvManager();
+			this.FindAscendant<ColumnsLayoutPage>()?.ParentShellPageInstance?.NavigateToResourceManager();
 		}
 
-		public override void NavigateToAvManagerTools()
+		public override void NavigateToResourceManagerTools()
 		{
-			this.FindAscendant<ColumnsLayoutPage>()?.ParentShellPageInstance?.NavigateToAvManagerTools();
+			this.FindAscendant<ColumnsLayoutPage>()?.ParentShellPageInstance?.NavigateToResourceManagerTools();
 		}
 #endif
 

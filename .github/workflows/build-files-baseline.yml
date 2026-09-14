@@ -60,7 +60,7 @@ jobs:
             throw 'Files.App.Launcher.exe was not produced.'
           }
 
-      - name: Publish non-AV Files application
+      - name: Publish standard Files application
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -75,7 +75,7 @@ jobs:
             -p:SelfContained=true `
             -p:WindowsPackageType=None `
             -p:FilesExternalLocationBuild=true `
-            -p:FilesAvManagerBuild=false `
+            -p:FilesResourceManagerBuild=false `
             -p:GenerateAppxPackageOnBuild=false `
             "-p:PublishDir=$publishDir\" `
             -v:minimal
@@ -123,18 +123,15 @@ jobs:
           New-Item -ItemType Directory -Path $serverPayloadDir -Force | Out-Null
           Copy-Item -Path (Join-Path $serverPublishDir '*') -Destination $serverPayloadDir -Recurse -Force
 
-          # The baseline must not expose AV implementation files in its publish
+          # The baseline must not expose resource manager implementation files in its publish
           # directory. The compile-time switch is the source of truth; this
-          # check catches an accidental reintroduction of a copied AV payload.
-          if (Get-ChildItem -LiteralPath $publishDir -Recurse -File | Where-Object { $_.Name -match 'AvManager|av-resource' }) {
-            throw 'The non-AV baseline publish output contains AV implementation files.'
+          # check catches an accidental reintroduction of a copied resource manager payload.
+          if (Get-ChildItem -LiteralPath $publishDir -Recurse -File | Where-Object { $_.Name -match 'ResourceManager|files-resource-manager' }) {
+            throw 'The standard baseline publish output contains resource manager implementation files.'
           }
 
       - name: Build identity package and traditional installer
         shell: pwsh
-        env:
-          MSIX_PFX_BASE64: ${{ secrets.MSIX_PFX_BASE64 }}
-          MSIX_PFX_PASSWORD: ${{ secrets.MSIX_PFX_PASSWORD }}
         run: |
           $ErrorActionPreference = 'Stop'
           $workspace = $env:GITHUB_WORKSPACE
@@ -144,11 +141,6 @@ jobs:
           $certificatePath = Join-Path $workspace 'artifacts\Files.cer'
           $vcRedistPath = Join-Path $workspace 'artifacts\VC_redist.x64.exe'
           $pfxPath = Join-Path $workspace 'artifacts\sign.pfx'
-
-          if ([string]::IsNullOrWhiteSpace($env:MSIX_PFX_BASE64) -or
-              [string]::IsNullOrWhiteSpace($env:MSIX_PFX_PASSWORD)) {
-            throw 'MSIX_PFX_BASE64 and MSIX_PFX_PASSWORD GitHub Secrets are required.'
-          }
 
           $sourcePackageManifest = Join-Path $workspace 'src\Files.App\Package.appxmanifest'
           [xml]$sourceManifest = Get-Content -LiteralPath $sourcePackageManifest
@@ -186,15 +178,21 @@ jobs:
             throw "Identity package creation failed with exit code $LASTEXITCODE."
           }
 
-          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:MSIX_PFX_BASE64))
-          $pfxPassword = ConvertTo-SecureString $env:MSIX_PFX_PASSWORD -AsPlainText -Force
-          $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation 'Cert:\CurrentUser\My' -Password $pfxPassword
-          if ($cert.Subject -ne 'CN=Files AV Manager') {
-            throw "Certificate subject '$($cert.Subject)' does not match 'CN=Files AV Manager'."
-          }
+          # Keep the baseline identity and installer signed with the same
+          # temporary Files certificate used by the package manifest.
+          $pfxPasswordText = [guid]::NewGuid().ToString()
+          $pfxPassword = ConvertTo-SecureString $pfxPasswordText -AsPlainText -Force
+          $cert = New-SelfSignedCertificate `
+            -Type Custom `
+            -Subject 'CN=Files' `
+            -KeyUsage DigitalSignature `
+            -FriendlyName 'Files_SelfSigned' `
+            -CertStoreLocation 'Cert:\CurrentUser\My' `
+            -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3', '2.5.29.19={text}')
+          Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $pfxPassword | Out-Null
           Export-Certificate -Cert $cert -FilePath $certificatePath -Type CERT | Out-Null
 
-          & $signtool sign /f $pfxPath /p $env:MSIX_PFX_PASSWORD /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $identityPackage
+          & $signtool sign /f $pfxPath /p $pfxPasswordText /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $identityPackage
           if ($LASTEXITCODE -ne 0) {
             throw "Identity package signing failed with exit code $LASTEXITCODE."
           }
@@ -220,7 +218,7 @@ jobs:
             throw 'Files baseline NSIS installer build failed.'
           }
 
-          & $signtool sign /f $pfxPath /p $env:MSIX_PFX_PASSWORD /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $setupPath
+          & $signtool sign /f $pfxPath /p $pfxPasswordText /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $setupPath
           if ($LASTEXITCODE -ne 0) {
             throw "Installer signing failed with exit code $LASTEXITCODE."
           }
@@ -249,4 +247,4 @@ jobs:
           body: |
             ## Files
 
-            Traditional Windows installer for the non-AV Files baseline.
+            Traditional Windows installer for the standard Files baseline.

@@ -42,8 +42,8 @@ namespace Files.App.Data.Contracts
 		Network,
 		WSL,
 		FileTag
-#if FILES_AV_MANAGER
-		, AvManager
+#if FILES_RESOURCE_MANAGER
+		, ResourceManager
 #endif
 	}
 

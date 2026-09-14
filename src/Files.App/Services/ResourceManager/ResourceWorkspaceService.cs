@@ -3,27 +3,27 @@
 
 using System.IO;
 using System.Text.Json;
-using Files.App.Data.Models.AvManager;
+using Files.App.Data.Models.ResourceManager;
 using Microsoft.Extensions.Logging;
 using Windows.Storage;
 
-namespace Files.App.Services.AvManager;
+namespace Files.App.Services.ResourceManager;
 
 /// <summary>
-/// Stores AV Manager preferences in the app-local settings directory. The
+/// Stores Resource Manager preferences in the app-local settings directory. The
 /// file is written atomically so a process interruption cannot leave a partial
 /// JSON document behind.
 /// </summary>
-public sealed class AvWorkspaceService : IAvWorkspaceService
+public sealed class ResourceWorkspaceService : IResourceWorkspaceService
 {
     private const int MaxRecentLibraries = 8;
-    private const string StateFileName = "av-workspace.json";
+    private const string StateFileName = "files-resource-workspace.json";
 
-    private readonly ILogger<AvWorkspaceService> _logger;
+    private readonly ILogger<ResourceWorkspaceService> _logger;
     private readonly string _statePath;
-    private AvWorkspaceState _state;
+    private ResourceWorkspaceState _state;
 
-    public AvWorkspaceService(ILogger<AvWorkspaceService> logger)
+    public ResourceWorkspaceService(ILogger<ResourceWorkspaceService> logger)
     {
         _logger = logger;
         _statePath = Path.Combine(
@@ -33,7 +33,7 @@ public sealed class AvWorkspaceService : IAvWorkspaceService
         _state = LoadState();
     }
 
-    public AvSettings Settings => _state.Settings;
+    public ResourceSettings Settings => _state.Settings;
 
     public string LibraryPath => _state.LibraryPath;
 
@@ -55,7 +55,7 @@ public sealed class AvWorkspaceService : IAvWorkspaceService
         PersistState();
     }
 
-    public void UpdateSettings(AvSettings settings)
+    public void UpdateSettings(ResourceSettings settings)
     {
         var normalized = settings.Clone();
         normalized.Normalize();
@@ -63,17 +63,17 @@ public sealed class AvWorkspaceService : IAvWorkspaceService
         PersistState();
     }
 
-    private AvWorkspaceState LoadState()
+    private ResourceWorkspaceState LoadState()
     {
         try
         {
             if (File.Exists(_statePath))
             {
-                var state = JsonSerializer.Deserialize<AvWorkspaceState>(File.ReadAllText(_statePath));
+                var state = JsonSerializer.Deserialize<ResourceWorkspaceState>(File.ReadAllText(_statePath));
                 if (state is not null)
                 {
                     state.LibraryPath ??= string.Empty;
-                    state.Settings ??= new AvSettings();
+                    state.Settings ??= new ResourceSettings();
                     state.Settings.Normalize();
                     state.RecentLibraries ??= [];
                     state.RecentLibraries = NormalizeRecentLibraries(state.RecentLibraries);
@@ -83,10 +83,10 @@ public sealed class AvWorkspaceService : IAvWorkspaceService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Unable to load AV workspace state");
+            _logger.LogWarning(ex, "Unable to load resource workspace state");
         }
 
-        return new AvWorkspaceState();
+        return new ResourceWorkspaceState();
     }
 
     private static List<string> NormalizeRecentLibraries(IEnumerable<string>? paths)
@@ -130,7 +130,7 @@ public sealed class AvWorkspaceService : IAvWorkspaceService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Unable to save AV workspace state");
+            _logger.LogWarning(ex, "Unable to save resource workspace state");
             try
             {
                 if (File.Exists(temporaryPath))

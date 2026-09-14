@@ -6,11 +6,11 @@ using System.IO;
 namespace Files.App.Helpers
 {
 	/// <summary>
-	/// Provides the path boundary used by the AV manager. The AV page is a
+	/// Provides the path boundary used by the resource manager. The resource page is a
 	/// scoped file browser: the configured library and its descendants are
 	/// available, while navigating above or outside the library is rejected.
 	/// </summary>
-	public static class AvManagerPathScope
+	public static class ResourceManagerPathScope
 	{
 		public static bool IsWithinLibrary(string? path, string? libraryPath)
 		{

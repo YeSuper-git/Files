@@ -1,17 +1,17 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-namespace Files.App.Data.Models.AvManager;
+namespace Files.App.Data.Models.ResourceManager;
 
 /// <summary>
-/// Persistent AV workspace state. This is intentionally separate from the
+/// Persistent resource workspace state. This is intentionally separate from the
 /// library itself so no configuration file is written into the user's video
 /// folders.
 /// </summary>
-public sealed class AvWorkspaceState
+public sealed class ResourceWorkspaceState
 {
     public int Version { get; set; } = 1;
     public string LibraryPath { get; set; } = string.Empty;
     public List<string> RecentLibraries { get; set; } = [];
-    public AvSettings Settings { get; set; } = new();
+    public ResourceSettings Settings { get; set; } = new();
 }

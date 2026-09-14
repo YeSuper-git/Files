@@ -461,8 +461,8 @@ namespace Files.App.Views.Layouts
 						SearchPathParam = args.SearchPathParam,
 						SearchQuery = args.SearchQuery,
 						IsLayoutSwitch = true,
-						IsAvManagerMode = args.IsAvManagerMode,
-						AvLibraryPath = args.AvLibraryPath,
+						IsResourceManagerMode = args.IsResourceManagerMode,
+						ResourceLibraryPath = args.ResourceLibraryPath,
 						AssociatedTabInstance = parentShellPage
 					});
 
@@ -509,8 +509,8 @@ namespace Files.App.Views.Layouts
 			navigationArguments = args;
 			ParentShellPageInstance = parentShellPage;
 			var folderSettings = parentShellPage.InstanceViewModel.FolderSettings;
-			parentShellPage.InstanceViewModel.IsAvManagerMode = args.IsAvManagerMode;
-			parentShellPage.InstanceViewModel.AvLibraryPath = args.IsAvManagerMode ? args.AvLibraryPath : null;
+			parentShellPage.InstanceViewModel.IsResourceManagerMode = args.IsResourceManagerMode;
+			parentShellPage.InstanceViewModel.ResourceLibraryPath = args.IsResourceManagerMode ? args.ResourceLibraryPath : null;
 
 			// Git properties are not loaded by default
 			shellViewModel.EnabledGitProperties = GitProperties.None;
@@ -540,11 +540,11 @@ namespace Files.App.Views.Layouts
 				var isRecycleBin = workingDir.StartsWith(Constants.UserEnvironmentPaths.RecycleBinPath, StringComparison.Ordinal);
 				parentShellPage.InstanceViewModel.IsPageTypeRecycleBin = isRecycleBin;
 
-				// Can't go up from recycle bin. An AV library is also a scoped root,
-				// so its parent is deliberately not exposed by the AV browser.
-				parentShellPage.ToolbarViewModel.CanNavigateToParent = args.IsAvManagerMode
-					? !AvManagerPathScope.IsLibraryRoot(workingDir, args.AvLibraryPath) &&
-					  AvManagerPathScope.IsWithinLibrary(workingDir, args.AvLibraryPath)
+				// Can't go up from recycle bin. A resource library is also a scoped root,
+				// so its parent is deliberately not exposed by the resource browser.
+				parentShellPage.ToolbarViewModel.CanNavigateToParent = args.IsResourceManagerMode
+					? !ResourceManagerPathScope.IsLibraryRoot(workingDir, args.ResourceLibraryPath) &&
+					  ResourceManagerPathScope.IsWithinLibrary(workingDir, args.ResourceLibraryPath)
 					: !(string.IsNullOrEmpty(pathRoot) || isRecycleBin);
 
 				parentShellPage.InstanceViewModel.IsPageTypeMtpDevice = workingDir.StartsWith("\\\\?\\", StringComparison.Ordinal);

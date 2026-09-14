@@ -26,7 +26,7 @@
     <Variable
         Name="InstallFolder"
         Type="formatted"
-        Value="[ProgramFiles64Folder]Files AV Resource Manager"
+        Value="[ProgramFiles64Folder]Files"
         bal:Overridable="yes"
         Persisted="yes" />
 
@@ -51,8 +51,8 @@
           Permanent="yes"
           Vital="yes" />
       <MsiPackage
-          Id="FilesAvManagerMsi"
-          DisplayName="Files AV Resource Manager"
+          Id="FilesInstallerMsi"
+          DisplayName="Files"
           SourceFile="$(var.MsiPath)"
           Vital="yes">
         <MsiProperty Name="INSTALLFOLDER" Value="[InstallFolder]" />

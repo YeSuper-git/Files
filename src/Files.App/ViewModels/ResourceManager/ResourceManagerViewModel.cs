@@ -4,36 +4,36 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Files.App.Data.Models.AvManager;
-using Files.App.Services.AvManager;
+using Files.App.Data.Models.ResourceManager;
+using Files.App.Services.ResourceManager;
 using Microsoft.Extensions.Logging;
 
-namespace Files.App.ViewModels.AvManager;
+namespace Files.App.ViewModels.ResourceManager;
 
-public sealed partial class AvManagerViewModel : ObservableObject
+public sealed partial class ResourceManagerViewModel : ObservableObject
 {
-    private readonly IAvScanner _scanner;
-    private readonly IAvOperationsService _operations;
-    private readonly IAvWorkspaceService _workspace;
-    private readonly ILogger<AvManagerViewModel> _logger;
+    private readonly IResourceScanner _scanner;
+    private readonly IResourceOperationsService _operations;
+    private readonly IResourceWorkspaceService _workspace;
+    private readonly ILogger<ResourceManagerViewModel> _logger;
     private CancellationTokenSource? _operationCancellation;
 
     [ObservableProperty] private string _libraryPath = string.Empty;
     [ObservableProperty] private bool _isScanning;
     [ObservableProperty] private bool _isOperating;
     [ObservableProperty] private string _statusMessage = "选择一个本地文件夹作为资源库";
-    [ObservableProperty] private AvScanResult? _scanResult;
-    [ObservableProperty] private AvResourceFolder? _selectedFolder;
+    [ObservableProperty] private ResourceScanResult? _scanResult;
+    [ObservableProperty] private ResourceFolder? _selectedFolder;
     [ObservableProperty] private string _currentFilter = "全部";
     [ObservableProperty] private string _searchKeyword = string.Empty;
-    [ObservableProperty] private AvSettings _settings = new();
+    [ObservableProperty] private ResourceSettings _settings = new();
     [ObservableProperty] private bool _hasPendingOps;
 
-    public ObservableCollection<AvResourceFolder> DisplayFolders { get; } = [];
-    public ObservableCollection<AvFileOperation> PendingOperations { get; } = [];
-    public ObservableCollection<AvOperationBatch> OperationHistory { get; } = [];
+    public ObservableCollection<ResourceFolder> DisplayFolders { get; } = [];
+    public ObservableCollection<ResourceFileOperation> PendingOperations { get; } = [];
+    public ObservableCollection<ResourceOperationBatch> OperationHistory { get; } = [];
 
-    public AvManagerViewModel(IAvScanner scanner, IAvOperationsService operations, IAvWorkspaceService workspace, ILogger<AvManagerViewModel> logger)
+    public ResourceManagerViewModel(IResourceScanner scanner, IResourceOperationsService operations, IResourceWorkspaceService workspace, ILogger<ResourceManagerViewModel> logger)
     {
         _scanner = scanner;
         _operations = operations;
@@ -52,7 +52,7 @@ public sealed partial class AvManagerViewModel : ObservableObject
         _workspace.SetLibraryPath(path);
     }
 
-    public void SaveSettings(AvSettings settings)
+    public void SaveSettings(ResourceSettings settings)
     {
         settings.Normalize();
         Settings = settings.Clone();

@@ -76,10 +76,10 @@ namespace Files.App.UserControls
 				args.Handled = true;
 		}
 
-		private void AvManagerButton_Click(object sender, RoutedEventArgs e)
+		private void ResourceManagerButton_Click(object sender, RoutedEventArgs e)
 		{
-#if FILES_AV_MANAGER
-			ContentPageContext.ShellPage?.NavigateToAvManagerTools();
+#if FILES_RESOURCE_MANAGER
+			ContentPageContext.ShellPage?.NavigateToResourceManagerTools();
 #endif
 		}
 

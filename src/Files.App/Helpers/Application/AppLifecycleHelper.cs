@@ -330,13 +330,13 @@ namespace Files.App.Helpers
 					.AddSingleton<ITagsContext, TagsContext>()
 					.AddSingleton<ISidebarContext, SidebarContext>()
 					.AddSingleton<IShelfContext, ShelfContext>()
-#if FILES_AV_MANAGER
-					// AV Resource Manager
-					.AddSingleton<Files.App.Services.AvManager.IAvWorkspaceService, Files.App.Services.AvManager.AvWorkspaceService>()
-					.AddSingleton<Files.App.Services.AvManager.IAvCodeParser, Files.App.Services.AvManager.AvCodeParser>()
-					.AddSingleton<Files.App.Services.AvManager.IAvScanner, Files.App.Services.AvManager.AvScanner>()
-					.AddSingleton<Files.App.Services.AvManager.IAvOperationsService, Files.App.Services.AvManager.AvOperationsService>()
-					.AddTransient<Files.App.ViewModels.AvManager.AvManagerViewModel>()
+#if FILES_RESOURCE_MANAGER
+					// Resource Manager
+					.AddSingleton<Files.App.Services.ResourceManager.IResourceWorkspaceService, Files.App.Services.ResourceManager.ResourceWorkspaceService>()
+					.AddSingleton<Files.App.Services.ResourceManager.IResourceCodeParser, Files.App.Services.ResourceManager.ResourceCodeParser>()
+					.AddSingleton<Files.App.Services.ResourceManager.IResourceScanner, Files.App.Services.ResourceManager.ResourceScanner>()
+					.AddSingleton<Files.App.Services.ResourceManager.IResourceOperationsService, Files.App.Services.ResourceManager.ResourceOperationsService>()
+					.AddTransient<Files.App.ViewModels.ResourceManager.ResourceManagerViewModel>()
 #endif
 					// Services
 					.AddSingleton<IWindowsRecentItemsService, WindowsRecentItemsService>()

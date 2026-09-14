@@ -2,9 +2,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <!-- Keep the existing AV build as the default for the fork. The baseline
-             installer explicitly passes FilesAvManagerBuild=false. -->
-        <FilesAvManagerBuild Condition="'$(FilesAvManagerBuild)' == ''">true</FilesAvManagerBuild>
+        <!-- Keep the customized build as the default for the fork. The baseline
+             installer explicitly passes FilesResourceManagerBuild=false. -->
+        <FilesResourceManagerBuild Condition="'$(FilesResourceManagerBuild)' == ''">true</FilesResourceManagerBuild>
         <EnableMsixTooling>true</EnableMsixTooling>
         <PublishProfile>Properties\PublishProfiles\win-$(Platform).pubxml</PublishProfile>
         <TargetFramework>$(WindowsTargetFramework)</TargetFramework>
@@ -61,8 +61,8 @@
         <DefineConstants>$(DefineConstants);FILES_EXTERNAL_LOCATION_BUILD</DefineConstants>
     </PropertyGroup>
 
-    <PropertyGroup Condition="'$(FilesAvManagerBuild)' == 'true'">
-        <DefineConstants>$(DefineConstants);FILES_AV_MANAGER</DefineConstants>
+    <PropertyGroup Condition="'$(FilesResourceManagerBuild)' == 'true'">
+        <DefineConstants>$(DefineConstants);FILES_RESOURCE_MANAGER</DefineConstants>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(SENTRY_AUTH_TOKEN)' != ''">
@@ -91,12 +91,12 @@
     </ItemGroup>
   
     <ItemGroup>
-        <!-- The baseline Files build must not carry the AV manager feature code. -->
-        <Compile Remove="Data\Models\AvManager\**\*.cs" Condition="'$(FilesAvManagerBuild)' != 'true'" />
-        <Compile Remove="Services\AvManager\**\*.cs" Condition="'$(FilesAvManagerBuild)' != 'true'" />
-        <Compile Remove="ViewModels\AvManager\**\*.cs" Condition="'$(FilesAvManagerBuild)' != 'true'" />
-        <Compile Remove="Views\AvManager\**\*.xaml.cs" Condition="'$(FilesAvManagerBuild)' != 'true'" />
-        <Page Remove="Views\AvManager\**\*.xaml" Condition="'$(FilesAvManagerBuild)' != 'true'" />
+        <!-- The baseline Files build must not carry the resource manager feature code. -->
+        <Compile Remove="Data\Models\ResourceManager\**\*.cs" Condition="'$(FilesResourceManagerBuild)' != 'true'" />
+        <Compile Remove="Services\ResourceManager\**\*.cs" Condition="'$(FilesResourceManagerBuild)' != 'true'" />
+        <Compile Remove="ViewModels\ResourceManager\**\*.cs" Condition="'$(FilesResourceManagerBuild)' != 'true'" />
+        <Compile Remove="Views\ResourceManager\**\*.xaml.cs" Condition="'$(FilesResourceManagerBuild)' != 'true'" />
+        <Page Remove="Views\ResourceManager\**\*.xaml" Condition="'$(FilesResourceManagerBuild)' != 'true'" />
         <Manifest Include="$(ApplicationManifest)" />
         <!-- External-location builds still resolve ms-appx resources from the
              real install directory, so publish the complete asset tree. -->

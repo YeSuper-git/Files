@@ -407,14 +407,14 @@
 			Orientation="Horizontal"
 			Spacing="4">
 
-			<!--  AV Manager tools for the currently scoped native browser  -->
+			<!--  Resource Manager tools for the currently scoped native browser  -->
 			<Button
-				x:Name="AvManagerButton"
-				x:Load="{x:Bind ViewModel.IsAvManagerMode, Mode=OneWay}"
-				AutomationProperties.Name="AV 资源工具"
-				Click="AvManagerButton_Click"
+				x:Name="ResourceManagerButton"
+				x:Load="{x:Bind ViewModel.IsResourceManagerMode, Mode=OneWay}"
+				AutomationProperties.Name="资源工具"
+				Click="ResourceManagerButton_Click"
 				Style="{StaticResource AddressToolbarButtonStyle}"
-				ToolTipService.ToolTip="AV 资源工具">
+				ToolTipService.ToolTip="资源工具">
 				<FontIcon FontSize="14" Glyph="&#xE8B7;" />
 			</Button>
 

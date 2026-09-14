@@ -2,34 +2,34 @@
 // Licensed under the MIT License.
 
 using System.IO;
-using Files.App.Data.Models.AvManager;
+using Files.App.Data.Models.ResourceManager;
 using Microsoft.Extensions.Logging;
 
-namespace Files.App.Services.AvManager;
+namespace Files.App.Services.ResourceManager;
 
-public sealed class AvScanner : IAvScanner
+public sealed class ResourceScanner : IResourceScanner
 {
-    private readonly IAvCodeParser _codeParser;
-    private readonly ILogger<AvScanner> _logger;
+    private readonly IResourceCodeParser _codeParser;
+    private readonly ILogger<ResourceScanner> _logger;
 
-    public AvScanner(IAvCodeParser codeParser, ILogger<AvScanner> logger)
+    public ResourceScanner(IResourceCodeParser codeParser, ILogger<ResourceScanner> logger)
     {
         _codeParser = codeParser;
         _logger = logger;
     }
 
-    public async Task<AvScanResult> AnalyzeLibraryAsync(string root, AvSettings settings, CancellationToken ct = default)
+    public async Task<ResourceScanResult> AnalyzeLibraryAsync(string root, ResourceSettings settings, CancellationToken ct = default)
     {
         return await Task.Run(() =>
         {
             var effectiveSettings = settings.Clone();
             effectiveSettings.Normalize();
             var rootDir = new DirectoryInfo(root);
-            var folders = new List<AvResourceFolder>();
+            var folders = new List<ResourceFolder>();
 
             if (!rootDir.Exists)
             {
-                return new AvScanResult { Root = root };
+                return new ResourceScanResult { Root = root };
             }
 
             try
@@ -53,7 +53,7 @@ public sealed class AvScanner : IAvScanner
             MarkDuplicateCodes(folders);
             var looseVideoCount = CountLooseVideos(rootDir, effectiveSettings, ct);
 
-            return new AvScanResult
+            return new ResourceScanResult
             {
                 Root = root,
                 TotalFolders = folders.Count,
@@ -70,7 +70,7 @@ public sealed class AvScanner : IAvScanner
         }, ct);
     }
 
-    private void CollectWorkFolders(DirectoryInfo parent, List<AvResourceFolder> out_, AvSettings settings, CancellationToken ct)
+    private void CollectWorkFolders(DirectoryInfo parent, List<ResourceFolder> out_, ResourceSettings settings, CancellationToken ct)
     {
         try
         {
@@ -86,7 +86,7 @@ public sealed class AvScanner : IAvScanner
         catch (Exception ex) { _logger.LogWarning(ex, "Error collecting folders from {Path}", parent.FullName); }
     }
 
-    private AvResourceFolder AnalyzeWorkFolder(DirectoryInfo dir, AvSettings settings, CancellationToken ct)
+    private ResourceFolder AnalyzeWorkFolder(DirectoryInfo dir, ResourceSettings settings, CancellationToken ct)
     {
         var name = dir.Name;
         var code = _codeParser.ParseCode(name);
@@ -102,7 +102,7 @@ public sealed class AvScanner : IAvScanner
         if (pc > 1) problems.Add("多海报");
         if (lq > 0) problems.Add("低质量海报");
 
-        return new AvResourceFolder
+        return new ResourceFolder
         {
             Name = name, Path = dir.FullName, Code = code?.Normalized,
             HasVideo = vc > 0, HasPoster = pc > 0, HasChineseSubtitle = hasSub,
@@ -110,7 +110,7 @@ public sealed class AvScanner : IAvScanner
         };
     }
 
-    private void ScanFolderFast(DirectoryInfo dir, int depth, AvSettings s, ref int vc, ref int pc, ref int lq, ref bool hasSub, CancellationToken ct)
+    private void ScanFolderFast(DirectoryInfo dir, int depth, ResourceSettings s, ref int vc, ref int pc, ref int lq, ref bool hasSub, CancellationToken ct)
     {
         if (depth > 2) return;
         try
@@ -135,7 +135,7 @@ public sealed class AvScanner : IAvScanner
         catch (Exception ex) { _logger.LogWarning(ex, "Error scanning {Path}", dir.FullName); }
     }
 
-    private int CountLooseVideos(DirectoryInfo root, AvSettings s, CancellationToken ct)
+    private int CountLooseVideos(DirectoryInfo root, ResourceSettings s, CancellationToken ct)
     {
         try
         {
@@ -168,7 +168,7 @@ public sealed class AvScanner : IAvScanner
         }
     }
 
-    private void MarkDuplicateCodes(List<AvResourceFolder> folders)
+    private void MarkDuplicateCodes(List<ResourceFolder> folders)
     {
         var counts = new Dictionary<string, int>();
         foreach (var f in folders) if (f.Code is not null) counts[f.Code] = counts.GetValueOrDefault(f.Code) + 1;

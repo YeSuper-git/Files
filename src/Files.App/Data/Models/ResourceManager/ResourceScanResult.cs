@@ -1,9 +1,9 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-namespace Files.App.Data.Models.AvManager;
+namespace Files.App.Data.Models.ResourceManager;
 
-public sealed class AvScanResult
+public sealed class ResourceScanResult
 {
     public string Root { get; init; } = string.Empty;
     public int TotalFolders { get; init; }
@@ -15,6 +15,6 @@ public sealed class AvScanResult
     public int LowQualityPosterCount { get; init; }
     public int DuplicateCodeCount { get; init; }
     public int LooseVideoCount { get; init; }
-    public List<AvResourceFolder> Folders { get; init; } = [];
+    public List<ResourceFolder> Folders { get; init; } = [];
     public int ProblemCount => TotalFolders - NormalCount;
 }

@@ -22,10 +22,10 @@ namespace Files.App.Services
 	{
 		private const string ReleasesApiUrl = "https://api.github.com/repos/YeSuper-git/Files/releases?per_page=20";
 
-#if FILES_AV_MANAGER
-		private const string ProductName = "Files AV Resource Manager";
-		private const string InstallerAssetName = "Files-AV-Manager-Setup.exe";
-		private const string VersionAssetName = "Files-AV-Manager-Setup.version.json";
+#if FILES_RESOURCE_MANAGER
+		private const string ProductName = "Files";
+		private const string InstallerAssetName = "Files-Setup.exe";
+		private const string VersionAssetName = "Files-Setup.version.json";
 #else
 		private const string ProductName = "Files";
 		private const string InstallerAssetName = "Files-Setup.exe";

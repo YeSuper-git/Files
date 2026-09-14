@@ -535,8 +535,8 @@ namespace Files.App.Views.Shells
 				IsSearchResultPage = true,
 				SearchPathParam = shellViewModel.WorkingDirectory,
 				SearchQuery = query,
-				IsAvManagerMode = InstanceViewModel.IsAvManagerMode,
-				AvLibraryPath = InstanceViewModel.AvLibraryPath,
+				IsResourceManagerMode = InstanceViewModel.IsResourceManagerMode,
+				ResourceLibraryPath = InstanceViewModel.ResourceLibraryPath,
 			};
 
 			var layout = InstanceViewModel.FolderSettings.GetLayoutType(shellViewModel.WorkingDirectory);
@@ -878,9 +878,9 @@ namespace Files.App.Views.Shells
 		public abstract void NavigateHome();
 
 		public abstract void NavigateToReleaseNotes();
-#if FILES_AV_MANAGER
-		public abstract void NavigateToAvManager();
-		public abstract void NavigateToAvManagerTools();
+#if FILES_RESOURCE_MANAGER
+		public abstract void NavigateToResourceManager();
+		public abstract void NavigateToResourceManagerTools();
 #endif
 
 		public abstract void NavigateToSettings(string? selectItem = null);

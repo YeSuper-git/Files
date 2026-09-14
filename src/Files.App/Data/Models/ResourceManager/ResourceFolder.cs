@@ -1,9 +1,9 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-namespace Files.App.Data.Models.AvManager;
+namespace Files.App.Data.Models.ResourceManager;
 
-public sealed class AvResourceFolder
+public sealed class ResourceFolder
 {
     public string Name { get; init; } = string.Empty;
     public string Path { get; init; } = string.Empty;

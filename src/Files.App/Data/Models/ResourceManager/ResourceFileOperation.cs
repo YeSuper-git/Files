@@ -1,9 +1,9 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-namespace Files.App.Data.Models.AvManager;
+namespace Files.App.Data.Models.ResourceManager;
 
-public sealed class AvFileOperation
+public sealed class ResourceFileOperation
 {
     public string Operation { get; init; } = string.Empty;
     public string Source { get; init; } = string.Empty;

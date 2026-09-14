@@ -22,9 +22,9 @@ namespace Files.App.Actions
 			if (await DriveHelpers.CheckEmptyDrive(SidebarContext.RightClickedItem!.Path))
 				return;
 
-#if FILES_AV_MANAGER
-			if (string.Equals(SidebarContext.RightClickedItem!.Path, "AvManager", StringComparison.OrdinalIgnoreCase))
-				await NavigationHelpers.OpenAvManagerInNewTab();
+#if FILES_RESOURCE_MANAGER
+			if (string.Equals(SidebarContext.RightClickedItem!.Path, "ResourceManager", StringComparison.OrdinalIgnoreCase))
+				await NavigationHelpers.OpenResourceManagerInNewTab();
 			else
 #endif
 				await NavigationHelpers.OpenPathInNewTab(SidebarContext.RightClickedItem!.Path ?? string.Empty);

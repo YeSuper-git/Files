@@ -147,18 +147,18 @@ namespace Files.App.Data.Models
 			}
 		}
 
-		private bool isAvManagerMode;
-		public bool IsAvManagerMode
+		private bool isResourceManagerMode;
+		public bool IsResourceManagerMode
 		{
-			get => isAvManagerMode;
-			set => SetProperty(ref isAvManagerMode, value);
+			get => isResourceManagerMode;
+			set => SetProperty(ref isResourceManagerMode, value);
 		}
 
-		private string? avLibraryPath;
-		public string? AvLibraryPath
+		private string? resourceLibraryPath;
+		public string? ResourceLibraryPath
 		{
-			get => avLibraryPath;
-			set => SetProperty(ref avLibraryPath, value);
+			get => resourceLibraryPath;
+			set => SetProperty(ref resourceLibraryPath, value);
 		}
 
 		private string? zipEncodingName;

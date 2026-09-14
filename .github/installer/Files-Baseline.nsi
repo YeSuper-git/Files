@@ -39,7 +39,7 @@ Section "Install"
     StrCpy $IdentityPackage "$INSTDIR\Files.Identity.msix"
 
     DetailPrint "Registering Files..."
-    nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$InstallScript" -Mode Install -InstallDirectory "$INSTDIR" -IdentityPackagePath "$IdentityPackage" -PackageName "FilesDev" -Publisher "CN=Files AV Manager" -ProductName "Files" -CertificateFileName "Files.cer" -LogFileName "Files-install.log"'
+    nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$InstallScript" -Mode Install -InstallDirectory "$INSTDIR" -IdentityPackagePath "$IdentityPackage" -PackageName "FilesDev" -Publisher "CN=Files" -ProductName "Files" -CertificateFileName "Files.cer" -LogFileName "Files-install.log"'
     Pop $0
     ${If} $0 != 0
         Abort "Files installation failed. See %TEMP%\Files-install.log for details."
@@ -67,7 +67,7 @@ Section "Uninstall"
     StrCpy $IdentityPackage "$INSTDIR\Files.Identity.msix"
 
     DetailPrint "Unregistering Files..."
-    nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$InstallScript" -Mode Uninstall -InstallDirectory "$INSTDIR" -IdentityPackagePath "$IdentityPackage" -PackageName "FilesDev" -Publisher "CN=Files AV Manager" -ProductName "Files" -CertificateFileName "Files.cer" -LogFileName "Files-install.log"'
+    nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$InstallScript" -Mode Uninstall -InstallDirectory "$INSTDIR" -IdentityPackagePath "$IdentityPackage" -PackageName "FilesDev" -Publisher "CN=Files" -ProductName "Files" -CertificateFileName "Files.cer" -LogFileName "Files-install.log"'
     Pop $0
     ${If} $0 != 0
         MessageBox MB_ICONEXCLAMATION|MB_OK "Files identity cleanup failed. Close Files and run the uninstaller again. No files were removed."

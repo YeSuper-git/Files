@@ -85,8 +85,8 @@ namespace Files.App.ViewModels.UserControls
 				SectionType.Network,
 				SectionType.WSL,
 				SectionType.FileTag
-#if FILES_AV_MANAGER
-				, SectionType.AvManager
+#if FILES_RESOURCE_MANAGER
+				, SectionType.ResourceManager
 #endif
 			];
 
@@ -319,8 +319,8 @@ namespace Files.App.ViewModels.UserControls
 			Manager_DataChanged(SectionType.Network, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
 			Manager_DataChanged(SectionType.WSL, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
 			Manager_DataChanged(SectionType.FileTag, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
-#if FILES_AV_MANAGER
-			Manager_DataChanged(SectionType.AvManager, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+#if FILES_RESOURCE_MANAGER
+			Manager_DataChanged(SectionType.ResourceManager, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
 #endif
 
 			App.QuickAccessManager.Model.DataChanged += Manager_DataChanged;
@@ -390,9 +390,9 @@ namespace Files.App.ViewModels.UserControls
 					SectionType.WSL => WSLDistroManager.Distros,
 					SectionType.Library => App.LibraryManager.Libraries,
 					SectionType.FileTag => App.FileTagsManager.FileTags,
-#if FILES_AV_MANAGER
-					// AV Manager is a standalone navigation item, not a collection-backed section.
-					SectionType.AvManager => Array.Empty<INavigationControlItem>(),
+#if FILES_RESOURCE_MANAGER
+					// Resource Manager is a standalone navigation item, not a collection-backed section.
+					SectionType.ResourceManager => Array.Empty<INavigationControlItem>(),
 #endif
 					_ => throw new ArgumentOutOfRangeException(nameof(sectionType), sectionType, "The sidebar section type is not supported.")
 				};
@@ -618,10 +618,10 @@ namespace Files.App.ViewModels.UserControls
 					section.IsHeader = true;
 					break;
 
-#if FILES_AV_MANAGER
-				case SectionType.AvManager:
-					section = BuildSection("AV 资源管理", sectionType, new ContextMenuOptions { IsLocationItem = true }, true);
-					section.Path = "AvManager";
+#if FILES_RESOURCE_MANAGER
+				case SectionType.ResourceManager:
+					section = BuildSection("资源管理", sectionType, new ContextMenuOptions { IsLocationItem = true }, true);
+					section.Path = "ResourceManager";
 					section.IsHeader = true;
 					break;
 #endif
@@ -672,8 +672,8 @@ namespace Files.App.ViewModels.UserControls
 					SectionType.FileTag when generalSettingsService.ShowFileTagsSection => App.FileTagsManager.UpdateFileTagsAsync,
 					SectionType.Library => App.LibraryManager.UpdateLibrariesAsync,
 					SectionType.Pinned => App.QuickAccessManager.Model.AddAllItemsToSidebarAsync,
-#if FILES_AV_MANAGER
-					SectionType.AvManager => () => Task.CompletedTask,
+#if FILES_RESOURCE_MANAGER
+					SectionType.ResourceManager => () => Task.CompletedTask,
 #endif
 					_ => () => Task.CompletedTask
 				};
@@ -851,19 +851,19 @@ namespace Files.App.ViewModels.UserControls
 			var ctrlPressed = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
 			var middleClickPressed = pointerUpdateKind == PointerUpdateKind.MiddleButtonReleased;
 
-#if FILES_AV_MANAGER
-			// AV Manager is an application page, not a filesystem path. Route it directly
-			// so the normal sidebar navigation pipeline does not treat "AvManager" as a folder.
-			if (string.Equals(navigationPath, "AvManager", StringComparison.OrdinalIgnoreCase))
+#if FILES_RESOURCE_MANAGER
+			// Resource Manager is an application page, not a filesystem path. Route it directly
+			// so the normal sidebar navigation pipeline does not treat "ResourceManager" as a folder.
+			if (string.Equals(navigationPath, "ResourceManager", StringComparison.OrdinalIgnoreCase))
 			{
 				if (ctrlPressed || middleClickPressed)
 				{
-					await NavigationHelpers.OpenAvManagerInNewTab();
+					await NavigationHelpers.OpenResourceManagerInNewTab();
 					return;
 				}
 
-				if (PaneHolder?.ActivePane is IShellPage avManagerShellPage)
-					avManagerShellPage.NavigateToAvManager();
+				if (PaneHolder?.ActivePane is IShellPage resourceManagerShellPage)
+					resourceManagerShellPage.NavigateToResourceManager();
 				return;
 			}
 #endif

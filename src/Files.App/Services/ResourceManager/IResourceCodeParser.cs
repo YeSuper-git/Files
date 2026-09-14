@@ -1,13 +1,13 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-using Files.App.Data.Models.AvManager;
+using Files.App.Data.Models.ResourceManager;
 
-namespace Files.App.Services.AvManager;
+namespace Files.App.Services.ResourceManager;
 
-public interface IAvCodeParser
+public interface IResourceCodeParser
 {
-    AvCodeInfo? ParseCode(string name);
+    ResourceCodeInfo? ParseCode(string name);
     bool HasChineseSubtitle(string name);
     bool HasChineseSubtitle(string name, IReadOnlyList<string> keywords);
 }

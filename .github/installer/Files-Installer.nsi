@@ -2,19 +2,19 @@ Unicode True
 ManifestSupportedOS win10
 RequestExecutionLevel admin
 SetCompressor /SOLID lzma
-InstallDir "$PROGRAMFILES64\Files AV Resource Manager"
-InstallDirRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files AV Resource Manager" "InstallLocation"
+InstallDir "$PROGRAMFILES64\Files"
+InstallDirRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "InstallLocation"
 
-Name "Files AV Resource Manager"
+Name "Files"
 OutFile "${OUTPUT_EXE}"
-BrandingText "Files AV Resource Manager"
+BrandingText "Files"
 ShowInstDetails nevershow
 ShowUninstDetails nevershow
 
 VIProductVersion "${APP_VERSION}"
-VIAddVersionKey /LANG=2052 "ProductName" "Files AV Resource Manager"
+VIAddVersionKey /LANG=2052 "ProductName" "Files"
 VIAddVersionKey /LANG=2052 "CompanyName" "YeSuper"
-VIAddVersionKey /LANG=2052 "FileDescription" "Files AV Resource Manager installer"
+VIAddVersionKey /LANG=2052 "FileDescription" "Files installer"
 VIAddVersionKey /LANG=2052 "FileVersion" "${APP_VERSION}"
 VIAddVersionKey /LANG=2052 "ProductVersion" "${APP_VERSION}"
 
@@ -42,22 +42,22 @@ Section "Install"
     nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$InstallScript" -Mode Install -InstallDirectory "$INSTDIR" -IdentityPackagePath "$IdentityPackage"'
     Pop $0
     ${If} $0 != 0
-        Abort "Files installation failed. See %TEMP%\Files-AV-Manager-install.log for details."
+        Abort "Files installation failed. See %TEMP%\Files-Installer-install.log for details."
     ${EndIf}
 
-    CreateDirectory "$SMPROGRAMS\Files AV Resource Manager"
-    CreateShortCut "$SMPROGRAMS\Files AV Resource Manager\Files AV Resource Manager.lnk" "$INSTDIR\Files.exe"
+    CreateDirectory "$SMPROGRAMS\Files"
+    CreateShortCut "$SMPROGRAMS\Files\Files.lnk" "$INSTDIR\Files.exe"
     !insertmacro InstallFilesShellIntegration
 
     WriteUninstaller "$INSTDIR\Uninstall.exe"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files AV Resource Manager" "DisplayName" "Files AV Resource Manager"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files AV Resource Manager" "DisplayVersion" "${APP_VERSION}"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files AV Resource Manager" "Publisher" "YeSuper"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files AV Resource Manager" "InstallLocation" "$INSTDIR"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files AV Resource Manager" "DisplayIcon" "$INSTDIR\Assets\AppTiles\Dev\Logo.ico"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files AV Resource Manager" "UninstallString" "$INSTDIR\Uninstall.exe"
-    WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files AV Resource Manager" "NoModify" 1
-    WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files AV Resource Manager" "NoRepair" 1
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "DisplayName" "Files"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "DisplayVersion" "${APP_VERSION}"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "Publisher" "YeSuper"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "InstallLocation" "$INSTDIR"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "DisplayIcon" "$INSTDIR\Assets\AppTiles\Dev\Logo.ico"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "UninstallString" "$INSTDIR\Uninstall.exe"
+    WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "NoModify" 1
+    WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "NoRepair" 1
 SectionEnd
 
 Section "Uninstall"
@@ -74,9 +74,9 @@ Section "Uninstall"
         Abort
     ${EndIf}
 
-    Delete "$SMPROGRAMS\Files AV Resource Manager\Files AV Resource Manager.lnk"
-    RMDir "$SMPROGRAMS\Files AV Resource Manager"
+    Delete "$SMPROGRAMS\Files\Files.lnk"
+    RMDir "$SMPROGRAMS\Files"
     !insertmacro UninstallFilesShellIntegration
-    DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files AV Resource Manager"
+    DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files"
     RMDir /r "$INSTDIR"
 SectionEnd

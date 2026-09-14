@@ -5,28 +5,28 @@ using CommunityToolkit.Mvvm.DependencyInjection;
 using System.IO;
 using Microsoft.UI;
 using Microsoft.UI.Xaml.Shapes;
-using Files.App.Data.Models.AvManager;
-using Files.App.Services.AvManager;
-using Files.App.ViewModels.AvManager;
+using Files.App.Data.Models.ResourceManager;
+using Files.App.Services.ResourceManager;
+using Files.App.ViewModels.ResourceManager;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 
-namespace Files.App.Views.AvManager;
+namespace Files.App.Views.ResourceManager;
 
-public sealed partial class AvManagerPage : Page
+public sealed partial class ResourceManagerPage : Page
 {
-    private readonly AvManagerViewModel _vm = Ioc.Default.GetRequiredService<AvManagerViewModel>();
-    private readonly IAvOperationsService _ops = Ioc.Default.GetRequiredService<IAvOperationsService>();
-    private readonly IAvScanner _scanner = Ioc.Default.GetRequiredService<IAvScanner>();
+    private readonly ResourceManagerViewModel _vm = Ioc.Default.GetRequiredService<ResourceManagerViewModel>();
+    private readonly IResourceOperationsService _ops = Ioc.Default.GetRequiredService<IResourceOperationsService>();
+    private readonly IResourceScanner _scanner = Ioc.Default.GetRequiredService<IResourceScanner>();
     private readonly IContentPageContext _contentPageContext = Ioc.Default.GetRequiredService<IContentPageContext>();
 
-    private List<AvResourceFolder> _allFolders = [];
-    private List<AvFileOperation> _pendingOps = [];
+    private List<ResourceFolder> _allFolders = [];
+    private List<ResourceFileOperation> _pendingOps = [];
     private string _filter = "全部";
     private CancellationTokenSource? _operationCancellation;
 
-    public AvManagerPage()
+    public ResourceManagerPage()
     {
         InitializeComponent();
         Loaded += OnPageLoaded;
@@ -85,7 +85,7 @@ public sealed partial class AvManagerPage : Page
     private void ApplyFilter(string? kw = null)
     {
         FolderList.Items.Clear();
-        IEnumerable<AvResourceFolder> list = _allFolders;
+        IEnumerable<ResourceFolder> list = _allFolders;
         list = _filter switch { "异常" => list.Where(f => !f.IsNormal), "缺视频" => list.Where(f => !f.HasVideo), "缺海报" => list.Where(f => !f.HasPoster), "无中字" => list.Where(f => !f.HasChineseSubtitle), "重复番号" => list.Where(f => f.Problems.Contains("重复番号")), _ => list };
         if (!string.IsNullOrWhiteSpace(kw)) { var k = kw.Trim().ToLower(); list = list.Where(f => f.Name.Contains(k, StringComparison.OrdinalIgnoreCase) || (f.Code?.Contains(k, StringComparison.OrdinalIgnoreCase) ?? false)); }
         foreach (var f in list)
@@ -125,11 +125,11 @@ public sealed partial class AvManagerPage : Page
         var folder = await picker.PickSingleFolderAsync();
         if (folder is null) return;
         _vm.SetLibraryPath(folder.Path);
-        _contentPageContext.ShellPage?.NavigateToAvManager();
+        _contentPageContext.ShellPage?.NavigateToResourceManager();
     }
 
     private void OnOpenNativeBrowser(object s, RoutedEventArgs e)
-        => _contentPageContext.ShellPage?.NavigateToAvManager();
+        => _contentPageContext.ShellPage?.NavigateToResourceManager();
 
     private async void OnRefresh(object s, RoutedEventArgs e) => await RefreshAsync();
 
@@ -171,7 +171,7 @@ public sealed partial class AvManagerPage : Page
 
     private void OnFolderSelected(object s, SelectionChangedEventArgs e)
     {
-        if (FolderList.SelectedItem is ListViewItem item && item.Tag is AvResourceFolder folder)
+        if (FolderList.SelectedItem is ListViewItem item && item.Tag is ResourceFolder folder)
         {
             DetailPanel.Visibility = Visibility.Visible; DetailContent.Children.Clear();
             AddDetail("名称", folder.Name); AddDetail("路径", folder.Path, true);
@@ -324,7 +324,7 @@ public sealed partial class AvManagerPage : Page
 
         var dialog = new ContentDialog
         {
-            Title = "AV 资源规则",
+            Title = "资源规则",
             Content = new ScrollViewer { MaxHeight = 520, Content = content },
             PrimaryButtonText = "保存",
             CloseButtonText = "取消",
@@ -334,7 +334,7 @@ public sealed partial class AvManagerPage : Page
         if (await dialog.ShowAsync() != ContentDialogResult.Primary)
             return;
 
-        var settings = new AvSettings
+        var settings = new ResourceSettings
         {
             VideoExtensions = ParseList(videoExtensions.Text),
             ImageExtensions = ParseList(imageExtensions.Text),
@@ -342,7 +342,7 @@ public sealed partial class AvManagerPage : Page
             PosterQualityKb = double.IsNaN(posterQuality.Value) ? _vm.Settings.PosterQualityKb : (int)Math.Round(posterQuality.Value)
         };
         _vm.SaveSettings(settings);
-        SetStatus("AV 资源规则已保存");
+        SetStatus("资源规则已保存");
         if (!string.IsNullOrEmpty(_vm.LibraryPath))
             await RefreshAsync();
     }

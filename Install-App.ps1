@@ -7,11 +7,11 @@ param(
     [string]$InstallDirectory = '',
     [string]$IdentityPackagePath = '',
     [string]$PackageName = 'FilesDev',
-    [string]$Publisher = 'CN=Files AV Manager',
-    [string]$ProductName = 'Files AV Resource Manager',
-    [string]$CertificateFileName = 'FilesAVManager.cer',
-    [string]$LogFileName = 'Files-AV-Manager-install.log',
-    [string]$LegacyUninstallKeyName = 'Files AV Resource Manager'
+    [string]$Publisher = 'CN=Files',
+    [string]$ProductName = 'Files',
+    [string]$CertificateFileName = 'Files.cer',
+    [string]$LogFileName = 'Files-Installer-install.log',
+    [string]$LegacyUninstallKeyName = 'Files'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -79,8 +79,9 @@ try {
     }
 
     if ($Mode -eq 'Uninstall') {
-        $installedPackages = @(Get-AppxPackage -Name $PackageName -ErrorAction SilentlyContinue |
-            Where-Object { $_.Publisher -eq $Publisher })
+        # Remove every identity package with this package name. This also
+        # cleans up installations made by an earlier publisher identity.
+        $installedPackages = @(Get-AppxPackage -Name $PackageName -ErrorAction SilentlyContinue)
         foreach ($package in $installedPackages) {
             Write-InstallLog "Removing identity package: $($package.PackageFullName)"
             Remove-AppxPackage -Package $package.PackageFullName -ErrorAction Stop
@@ -128,6 +129,16 @@ try {
         if ($exitCode -notin @(0, 1638, 3010)) {
             throw "Microsoft Visual C++ Redistributable installation failed with exit code $exitCode"
         }
+    }
+
+    # Remove an older identity package before registering the current one.
+    # The package name is stable, while the signing identity may change when
+    # moving from a development build to the standard Files identity.
+    $legacyIdentities = @(Get-AppxPackage -Name $PackageName -ErrorAction SilentlyContinue |
+        Where-Object { $_.Publisher -ne $Publisher })
+    foreach ($legacyIdentity in $legacyIdentities) {
+        Write-InstallLog "Removing previous identity package: $($legacyIdentity.PackageFullName)"
+        Remove-AppxPackage -Package $legacyIdentity.PackageFullName -ErrorAction Stop
     }
 
     $existingIdentity = Get-AppxPackage -Name $PackageName -ErrorAction SilentlyContinue |

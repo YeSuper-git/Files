@@ -16,7 +16,7 @@
 
     <Identity
         Name="FilesDev"
-        Publisher="CN=Files AV Manager"
+        Publisher="CN=Files"
         Version="0.0.0.0"
         ProcessorArchitecture="neutral" />
 

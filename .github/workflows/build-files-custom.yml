@@ -1,8 +1,8 @@
-name: Build Files AV Resource Manager
+name: Build Files
 
 on:
   push:
-    branches: [main, feature/av-resource-manager, "codex/**"]
+    branches: [main, feature/files-resource-manager, "codex/**"]
     tags: ["v*"]
   workflow_dispatch:
 
@@ -65,7 +65,7 @@ jobs:
             -p:SelfContained=true `
             -p:WindowsPackageType=None `
             -p:FilesExternalLocationBuild=true `
-            -p:FilesAvManagerBuild=true `
+            -p:FilesResourceManagerBuild=true `
             -p:GenerateAppxPackageOnBuild=false `
             "-p:PublishDir=$publishDir\" `
             -v:minimal
@@ -118,23 +118,15 @@ jobs:
 
       - name: Build external-location identity package and installer
         shell: pwsh
-        env:
-          MSIX_PFX_BASE64: ${{ secrets.MSIX_PFX_BASE64 }}
-          MSIX_PFX_PASSWORD: ${{ secrets.MSIX_PFX_PASSWORD }}
         run: |
           $ErrorActionPreference = 'Stop'
           $workspace = $env:GITHUB_WORKSPACE
           $publishDir = Join-Path $workspace 'artifacts\publish'
           $identityDir = Join-Path $workspace 'artifacts\identity'
           $identityPackage = Join-Path $workspace 'artifacts\Files.Identity.msix'
-          $certificatePath = Join-Path $workspace 'artifacts\FilesAVManager.cer'
+          $certificatePath = Join-Path $workspace 'artifacts\Files.cer'
           $vcRedistPath = Join-Path $workspace 'artifacts\VC_redist.x64.exe'
           $pfxPath = Join-Path $workspace 'artifacts\sign.pfx'
-
-          if ([string]::IsNullOrWhiteSpace($env:MSIX_PFX_BASE64) -or
-              [string]::IsNullOrWhiteSpace($env:MSIX_PFX_PASSWORD)) {
-            throw 'MSIX_PFX_BASE64 and MSIX_PFX_PASSWORD GitHub Secrets are required.'
-          }
 
           $sourcePackageManifest = Join-Path $workspace 'src\Files.App\Package.appxmanifest'
           [xml]$sourceManifest = Get-Content -LiteralPath $sourcePackageManifest
@@ -172,18 +164,22 @@ jobs:
             throw "Identity package creation failed with exit code $LASTEXITCODE."
           }
 
-          [IO.File]::WriteAllBytes(
-            $pfxPath,
-            [Convert]::FromBase64String($env:MSIX_PFX_BASE64)
-          )
-          $pfxPassword = ConvertTo-SecureString $env:MSIX_PFX_PASSWORD -AsPlainText -Force
-          $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation 'Cert:\CurrentUser\My' -Password $pfxPassword
-          if ($cert.Subject -ne 'CN=Files AV Manager') {
-            throw "Certificate subject '$($cert.Subject)' does not match 'CN=Files AV Manager'."
-          }
+          # This is an unpackaged development-style build. Generate the
+          # matching temporary identity certificate on the runner so the
+          # package, installer, and Windows identity all use the Files name.
+          $pfxPasswordText = [guid]::NewGuid().ToString()
+          $pfxPassword = ConvertTo-SecureString $pfxPasswordText -AsPlainText -Force
+          $cert = New-SelfSignedCertificate `
+            -Type Custom `
+            -Subject 'CN=Files' `
+            -KeyUsage DigitalSignature `
+            -FriendlyName 'Files_SelfSigned' `
+            -CertStoreLocation 'Cert:\CurrentUser\My' `
+            -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3', '2.5.29.19={text}')
+          Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $pfxPassword | Out-Null
           Export-Certificate -Cert $cert -FilePath $certificatePath -Type CERT | Out-Null
 
-          & $signtool sign /f $pfxPath /p $env:MSIX_PFX_PASSWORD /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $identityPackage
+          & $signtool sign /f $pfxPath /p $pfxPasswordText /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $identityPackage
           if ($LASTEXITCODE -ne 0) {
             throw "Identity package signing failed with exit code $LASTEXITCODE."
           }
@@ -196,19 +192,19 @@ jobs:
             throw 'Microsoft Visual C++ Redistributable download failed.'
           }
 
-          $setupPath = Join-Path $workspace 'Files-AV-Manager-Setup.exe'
+          $setupPath = Join-Path $workspace 'Files-Setup.exe'
           $msiOutputDir = Join-Path $workspace 'artifacts\installer\msi'
           $bundleOutputDir = Join-Path $workspace 'artifacts\installer\bundle'
           $installScript = Join-Path $workspace 'Install-App.ps1'
-          $packageProject = Join-Path $workspace '.github\installer\wix\Files-AV-Manager.Package.wixproj'
-          $bundleProject = Join-Path $workspace '.github\installer\wix\Files-AV-Manager.Bundle.wixproj'
+          $packageProject = Join-Path $workspace '.github\installer\wix\Files.Package.wixproj'
+          $bundleProject = Join-Path $workspace '.github\installer\wix\Files.Bundle.wixproj'
 
           New-Item -ItemType Directory -Path $msiOutputDir, $bundleOutputDir -Force | Out-Null
 
           dotnet build $packageProject `
             --configuration Release `
             "-p:AppVersion=$appVersion" `
-            "-p:ProductName=Files AV Resource Manager" `
+            "-p:ProductName=Files" `
             "-p:PayloadDir=$publishDir" `
             "-p:InstallScript=$installScript" `
             "-p:IdentityPackage=$identityPackage" `
@@ -219,7 +215,7 @@ jobs:
             throw 'WiX MSI build failed.'
           }
 
-          $msiPath = Join-Path $msiOutputDir 'Files-AV-Manager.msi'
+          $msiPath = Join-Path $msiOutputDir 'Files-Installer.msi'
           if (-not (Test-Path -LiteralPath $msiPath)) {
             throw "WiX MSI was not produced at '$msiPath'."
           }
@@ -238,7 +234,7 @@ jobs:
           [void][Runtime.InteropServices.Marshal]::ReleaseComObject($msiTransaction)
           [void][Runtime.InteropServices.Marshal]::ReleaseComObject($msiDatabase)
 
-          & $signtool sign /f $pfxPath /p $env:MSIX_PFX_PASSWORD /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $msiPath
+          & $signtool sign /f $pfxPath /p $pfxPasswordText /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $msiPath
           if ($LASTEXITCODE -ne 0) {
             throw "MSI signing failed with exit code $LASTEXITCODE."
           }
@@ -246,7 +242,7 @@ jobs:
           dotnet build $bundleProject `
             --configuration Release `
             "-p:AppVersion=$appVersion" `
-            "-p:ProductName=Files AV Resource Manager" `
+            "-p:ProductName=Files" `
             "-p:MsiPath=$msiPath" `
             "-p:VCRedistPath=$vcRedistPath" `
             "-p:OutputPath=$bundleOutputDir\" `
@@ -255,7 +251,7 @@ jobs:
             throw 'WiX Burn bundle build failed.'
           }
 
-          $builtBundlePath = Join-Path $bundleOutputDir 'Files-AV-Manager-Setup.exe'
+          $builtBundlePath = Join-Path $bundleOutputDir 'Files-Setup.exe'
           if (-not (Test-Path -LiteralPath $builtBundlePath)) {
             throw "WiX Burn bundle was not produced at '$builtBundlePath'."
           }
@@ -276,15 +272,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw 'WiX command-line tool EULA acceptance failed.'
           }
-          $enginePath = Join-Path $bundleOutputDir 'Files-AV-Manager-Engine.exe'
-          $reattachedBundlePath = Join-Path $bundleOutputDir 'Files-AV-Manager-Setup-signed.exe'
+          $enginePath = Join-Path $bundleOutputDir 'Files-Installer-Engine.exe'
+          $reattachedBundlePath = Join-Path $bundleOutputDir 'Files-Setup-signed.exe'
 
           & $wixTool burn detach $builtBundlePath -engine $enginePath
           if ($LASTEXITCODE -ne 0) {
             throw "Burn engine detach failed with exit code $LASTEXITCODE."
           }
 
-          & $signtool sign /f $pfxPath /p $env:MSIX_PFX_PASSWORD /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $enginePath
+          & $signtool sign /f $pfxPath /p $pfxPasswordText /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $enginePath
           if ($LASTEXITCODE -ne 0) {
             throw "Burn engine signing failed with exit code $LASTEXITCODE."
           }
@@ -296,13 +292,13 @@ jobs:
 
           Copy-Item -LiteralPath $reattachedBundlePath -Destination $setupPath -Force
 
-          & $signtool sign /f $pfxPath /p $env:MSIX_PFX_PASSWORD /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $setupPath
+          & $signtool sign /f $pfxPath /p $pfxPasswordText /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $setupPath
           if ($LASTEXITCODE -ne 0) {
             throw "Installer signing failed with exit code $LASTEXITCODE."
           }
-          $metadataPath = Join-Path $workspace 'Files-AV-Manager-Setup.version.json'
+          $metadataPath = Join-Path $workspace 'Files-Setup.version.json'
           $sha256 = (Get-FileHash -LiteralPath $setupPath -Algorithm SHA256).Hash
-          @{ version = $appVersion; product = 'Files AV Resource Manager'; installer = 'Files-AV-Manager-Setup.exe'; sha256 = $sha256 } |
+          @{ version = $appVersion; product = 'Files'; installer = 'Files-Setup.exe'; sha256 = $sha256 } |
             ConvertTo-Json | Set-Content -LiteralPath $metadataPath -Encoding UTF8
           Remove-Item -LiteralPath $pfxPath -Force
 
@@ -313,13 +309,13 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $setupPath = Join-Path $env:GITHUB_WORKSPACE 'Files-AV-Manager-Setup.exe'
+          $setupPath = Join-Path $env:GITHUB_WORKSPACE 'Files-Setup.exe'
           # Keep the smoke-test path free of spaces so the Burn variable
           # assignment is passed exactly as intended through Start-Process.
-          $installDir = Join-Path $env:ProgramData 'FilesAvManagerSmoke'
+          $installDir = Join-Path $env:ProgramData 'FilesInstallerSmoke'
           $installedExe = Join-Path $installDir 'Files.exe'
           $installFolderArgument = 'InstallFolder="{0}"' -f $installDir
-          $installLog = Join-Path $env:TEMP 'Files-AV-Manager-install.log'
+          $installLog = Join-Path $env:TEMP 'Files-Installer-install.log'
 
           $installerProcess = Start-Process -FilePath $setupPath -ArgumentList '/quiet', '/norestart', '/log', $installLog, $installFolderArgument -Wait -PassThru
           if ($installerProcess.ExitCode -ne 0) {
@@ -329,7 +325,7 @@ jobs:
             # are visible in the Actions log when an install rolls back.
             $diagnosticRoots = @($env:TEMP, (Join-Path $env:SystemRoot 'Temp')) | Select-Object -Unique
             $diagnosticLogs = foreach ($diagnosticRoot in $diagnosticRoots) {
-              Get-ChildItem -Path $diagnosticRoot -Filter 'Files-AV-Manager-*.log' -File -ErrorAction SilentlyContinue
+              Get-ChildItem -Path $diagnosticRoot -Filter 'Files-Installer-*.log' -File -ErrorAction SilentlyContinue
             }
             $diagnosticLogs = $diagnosticLogs | Sort-Object FullName -Unique
             foreach ($diagnosticLog in $diagnosticLogs) {
@@ -343,7 +339,7 @@ jobs:
           }
 
           $identity = Get-AppxPackage -Name 'FilesDev' -ErrorAction SilentlyContinue |
-            Where-Object { $_.Publisher -eq 'CN=Files AV Manager' -and $_.Status -eq 'Ok' } |
+            Where-Object { $_.Publisher -eq 'CN=Files' -and $_.Status -eq 'Ok' } |
             Select-Object -First 1
           if (-not $identity) {
             throw 'External-location identity was not registered.'
@@ -384,11 +380,11 @@ jobs:
               ForEach-Object {
                 Get-ItemProperty -LiteralPath $_.PSPath -ErrorAction SilentlyContinue
               } |
-              Where-Object { $_.DisplayName -eq 'Files AV Resource Manager' }
+              Where-Object { $_.DisplayName -eq 'Files' }
           )
           $uninstallEntry = $uninstallEntries | Select-Object -First 1
           if (-not $uninstallEntry) {
-            throw 'Files AV Resource Manager was not registered in Add/Remove Programs.'
+            throw 'Files was not registered in Add/Remove Programs.'
           }
           $uninstallCommand = $uninstallEntry.QuietUninstallString
           if ([string]::IsNullOrWhiteSpace($uninstallCommand)) {
@@ -402,7 +398,7 @@ jobs:
             throw "Silent uninstaller failed with exit code $($uninstallerProcess.ExitCode)."
           }
           $remainingIdentity = Get-AppxPackage -Name 'FilesDev' -ErrorAction SilentlyContinue |
-            Where-Object { $_.Publisher -eq 'CN=Files AV Manager' }
+            Where-Object { $_.Publisher -eq 'CN=Files' }
           if ($remainingIdentity) {
             throw 'External-location identity remained registered after uninstall.'
           }
@@ -410,25 +406,25 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Files-AV-Manager
+          name: Files-Installer
           path: |
-            Files-AV-Manager-Setup.exe
-            Files-AV-Manager-Setup.version.json
+            Files-Setup.exe
+            Files-Setup.version.json
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            Files-AV-Manager-Setup.exe
-            Files-AV-Manager-Setup.version.json
+            Files-Setup.exe
+            Files-Setup.version.json
           draft: false
           body: |
-            ## Files AV Resource Manager
+            ## Files
 
             Traditional installer for Windows 10/11. Files is installed as a normal desktop application under Program Files.
 
             - Full Files App file manager
-            - AV resource code detection
+            - resource code detection
             - Health check / batch rename
             - Subtitle classification / undo

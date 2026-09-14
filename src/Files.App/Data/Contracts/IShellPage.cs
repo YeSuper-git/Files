@@ -70,9 +70,9 @@ namespace Files.App.Data.Contracts
 		/// Navigates to the release notes page
 		/// </summary>
 		public void NavigateToReleaseNotes();
-#if FILES_AV_MANAGER
-		public void NavigateToAvManager();
-		public void NavigateToAvManagerTools();
+#if FILES_RESOURCE_MANAGER
+		public void NavigateToResourceManager();
+		public void NavigateToResourceManagerTools();
 #endif
 
 		/// <summary>

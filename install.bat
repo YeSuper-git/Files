@@ -4,7 +4,7 @@ set "SCRIPT=%~dp0Install-App.ps1"
 
 if not exist "%SCRIPT%" (
     echo Install-App.ps1 was not found next to this file.
-    echo Please use the generated Files-Setup.exe or Files-AV-Manager-Setup.exe.
+    echo Please use the generated Files-Setup.exe.
     pause
     exit /b 1
 )

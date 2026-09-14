@@ -1,9 +1,9 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-namespace Files.App.Data.Models.AvManager;
+namespace Files.App.Data.Models.ResourceManager;
 
-public sealed class AvCodeInfo
+public sealed class ResourceCodeInfo
 {
     public string Normalized { get; init; } = string.Empty;
     public string NoZero { get; init; } = string.Empty;

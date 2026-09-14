@@ -3,13 +3,13 @@
     <OutputType>Bundle</OutputType>
     <AcceptEula>wix7</AcceptEula>
     <InstallerPlatform>x64</InstallerPlatform>
-    <OutputName>Files-AV-Manager-Setup</OutputName>
+    <OutputName>Files-Setup</OutputName>
     <SuppressPdbOutput Condition="'$(Configuration)' == 'Release'">true</SuppressPdbOutput>
 
-    <MsiPath Condition="'$(MsiPath)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\installer\msi\Files-AV-Manager.msi</MsiPath>
+    <MsiPath Condition="'$(MsiPath)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\installer\msi\Files-Installer.msi</MsiPath>
     <VCRedistPath Condition="'$(VCRedistPath)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\VC_redist.x64.exe</VCRedistPath>
     <AppVersion Condition="'$(AppVersion)' == ''">1.0.0.0</AppVersion>
-    <ProductName Condition="'$(ProductName)' == ''">Files AV Resource Manager</ProductName>
+    <ProductName Condition="'$(ProductName)' == ''">Files</ProductName>
 
     <DefineConstants>
       $(DefineConstants);
@@ -21,7 +21,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Files-AV-Manager.Package.wxs" />
+    <Compile Remove="Files.Package.wxs" />
     <PackageReference Include="WixToolset.BootstrapperApplications.wixext" />
     <PackageReference Include="WixToolset.Util.wixext" />
   </ItemGroup>

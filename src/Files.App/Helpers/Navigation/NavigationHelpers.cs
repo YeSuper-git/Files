@@ -44,12 +44,12 @@ namespace Files.App.Helpers
 			return AddNewTabByPathAsync(typeof(ShellPanesPage), path, GeneralSettingsService.AlwaysSwitchToNewlyOpenedTab);
 		}
 
-#if FILES_AV_MANAGER
-		public static Task OpenAvManagerInNewTab()
+#if FILES_RESOURCE_MANAGER
+		public static Task OpenResourceManagerInNewTab()
 		{
 			return AddNewTabByParamAsync(
 				typeof(ShellPanesPage),
-				new PaneNavigationArguments { LeftPaneNavPathParam = "AvManager" },
+				new PaneNavigationArguments { LeftPaneNavPathParam = "ResourceManager" },
 				 switchToNewTab: GeneralSettingsService.AlwaysSwitchToNewlyOpenedTab);
 		}
 #endif
@@ -286,10 +286,10 @@ namespace Files.App.Helpers
 				iconSource = new FontIconSource() { Glyph = "\uE713" };
 				toolTipText = Strings.Settings.GetLocalizedResource();
 			}
-#if FILES_AV_MANAGER
-			else if (currentPath.Equals("AvManager", StringComparison.OrdinalIgnoreCase))
+#if FILES_RESOURCE_MANAGER
+			else if (currentPath.Equals("ResourceManager", StringComparison.OrdinalIgnoreCase))
 			{
-				tabLocationHeader = "AV 资源管理";
+				tabLocationHeader = "资源管理";
 				iconSource = new FontIconSource() { Glyph = "\uE8B7" };
 				toolTipText = tabLocationHeader;
 			}

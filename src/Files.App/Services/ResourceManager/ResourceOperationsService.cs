@@ -3,37 +3,37 @@
 
 using System.IO;
 using System.Text.Json;
-using Files.App.Data.Models.AvManager;
+using Files.App.Data.Models.ResourceManager;
 using Microsoft.Extensions.Logging;
 
-namespace Files.App.Services.AvManager;
+namespace Files.App.Services.ResourceManager;
 
-public sealed class AvOperationsService : IAvOperationsService
+public sealed class ResourceOperationsService : IResourceOperationsService
 {
-    private const string BackupDirectoryName = ".av-resource-manager-backups";
+    private const string BackupDirectoryName = ".files-resource-manager-backups";
 
-    private readonly IAvCodeParser _codeParser;
-    private readonly IAvScanner _scanner;
-    private readonly ILogger<AvOperationsService> _logger;
+    private readonly IResourceCodeParser _codeParser;
+    private readonly IResourceScanner _scanner;
+    private readonly ILogger<ResourceOperationsService> _logger;
 
-    public AvOperationsService(IAvCodeParser codeParser, IAvScanner scanner, ILogger<AvOperationsService> logger)
+    public ResourceOperationsService(IResourceCodeParser codeParser, IResourceScanner scanner, ILogger<ResourceOperationsService> logger)
     {
         _codeParser = codeParser;
         _scanner = scanner;
         _logger = logger;
     }
 
-    public async Task<List<AvFileOperation>> PreviewRenameVideosAsync(
+    public async Task<List<ResourceFileOperation>> PreviewRenameVideosAsync(
         string root,
-        AvSettings? settings = null,
+        ResourceSettings? settings = null,
         CancellationToken ct = default)
     {
         return await Task.Run(() =>
         {
-            var effectiveSettings = settings?.Clone() ?? new AvSettings();
+            var effectiveSettings = settings?.Clone() ?? new ResourceSettings();
             effectiveSettings.Normalize();
             var extensions = effectiveSettings.VideoExtensions.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var ops = new List<AvFileOperation>();
+            var ops = new List<ResourceFileOperation>();
             var plannedTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var file in EnumerateFiles(root, 0, 4, ct))
@@ -49,7 +49,7 @@ public sealed class AvOperationsService : IAvOperationsService
                 var code = FindNearestCode(parent, root);
                 if (code is null)
                 {
-                    ops.Add(new AvFileOperation
+                    ops.Add(new ResourceFileOperation
                     {
                         Operation = "rename",
                         Source = file.FullName,
@@ -73,7 +73,7 @@ public sealed class AvOperationsService : IAvOperationsService
                         ? "conflict"
                         : "ready";
 
-                ops.Add(new AvFileOperation
+                ops.Add(new ResourceFileOperation
                 {
                     Operation = "rename",
                     Source = file.FullName,
@@ -92,9 +92,9 @@ public sealed class AvOperationsService : IAvOperationsService
         }, ct);
     }
 
-    public async Task<List<AvFileOperation>> PreviewClassifySubtitlesAsync(
+    public async Task<List<ResourceFileOperation>> PreviewClassifySubtitlesAsync(
         string root,
-        AvSettings settings,
+        ResourceSettings settings,
         CancellationToken ct = default)
     {
         return await Task.Run(() =>
@@ -102,7 +102,7 @@ public sealed class AvOperationsService : IAvOperationsService
             var effectiveSettings = settings.Clone();
             effectiveSettings.Normalize();
             var scanResult = _scanner.AnalyzeLibraryAsync(root, effectiveSettings, ct).GetAwaiter().GetResult();
-            var ops = new List<AvFileOperation>();
+            var ops = new List<ResourceFileOperation>();
 
             foreach (var folder in scanResult.Folders)
             {
@@ -121,7 +121,7 @@ public sealed class AvOperationsService : IAvOperationsService
 
                 var target = Path.Combine(targetRoot, folder.Name);
                 var status = Directory.Exists(target) ? "conflict" : "ready";
-                ops.Add(new AvFileOperation
+                ops.Add(new ResourceFileOperation
                 {
                     Operation = "classify_no_subtitle",
                     Source = folder.Path,
@@ -136,9 +136,9 @@ public sealed class AvOperationsService : IAvOperationsService
         }, ct);
     }
 
-    public List<AvFileOperation> ApplyConflictStrategy(List<AvFileOperation> ops, string strategy)
+    public List<ResourceFileOperation> ApplyConflictStrategy(List<ResourceFileOperation> ops, string strategy)
     {
-        var resolved = new List<AvFileOperation>(ops.Count);
+        var resolved = new List<ResourceFileOperation>(ops.Count);
         foreach (var op in ops)
         {
             if (op.Status != "conflict" || string.IsNullOrEmpty(op.Target))
@@ -151,7 +151,7 @@ public sealed class AvOperationsService : IAvOperationsService
             switch (strategy)
             {
                 case "skip":
-                    resolved.Add(new AvFileOperation
+                    resolved.Add(new ResourceFileOperation
                     {
                         Operation = op.Operation,
                         Source = op.Source,
@@ -175,7 +175,7 @@ public sealed class AvOperationsService : IAvOperationsService
                         if (PathExists(candidate))
                             continue;
 
-                        resolved.Add(new AvFileOperation
+                        resolved.Add(new ResourceFileOperation
                         {
                             Operation = op.Operation,
                             Source = op.Source,
@@ -189,7 +189,7 @@ public sealed class AvOperationsService : IAvOperationsService
 
                     if (!found)
                     {
-                        resolved.Add(new AvFileOperation
+                        resolved.Add(new ResourceFileOperation
                         {
                             Operation = op.Operation,
                             Source = op.Source,
@@ -203,7 +203,7 @@ public sealed class AvOperationsService : IAvOperationsService
 
                 case "overwrite":
                     resolved.Add(isDirectory
-                        ? new AvFileOperation
+                        ? new ResourceFileOperation
                         {
                             Operation = op.Operation,
                             Source = op.Source,
@@ -212,7 +212,7 @@ public sealed class AvOperationsService : IAvOperationsService
                             Status = "conflict",
                             Reason = "为避免数据丢失，文件夹不支持自动覆盖"
                         }
-                        : new AvFileOperation
+                        : new ResourceFileOperation
                         {
                             Operation = op.Operation,
                             Source = op.Source,
@@ -232,11 +232,11 @@ public sealed class AvOperationsService : IAvOperationsService
         return resolved;
     }
 
-    public async Task<List<AvFileOperation>> ExecuteOperationsAsync(string root, List<AvFileOperation> ops, CancellationToken ct = default)
+    public async Task<List<ResourceFileOperation>> ExecuteOperationsAsync(string root, List<ResourceFileOperation> ops, CancellationToken ct = default)
     {
         return await Task.Run(() =>
         {
-            var results = new List<AvFileOperation>(ops.Count);
+            var results = new List<ResourceFileOperation>(ops.Count);
             foreach (var op in ops)
             {
                 ct.ThrowIfCancellationRequested();
@@ -271,7 +271,7 @@ public sealed class AvOperationsService : IAvOperationsService
 
                     if (PathsEqual(op.Source, op.Target))
                     {
-                        results.Add(new AvFileOperation
+                        results.Add(new ResourceFileOperation
                         {
                             Operation = op.Operation,
                             Source = op.Source,
@@ -335,7 +335,7 @@ public sealed class AvOperationsService : IAvOperationsService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "AV operation failed: {Source} -> {Target}", op.Source, op.Target);
+                    _logger.LogWarning(ex, "Resource operation failed: {Source} -> {Target}", op.Source, op.Target);
                     results.Add(FailedOperation(op, ex.Message, "failed"));
                 }
             }
@@ -347,7 +347,7 @@ public sealed class AvOperationsService : IAvOperationsService
         }, ct);
     }
 
-    public async Task<List<AvOperationBatch>> GetOperationHistoryAsync(string root, CancellationToken ct = default)
+    public async Task<List<ResourceOperationBatch>> GetOperationHistoryAsync(string root, CancellationToken ct = default)
     {
         return await Task.Run(() =>
         {
@@ -358,17 +358,17 @@ public sealed class AvOperationsService : IAvOperationsService
 
             try
             {
-                return JsonSerializer.Deserialize<List<AvOperationBatch>>(File.ReadAllText(path)) ?? [];
+                return JsonSerializer.Deserialize<List<ResourceOperationBatch>>(File.ReadAllText(path)) ?? [];
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Unable to read AV operation history");
+                _logger.LogWarning(ex, "Unable to read resource operation history");
                 return [];
             }
         }, ct);
     }
 
-    public async Task<List<AvFileOperation>> UndoLastOperationAsync(string root, CancellationToken ct = default)
+    public async Task<List<ResourceFileOperation>> UndoLastOperationAsync(string root, CancellationToken ct = default)
     {
         return await Task.Run(() =>
         {
@@ -377,11 +377,11 @@ public sealed class AvOperationsService : IAvOperationsService
                 return [];
 
             var batch = history[^1];
-            var reversed = new List<AvFileOperation>();
+            var reversed = new List<ResourceFileOperation>();
             foreach (var op in batch.Operations.AsEnumerable().Reverse().ToList())
             {
                 ct.ThrowIfCancellationRequested();
-                var undo = new AvFileOperation
+                var undo = new ResourceFileOperation
                 {
                     Operation = $"undo_{op.Operation}",
                     Source = op.Target,
@@ -453,7 +453,7 @@ public sealed class AvOperationsService : IAvOperationsService
         }, ct);
     }
 
-    private static AvFileOperation DoneOperation(AvFileOperation op, string? backup = null) => new()
+    private static ResourceFileOperation DoneOperation(ResourceFileOperation op, string? backup = null) => new()
     {
         Operation = op.Operation,
         Source = op.Source,
@@ -463,7 +463,7 @@ public sealed class AvOperationsService : IAvOperationsService
         Backup = backup
     };
 
-    private static AvFileOperation FailedOperation(AvFileOperation op, string reason, string status) => new()
+    private static ResourceFileOperation FailedOperation(ResourceFileOperation op, string reason, string status) => new()
     {
         Operation = op.Operation,
         Source = op.Source,
@@ -473,7 +473,7 @@ public sealed class AvOperationsService : IAvOperationsService
         Reason = reason
     };
 
-    private AvCodeInfo? FindNearestCode(DirectoryInfo directory, string root)
+    private ResourceCodeInfo? FindNearestCode(DirectoryInfo directory, string root)
     {
         for (var current = directory; current is not null && IsPathInsideRoot(root, current.FullName); current = current.Parent)
         {
@@ -485,7 +485,7 @@ public sealed class AvOperationsService : IAvOperationsService
         return null;
     }
 
-    private static bool IsDirectoryOperation(AvFileOperation op) =>
+    private static bool IsDirectoryOperation(ResourceFileOperation op) =>
         op.Operation.StartsWith("classify", StringComparison.OrdinalIgnoreCase)
         || Directory.Exists(op.Source);
 
@@ -512,7 +512,7 @@ public sealed class AvOperationsService : IAvOperationsService
         }
     }
 
-    private static string HistoryPath(string root) => Path.Combine(root, ".av-resource-manager-history.json");
+    private static string HistoryPath(string root) => Path.Combine(root, ".files-resource-manager-history.json");
 
     private static string CreateBackupPath(string root, string target)
     {
@@ -520,13 +520,13 @@ public sealed class AvOperationsService : IAvOperationsService
         return Path.Combine(root, BackupDirectoryName, $"{DateTime.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}-{name}");
     }
 
-    private void AppendHistory(string root, List<AvFileOperation> done)
+    private void AppendHistory(string root, List<ResourceFileOperation> done)
     {
         try
         {
             var history = ReadHistory(root);
             var now = (ulong)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            history.Add(new AvOperationBatch
+            history.Add(new ResourceOperationBatch
             {
                 Id = $"batch-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}-{Guid.NewGuid():N}",
                 CreatedAt = now,
@@ -537,11 +537,11 @@ public sealed class AvOperationsService : IAvOperationsService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to append AV operation history");
+            _logger.LogWarning(ex, "Failed to append resource operation history");
         }
     }
 
-    private List<AvOperationBatch> ReadHistory(string root)
+    private List<ResourceOperationBatch> ReadHistory(string root)
     {
         var path = HistoryPath(root);
         if (!File.Exists(path))
@@ -549,16 +549,16 @@ public sealed class AvOperationsService : IAvOperationsService
 
         try
         {
-            return JsonSerializer.Deserialize<List<AvOperationBatch>>(File.ReadAllText(path)) ?? [];
+            return JsonSerializer.Deserialize<List<ResourceOperationBatch>>(File.ReadAllText(path)) ?? [];
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Unable to read AV operation history");
+            _logger.LogWarning(ex, "Unable to read resource operation history");
             return [];
         }
     }
 
-    private void WriteHistory(string root, List<AvOperationBatch> history)
+    private void WriteHistory(string root, List<ResourceOperationBatch> history)
     {
         var path = HistoryPath(root);
         var temporaryPath = $"{path}.{Guid.NewGuid():N}.tmp";
@@ -569,7 +569,7 @@ public sealed class AvOperationsService : IAvOperationsService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Unable to write AV operation history");
+            _logger.LogWarning(ex, "Unable to write resource operation history");
             try
             {
                 if (File.Exists(temporaryPath))

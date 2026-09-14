@@ -8,9 +8,9 @@ using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Navigation;
 using System.IO;
 using Windows.System;
-#if FILES_AV_MANAGER
+#if FILES_RESOURCE_MANAGER
 using Files.App.Helpers;
-using Files.App.Services.AvManager;
+using Files.App.Services.ResourceManager;
 #endif
 
 namespace Files.App.Views.Shells
@@ -22,8 +22,8 @@ namespace Files.App.Views.Shells
 
 		private NavigationInteractionTracker _navigationInteractionTracker;
 
-#if FILES_AV_MANAGER
-		private readonly IAvWorkspaceService _avWorkspaceService = Ioc.Default.GetRequiredService<IAvWorkspaceService>();
+#if FILES_RESOURCE_MANAGER
+		private readonly IResourceWorkspaceService _resourceWorkspaceService = Ioc.Default.GetRequiredService<IResourceWorkspaceService>();
 #endif
 
 		private NavigationParams? _NavParams;
@@ -114,17 +114,17 @@ namespace Files.App.Views.Shells
 			if (e.ItemPath is null)
 				return;
 
-#if FILES_AV_MANAGER
-			if (InstanceViewModel.IsAvManagerMode &&
-				!AvManagerPathScope.IsWithinLibrary(e.ItemPath, InstanceViewModel.AvLibraryPath))
+#if FILES_RESOURCE_MANAGER
+			if (InstanceViewModel.IsResourceManagerMode &&
+				!ResourceManagerPathScope.IsWithinLibrary(e.ItemPath, InstanceViewModel.ResourceLibraryPath))
 				return;
 #endif
 
 			ItemDisplayFrame.Navigate(InstanceViewModel.FolderSettings.GetLayoutType(e.ItemPath), new NavigationArguments()
 			{
 				NavPathParam = e.ItemPath,
-				IsAvManagerMode = InstanceViewModel.IsAvManagerMode,
-				AvLibraryPath = InstanceViewModel.AvLibraryPath,
+				IsResourceManagerMode = InstanceViewModel.IsResourceManagerMode,
+				ResourceLibraryPath = InstanceViewModel.ResourceLibraryPath,
 				AssociatedTabInstance = this
 			},
 			new SuppressNavigationTransitionInfo());
@@ -141,14 +141,14 @@ namespace Files.App.Views.Shells
 			{
 				NavigateToReleaseNotes();
 			}
-#if FILES_AV_MANAGER
-			else if (navParams.NavPath == "AvManager")
+#if FILES_RESOURCE_MANAGER
+			else if (navParams.NavPath == "ResourceManager")
 			{
-				NavigateToAvManager();
+				NavigateToResourceManager();
 			}
-			else if (navParams.NavPath == "AvManagerTools")
+			else if (navParams.NavPath == "ResourceManagerTools")
 			{
-				NavigateToAvManagerTools();
+				NavigateToResourceManagerTools();
 			}
 #endif
 			else if (navParams.NavPath == "Settings")
@@ -168,7 +168,7 @@ namespace Files.App.Views.Shells
 						IsSearchResultPage = isTagSearch,
 						SearchPathParam = isTagSearch ? "Home" : null,
 						SearchQuery = isTagSearch ? navParams.NavPath : null,
-						IsAvManagerMode = false,
+						IsResourceManagerMode = false,
 						AssociatedTabInstance = this
 					});
 			}
@@ -258,9 +258,9 @@ namespace Files.App.Views.Shells
 			if (string.IsNullOrEmpty(ShellViewModel?.WorkingDirectory))
 				return;
 
-#if FILES_AV_MANAGER
-			if (InstanceViewModel.IsAvManagerMode &&
-				AvManagerPathScope.IsLibraryRoot(ShellViewModel.WorkingDirectory, InstanceViewModel.AvLibraryPath))
+#if FILES_RESOURCE_MANAGER
+			if (InstanceViewModel.IsResourceManagerMode &&
+				ResourceManagerPathScope.IsLibraryRoot(ShellViewModel.WorkingDirectory, InstanceViewModel.ResourceLibraryPath))
 				return;
 #endif
 
@@ -316,8 +316,8 @@ namespace Files.App.Views.Shells
 
 		public override void NavigateHome()
 		{
-			InstanceViewModel.IsAvManagerMode = false;
-			InstanceViewModel.AvLibraryPath = null;
+			InstanceViewModel.IsResourceManagerMode = false;
+			InstanceViewModel.ResourceLibraryPath = null;
 			ItemDisplayFrame.Navigate(
 				typeof(HomePage),
 				new NavigationArguments()
@@ -330,8 +330,8 @@ namespace Files.App.Views.Shells
 
 		public override void NavigateToReleaseNotes()
 		{
-			InstanceViewModel.IsAvManagerMode = false;
-			InstanceViewModel.AvLibraryPath = null;
+			InstanceViewModel.IsResourceManagerMode = false;
+			InstanceViewModel.ResourceLibraryPath = null;
 			ItemDisplayFrame.Navigate(
 				typeof(ReleaseNotesPage),
 				new NavigationArguments()
@@ -342,50 +342,50 @@ namespace Files.App.Views.Shells
 				new SuppressNavigationTransitionInfo());
 		}
 
-#if FILES_AV_MANAGER
-		public override void NavigateToAvManager()
+#if FILES_RESOURCE_MANAGER
+		public override void NavigateToResourceManager()
 		{
-			var libraryPath = _avWorkspaceService.LibraryPath;
+			var libraryPath = _resourceWorkspaceService.LibraryPath;
 			if (!string.IsNullOrWhiteSpace(libraryPath) && Directory.Exists(libraryPath))
 			{
-				InstanceViewModel.IsAvManagerMode = true;
-				InstanceViewModel.AvLibraryPath = libraryPath;
+				InstanceViewModel.IsResourceManagerMode = true;
+				InstanceViewModel.ResourceLibraryPath = libraryPath;
 				ItemDisplayFrame.Navigate(
 					InstanceViewModel.FolderSettings.GetLayoutType(libraryPath),
 					new NavigationArguments()
 					{
 						NavPathParam = libraryPath,
-						IsAvManagerMode = true,
-						AvLibraryPath = libraryPath,
+						IsResourceManagerMode = true,
+						ResourceLibraryPath = libraryPath,
 						AssociatedTabInstance = this
 					},
 					new SuppressNavigationTransitionInfo());
 				return;
 			}
 
-			InstanceViewModel.IsAvManagerMode = false;
-			InstanceViewModel.AvLibraryPath = null;
+			InstanceViewModel.IsResourceManagerMode = false;
+			InstanceViewModel.ResourceLibraryPath = null;
 			ItemDisplayFrame.Navigate(
-				typeof(AvManager.AvManagerPage),
+				typeof(ResourceManager.ResourceManagerPage),
 				new NavigationArguments()
 				{
-					NavPathParam = "AvManager",
+					NavPathParam = "ResourceManager",
 					AssociatedTabInstance = this
 				},
 				new SuppressNavigationTransitionInfo());
 		}
 
-		public override void NavigateToAvManagerTools()
+		public override void NavigateToResourceManagerTools()
 		{
-			InstanceViewModel.IsAvManagerMode = true;
-			InstanceViewModel.AvLibraryPath = _avWorkspaceService.LibraryPath;
+			InstanceViewModel.IsResourceManagerMode = true;
+			InstanceViewModel.ResourceLibraryPath = _resourceWorkspaceService.LibraryPath;
 			ItemDisplayFrame.Navigate(
-				typeof(AvManager.AvManagerPage),
+				typeof(ResourceManager.ResourceManagerPage),
 				new NavigationArguments()
 				{
-					NavPathParam = "AvManagerTools",
-					IsAvManagerMode = true,
-					AvLibraryPath = _avWorkspaceService.LibraryPath,
+					NavPathParam = "ResourceManagerTools",
+					IsResourceManagerMode = true,
+					ResourceLibraryPath = _resourceWorkspaceService.LibraryPath,
 					AssociatedTabInstance = this
 				},
 				new SuppressNavigationTransitionInfo());
@@ -394,8 +394,8 @@ namespace Files.App.Views.Shells
 
 		public override void NavigateToSettings(string? selectItem = null)
 		{
-			InstanceViewModel.IsAvManagerMode = false;
-			InstanceViewModel.AvLibraryPath = null;
+			InstanceViewModel.IsResourceManagerMode = false;
+			InstanceViewModel.ResourceLibraryPath = null;
 			ItemDisplayFrame.Navigate(
 				typeof(SettingsPage),
 				new NavigationArguments()
@@ -411,21 +411,21 @@ namespace Files.App.Views.Shells
 		{
 			var shellViewModel = ShellViewModel!;
 			shellViewModel.FilesAndFoldersFilter = null;
-			var isAvManagerMode = false;
-			string? avLibraryPath = null;
+			var isResourceManagerMode = false;
+			string? resourceLibraryPath = null;
 
-#if FILES_AV_MANAGER
-			isAvManagerMode = navArgs?.IsAvManagerMode == true || InstanceViewModel.IsAvManagerMode;
-			avLibraryPath = navArgs?.AvLibraryPath ?? InstanceViewModel.AvLibraryPath;
-			if (isAvManagerMode &&
-				!AvManagerPathScope.IsWithinLibrary(navigationPath, avLibraryPath))
+#if FILES_RESOURCE_MANAGER
+			isResourceManagerMode = navArgs?.IsResourceManagerMode == true || InstanceViewModel.IsResourceManagerMode;
+			resourceLibraryPath = navArgs?.ResourceLibraryPath ?? InstanceViewModel.ResourceLibraryPath;
+			if (isResourceManagerMode &&
+				!ResourceManagerPathScope.IsWithinLibrary(navigationPath, resourceLibraryPath))
 				return;
 
-			if (isAvManagerMode)
+			if (isResourceManagerMode)
 			{
 				navArgs ??= new NavigationArguments();
-				navArgs.IsAvManagerMode = true;
-				navArgs.AvLibraryPath = avLibraryPath;
+				navArgs.IsResourceManagerMode = true;
+				navArgs.ResourceLibraryPath = resourceLibraryPath;
 			}
 #endif
 
@@ -464,8 +464,8 @@ namespace Files.App.Views.Shells
 					new NavigationArguments()
 					{
 						NavPathParam = navigationPath,
-						IsAvManagerMode = isAvManagerMode,
-						AvLibraryPath = avLibraryPath,
+						IsResourceManagerMode = isResourceManagerMode,
+					ResourceLibraryPath = resourceLibraryPath,
 						AssociatedTabInstance = this
 					},
 					new SuppressNavigationTransitionInfo());
