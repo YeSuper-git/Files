@@ -382,7 +382,12 @@ jobs:
               } |
               Where-Object { $_.DisplayName -eq 'Files' }
           )
-          $uninstallEntry = $uninstallEntries | Select-Object -First 1
+          $uninstallEntry = $uninstallEntries |
+            Where-Object { $_.QuietUninstallString -match 'Files-Setup\.exe' -or $_.UninstallString -match 'Files-Setup\.exe' } |
+            Select-Object -First 1
+          if (-not $uninstallEntry) {
+            $uninstallEntry = $uninstallEntries | Select-Object -First 1
+          }
           if (-not $uninstallEntry) {
             throw 'Files was not registered in Add/Remove Programs.'
           }
@@ -397,9 +402,15 @@ jobs:
           if ($uninstallerProcess.ExitCode -ne 0) {
             throw "Silent uninstaller failed with exit code $($uninstallerProcess.ExitCode)."
           }
-          $remainingIdentity = Get-AppxPackage -Name 'FilesDev' -ErrorAction SilentlyContinue |
-            Where-Object { $_.Publisher -eq 'CN=Files' }
-          if ($remainingIdentity) {
+          for ($attempt = 0; $attempt -lt 20; $attempt++) {
+            $remainingIdentity = @(Get-AppxPackage -Name 'FilesDev' -ErrorAction SilentlyContinue)
+            if ($remainingIdentity.Count -eq 0) {
+              break
+            }
+            Start-Sleep -Milliseconds 500
+          }
+          if ($remainingIdentity.Count -gt 0) {
+            Write-Host ($remainingIdentity | Select-Object PackageFullName, Publisher, Status | Out-String)
             throw 'External-location identity remained registered after uninstall.'
           }
 

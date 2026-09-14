@@ -27,6 +27,12 @@ function Write-InstallLog {
     Add-Content -Path $logPath -Value "[$(Get-Date -Format s)] $Message" -Encoding UTF8
 }
 
+function Stop-FilesProcesses {
+    Get-Process -Name 'Files', 'Files.App.Server' -ErrorAction SilentlyContinue |
+        Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 500
+}
+
 function Invoke-ProcessChecked {
     param(
         [Parameter(Mandatory)][string]$FileName,
@@ -79,12 +85,23 @@ try {
     }
 
     if ($Mode -eq 'Uninstall') {
+        Stop-FilesProcesses
         # Remove every identity package with this package name. This also
         # cleans up installations made by an earlier publisher identity.
         $installedPackages = @(Get-AppxPackage -Name $PackageName -ErrorAction SilentlyContinue)
         foreach ($package in $installedPackages) {
             Write-InstallLog "Removing identity package: $($package.PackageFullName)"
             Remove-AppxPackage -Package $package.PackageFullName -ErrorAction Stop
+        }
+
+        for ($attempt = 0; $attempt -lt 20; $attempt++) {
+            $remainingPackages = @(Get-AppxPackage -Name $PackageName -ErrorAction SilentlyContinue)
+            if ($remainingPackages.Count -eq 0)
+                break
+            Start-Sleep -Milliseconds 500
+        }
+        if ($remainingPackages.Count -gt 0) {
+            throw "Identity package removal is still pending: $($remainingPackages.PackageFullName -join ', ')"
         }
 
         Write-Host 'Files identity removed successfully.'
@@ -134,6 +151,7 @@ try {
     # Remove an older identity package before registering the current one.
     # The package name is stable, while the signing identity may change when
     # moving from a development build to the standard Files identity.
+    Stop-FilesProcesses
     $legacyIdentities = @(Get-AppxPackage -Name $PackageName -ErrorAction SilentlyContinue |
         Where-Object { $_.Publisher -ne $Publisher })
     foreach ($legacyIdentity in $legacyIdentities) {
