@@ -1,15 +1,6 @@
 name: Build Files Baseline
 
 on:
-  push:
-    branches: [main]
-    tags: ["files-v*"]
-    paths:
-      - 'src/**'
-      - 'Directory.Build.targets'
-      - 'Install-App.ps1'
-      - '.github/installer/**'
-      - '.github/workflows/build-files-baseline.yml'
   workflow_dispatch:
 
 permissions:

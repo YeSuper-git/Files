@@ -1,9 +1,6 @@
 name: Build Files
 
 on:
-  push:
-    branches: [main, feature/files-resource-manager, "codex/**"]
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
