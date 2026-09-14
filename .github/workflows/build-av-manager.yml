@@ -323,8 +323,10 @@ jobs:
 
           $installerProcess = Start-Process -FilePath $setupPath -ArgumentList '/quiet', '/norestart', '/log', $installLog, $installFolderArgument -Wait -PassThru
           if ($installerProcess.ExitCode -ne 0) {
-            if (Test-Path -LiteralPath $installLog) {
-              Get-Content -LiteralPath $installLog
+            $diagnosticLogs = Get-ChildItem -Path $env:TEMP -Filter 'Files-AV-Manager-install*.log' -File -ErrorAction SilentlyContinue
+            foreach ($diagnosticLog in $diagnosticLogs) {
+              Write-Host "Installer diagnostic log: $($diagnosticLog.FullName)"
+              Get-Content -LiteralPath $diagnosticLog.FullName
             }
             throw "Silent installer failed with exit code $($installerProcess.ExitCode)."
           }
