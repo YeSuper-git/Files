@@ -127,7 +127,7 @@
          LocalSystem would register the package for the wrong account. -->
     <SetProperty
         Id="RegisterFilesIdentity"
-        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppScript]&quot; -Mode Install -InstallDirectory &quot;[INSTALLFOLDER].&quot;"
+        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppScript]&quot; -Mode Install -InstallDirectory &quot;[INSTALLFOLDER].&quot; -LogFileName &quot;Files-AV-Manager-script.log&quot;"
         Before="RegisterFilesIdentity"
         Sequence="execute"
         Condition="NOT Installed OR REINSTALL~=&quot;ALL&quot;" />
@@ -141,7 +141,7 @@
 
     <SetProperty
         Id="UnregisterFilesIdentity"
-        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppScript]&quot; -Mode Uninstall"
+        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppScript]&quot; -Mode Uninstall -LogFileName &quot;Files-AV-Manager-script.log&quot;"
         Before="UnregisterFilesIdentity"
         Sequence="execute"
         Condition="REMOVE=&quot;ALL&quot;" />

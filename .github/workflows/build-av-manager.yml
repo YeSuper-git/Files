@@ -329,7 +329,7 @@ jobs:
             # are visible in the Actions log when an install rolls back.
             $diagnosticRoots = @($env:TEMP, (Join-Path $env:SystemRoot 'Temp')) | Select-Object -Unique
             $diagnosticLogs = foreach ($diagnosticRoot in $diagnosticRoots) {
-              Get-ChildItem -Path $diagnosticRoot -Filter 'Files-AV-Manager-install*.log' -File -ErrorAction SilentlyContinue
+              Get-ChildItem -Path $diagnosticRoot -Filter 'Files-AV-Manager-*.log' -File -ErrorAction SilentlyContinue
             }
             $diagnosticLogs = $diagnosticLogs | Sort-Object FullName -Unique
             foreach ($diagnosticLog in $diagnosticLogs) {
