@@ -280,13 +280,15 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $setupPath = Join-Path $env:GITHUB_WORKSPACE 'Files-AV-Manager-Setup.exe'
-          $installDir = Join-Path $env:ProgramData 'Files AV Resource Manager Smoke'
+          # Keep the smoke-test path free of spaces so the Burn variable
+          # assignment is passed exactly as intended through Start-Process.
+          $installDir = Join-Path $env:ProgramData 'FilesAvManagerSmoke'
           $installedExe = Join-Path $installDir 'Files.exe'
           $installFolderArgument = 'InstallFolder="{0}"' -f $installDir
+          $installLog = Join-Path $env:TEMP 'Files-AV-Manager-install.log'
 
-          $installerProcess = Start-Process -FilePath $setupPath -ArgumentList '/quiet', '/norestart', $installFolderArgument -Wait -PassThru
+          $installerProcess = Start-Process -FilePath $setupPath -ArgumentList '/quiet', '/norestart', '/log', $installLog, $installFolderArgument -Wait -PassThru
           if ($installerProcess.ExitCode -ne 0) {
-            $installLog = Join-Path $env:TEMP 'Files-AV-Manager-install.log'
             if (Test-Path -LiteralPath $installLog) {
               Get-Content -LiteralPath $installLog
             }
