@@ -462,9 +462,9 @@ jobs:
           $installDir = Join-Path $env:ProgramData 'FilesInstallerSmoke'
           $installedExe = Join-Path $installDir 'Files.exe'
           $installFolderArgument = 'InstallFolder="{0}"' -f $installDir
-          $installLog = Join-Path $env:TEMP 'Files max Installer-install.log'
+          $installLog = Join-Path $env:TEMP 'files-max-installer-install.log'
 
-          $installLogArgument = '/log="{0}"' -f $installLog
+          $installLogArgument = '/log={0}' -f $installLog
           $installerProcess = Start-Process -FilePath $setupPath -ArgumentList '/quiet', '/norestart', $installLogArgument, $installFolderArgument -Wait -PassThru
           if ($installerProcess.ExitCode -ne 0) {
             if (Test-Path -LiteralPath $installLog) {
@@ -477,7 +477,7 @@ jobs:
             # are visible in the Actions log when an install rolls back.
             $diagnosticRoots = @($env:TEMP, (Join-Path $env:SystemRoot 'Temp')) | Select-Object -Unique
             $diagnosticLogs = foreach ($diagnosticRoot in $diagnosticRoots) {
-              Get-ChildItem -Path $diagnosticRoot -Filter 'Files max Installer-*.log' -File -ErrorAction SilentlyContinue
+              Get-ChildItem -Path $diagnosticRoot -Filter '*installer-*.log' -File -ErrorAction SilentlyContinue
             }
             $diagnosticLogs = $diagnosticLogs | Sort-Object FullName -Unique
             foreach ($diagnosticLog in $diagnosticLogs) {
