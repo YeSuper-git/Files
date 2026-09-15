@@ -361,7 +361,10 @@ jobs:
           $xmlWriter.WriteStartElement('PayloadGroup')
           $xmlWriter.WriteAttributeString('Id', 'FilesMaxBootstrapperPayloads')
           foreach ($baFile in Get-ChildItem -LiteralPath $baOutputDir -Recurse -File) {
-            $relativeName = [System.IO.Path]::GetRelativePath($baOutputDir, $baFile.FullName).Replace('\', '/')
+            if ($baFile.FullName -ieq $baPath) {
+              continue
+            }
+            $relativeName = [System.IO.Path]::GetRelativePath($baOutputDir, $baFile.FullName).Replace('/', '\')
             $xmlWriter.WriteStartElement('Payload')
             $xmlWriter.WriteAttributeString('SourceFile', $baFile.FullName)
             $xmlWriter.WriteAttributeString('Name', $relativeName)
