@@ -52,11 +52,17 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         try
         {
             var parsedCommand = command.ParseCommandLine();
-            if (parsedCommand.Variables.TryGetValue(InstallFolderVariable, out var installFolder) &&
-                !string.IsNullOrWhiteSpace(installFolder))
+            foreach (var variable in parsedCommand.Variables)
             {
-                engine.SetVariableString(InstallFolderVariable, installFolder, formatted: false);
-                LogDiagnostic($"Applied command-line InstallFolder={installFolder}");
+                if (!string.Equals(variable.Key, InstallFolderVariable, StringComparison.OrdinalIgnoreCase) ||
+                    string.IsNullOrWhiteSpace(variable.Value))
+                {
+                    continue;
+                }
+
+                engine.SetVariableString(InstallFolderVariable, variable.Value, formatted: false);
+                LogDiagnostic($"Applied command-line InstallFolder={variable.Value}");
+                break;
             }
         }
         catch (Exception exception)
