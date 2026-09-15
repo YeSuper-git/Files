@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
@@ -23,6 +24,9 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
     private bool cancelRequested;
     private int result;
     private string? lastError;
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    private static extern IntPtr GetDesktopWindow();
 
     public FilesBootstrapperApplication()
     {
@@ -128,7 +132,9 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
 
             applying = true;
             window?.ShowProgress();
-            var parentHandle = window is null ? IntPtr.Zero : new WindowInteropHelper(window).Handle;
+            var parentHandle = window is null
+                ? GetDesktopWindow()
+                : new WindowInteropHelper(window).Handle;
             engine.Apply(parentHandle);
         });
     }
