@@ -6,7 +6,6 @@ namespace FilesMax.Installer.Bootstrapper;
 
 internal static class Program
 {
-    [STAThread]
     private static int Main()
     {
         try
