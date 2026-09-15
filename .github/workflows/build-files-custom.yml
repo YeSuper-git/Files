@@ -1,4 +1,4 @@
-name: Build Files
+name: Build Files max
 
 on:
   workflow_dispatch:
@@ -244,7 +244,7 @@ jobs:
             throw 'Microsoft Visual C++ Redistributable download failed.'
           }
 
-          $setupPath = Join-Path $workspace 'Files-Setup.exe'
+          $setupPath = Join-Path $workspace 'Files max Setup.exe'
           $msiOutputDir = Join-Path $workspace 'artifacts\installer\msi'
           $bundleOutputDir = Join-Path $workspace 'artifacts\installer\bundle'
           $installScript = Join-Path $workspace 'Install-App.ps1'
@@ -256,7 +256,7 @@ jobs:
           dotnet build $packageProject `
             --configuration Release `
             "-p:AppVersion=$appVersion" `
-            "-p:ProductName=Files" `
+            "-p:ProductName=Files max" `
             "-p:PayloadDir=$publishDir" `
             "-p:InstallScript=$installScript" `
             "-p:IdentityPackage=$identityPackage" `
@@ -270,7 +270,7 @@ jobs:
           # WiX may place localized outputs in a culture subdirectory (for
           # example, msi\zh-CN) depending on the SDK version. Resolve the
           # actual file instead of assuming it is directly under OutputPath.
-          $msiCandidates = @(Get-ChildItem -LiteralPath $msiOutputDir -Recurse -Filter 'Files-Installer.msi' -File)
+          $msiCandidates = @(Get-ChildItem -LiteralPath $msiOutputDir -Recurse -Filter 'Files max Installer.msi' -File)
           if ($msiCandidates.Count -ne 1) {
             throw "Expected exactly one WiX MSI under '$msiOutputDir', found $($msiCandidates.Count)."
           }
@@ -298,7 +298,7 @@ jobs:
           dotnet build $bundleProject `
             --configuration Release `
             "-p:AppVersion=$appVersion" `
-            "-p:ProductName=Files" `
+            "-p:ProductName=Files max" `
             "-p:MsiPath=$msiPath" `
             "-p:VCRedistPath=$vcRedistPath" `
             "-p:OutputPath=$bundleOutputDir\" `
@@ -307,7 +307,7 @@ jobs:
             throw 'WiX Burn bundle build failed.'
           }
 
-          $bundleCandidates = @(Get-ChildItem -LiteralPath $bundleOutputDir -Recurse -Filter 'Files-Setup.exe' -File)
+          $bundleCandidates = @(Get-ChildItem -LiteralPath $bundleOutputDir -Recurse -Filter 'Files max Setup.exe' -File)
           if ($bundleCandidates.Count -ne 1) {
             throw "Expected exactly one WiX Burn bundle under '$bundleOutputDir', found $($bundleCandidates.Count)."
           }
@@ -329,8 +329,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw 'WiX command-line tool EULA acceptance failed.'
           }
-          $enginePath = Join-Path $bundleOutputDir 'Files-Installer-Engine.exe'
-          $reattachedBundlePath = Join-Path $bundleOutputDir 'Files-Setup-signed.exe'
+          $enginePath = Join-Path $bundleOutputDir 'Files max Installer-Engine.exe'
+          $reattachedBundlePath = Join-Path $bundleOutputDir 'Files max Setup-signed.exe'
 
           & $wixTool burn detach $builtBundlePath -engine $enginePath
           if ($LASTEXITCODE -ne 0) {
@@ -353,9 +353,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Installer signing failed with exit code $LASTEXITCODE."
           }
-          $metadataPath = Join-Path $workspace 'Files-Setup.version.json'
+          $metadataPath = Join-Path $workspace 'Files max Setup.version.json'
           $sha256 = (Get-FileHash -LiteralPath $setupPath -Algorithm SHA256).Hash
-          @{ version = $appVersion; product = 'Files'; installer = 'Files-Setup.exe'; sha256 = $sha256 } |
+          @{ version = $appVersion; product = 'Files max'; installer = 'Files max Setup.exe'; sha256 = $sha256 } |
             ConvertTo-Json | Set-Content -LiteralPath $metadataPath -Encoding UTF8
           Remove-Item -LiteralPath $pfxPath -Force
 
@@ -366,13 +366,13 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $setupPath = Join-Path $env:GITHUB_WORKSPACE 'Files-Setup.exe'
+          $setupPath = Join-Path $env:GITHUB_WORKSPACE 'Files max Setup.exe'
           # Keep the smoke-test path free of spaces so the Burn variable
           # assignment is passed exactly as intended through Start-Process.
           $installDir = Join-Path $env:ProgramData 'FilesInstallerSmoke'
           $installedExe = Join-Path $installDir 'Files.exe'
           $installFolderArgument = 'InstallFolder="{0}"' -f $installDir
-          $installLog = Join-Path $env:TEMP 'Files-Installer-install.log'
+          $installLog = Join-Path $env:TEMP 'Files max Installer-install.log'
 
           $installerProcess = Start-Process -FilePath $setupPath -ArgumentList '/quiet', '/norestart', '/log', $installLog, $installFolderArgument -Wait -PassThru
           if ($installerProcess.ExitCode -ne 0) {
@@ -382,7 +382,7 @@ jobs:
             # are visible in the Actions log when an install rolls back.
             $diagnosticRoots = @($env:TEMP, (Join-Path $env:SystemRoot 'Temp')) | Select-Object -Unique
             $diagnosticLogs = foreach ($diagnosticRoot in $diagnosticRoots) {
-              Get-ChildItem -Path $diagnosticRoot -Filter 'Files-Installer-*.log' -File -ErrorAction SilentlyContinue
+              Get-ChildItem -Path $diagnosticRoot -Filter 'Files max Installer-*.log' -File -ErrorAction SilentlyContinue
             }
             $diagnosticLogs = $diagnosticLogs | Sort-Object FullName -Unique
             foreach ($diagnosticLog in $diagnosticLogs) {
@@ -437,10 +437,10 @@ jobs:
               ForEach-Object {
                 Get-ItemProperty -LiteralPath $_.PSPath -ErrorAction SilentlyContinue
               } |
-              Where-Object { $_.DisplayName -eq 'Files' }
+              Where-Object { $_.DisplayName -eq 'Files max' }
           )
           $uninstallEntry = $uninstallEntries |
-            Where-Object { $_.QuietUninstallString -match 'Files-Setup\.exe' -or $_.UninstallString -match 'Files-Setup\.exe' } |
+            Where-Object { $_.QuietUninstallString -match 'Files max Setup\.exe|Files-Setup\.exe' -or $_.UninstallString -match 'Files max Setup\.exe|Files-Setup\.exe' } |
             Select-Object -First 1
           if (-not $uninstallEntry) {
             $uninstallEntry = $uninstallEntries | Select-Object -First 1
@@ -474,25 +474,25 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Files-Installer
+          name: Files max
           path: |
-            Files-Setup.exe
-            Files-Setup.version.json
+            Files max Setup.exe
+            Files max Setup.version.json
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            Files-Setup.exe
-            Files-Setup.version.json
+            Files max Setup.exe
+            Files max Setup.version.json
           draft: false
           body: |
-            ## Files
+            ## Files max
 
-            Traditional installer for Windows 10/11. Files is installed as a normal desktop application under Program Files.
+            Traditional installer for Windows 10/11. Files max is installed as a normal desktop application under Program Files.
 
-            - Full Files App file manager
+            - Full Files max file manager
             - resource code detection
             - Health check / batch rename
             - Subtitle classification / undo

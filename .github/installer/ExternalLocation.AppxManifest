@@ -20,7 +20,7 @@
         ProcessorArchitecture="neutral" />
 
     <Properties>
-        <DisplayName>Files</DisplayName>
+        <DisplayName>Files max</DisplayName>
         <PublisherDisplayName>YeSuper</PublisherDisplayName>
         <Logo>Assets\AppTiles\Dev\StoreLogo.scale-100.png</Logo>
         <uap10:AllowExternalContent>true</uap10:AllowExternalContent>
@@ -90,8 +90,8 @@
             uap10:RuntimeBehavior="win32App">
             <uap:VisualElements
                 AppListEntry="none"
-                DisplayName="Files"
-                Description="A customized local video resource manager based on Files."
+                DisplayName="Files max"
+                Description="A customized local video resource manager based on Files max."
                 Square150x150Logo="Assets\AppTiles\Dev\Square150x150Logo.scale-100.png"
                 Square44x44Logo="Assets\AppTiles\Dev\Square44x44Logo.scale-100.png"
                 BackgroundColor="transparent" />
@@ -111,7 +111,7 @@
                 <uap5:StartupTask
                     TaskId="3AA55462-A5FA-4933-88C4-712D0B6CDEBB"
                         Enabled="false"
-                        DisplayName="Files" />
+                        DisplayName="Files max" />
                 </uap5:Extension>
 
                 <Extension Category="windows.updateTask" EntryPoint="Files.App.BackgroundTasks.UpdateTask" />

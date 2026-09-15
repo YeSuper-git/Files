@@ -3,14 +3,15 @@
     <OutputType>Bundle</OutputType>
     <AcceptEula>wix7</AcceptEula>
     <InstallerPlatform>x64</InstallerPlatform>
-    <OutputName>Files-Setup</OutputName>
+    <OutputName>Files max Setup</OutputName>
     <SuppressPdbOutput Condition="'$(Configuration)' == 'Release'">true</SuppressPdbOutput>
 
-    <MsiPath Condition="'$(MsiPath)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\installer\msi\Files-Installer.msi</MsiPath>
+    <MsiPath Condition="'$(MsiPath)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\installer\msi\Files max Installer.msi</MsiPath>
     <VCRedistPath Condition="'$(VCRedistPath)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\VC_redist.x64.exe</VCRedistPath>
     <AppVersion Condition="'$(AppVersion)' == ''">1.0.0.0</AppVersion>
-    <ProductName Condition="'$(ProductName)' == ''">Files</ProductName>
+    <ProductName Condition="'$(ProductName)' == ''">Files max</ProductName>
     <LogoFile Condition="'$(LogoFile)' == ''">$(MSBuildThisFileDirectory)..\..\..\src\Files.App\Assets\AppTiles\Dev\FilesSiameseCatLogo.png</LogoFile>
+    <IconFile Condition="'$(IconFile)' == ''">$(MSBuildThisFileDirectory)..\..\..\src\Files.App\Assets\AppTiles\Dev\Logo.ico</IconFile>
 
     <DefineConstants>
       $(DefineConstants);
@@ -18,7 +19,8 @@
       ProductName=$(ProductName);
       MsiPath=$(MsiPath);
       VCRedistPath=$(VCRedistPath);
-      LogoFile=$(LogoFile)
+      LogoFile=$(LogoFile);
+      IconFile=$(IconFile)
     </DefineConstants>
   </PropertyGroup>
 

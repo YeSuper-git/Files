@@ -1,27 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <WixLocalization Culture="zh-CN" Language="2052" xmlns="http://wixtoolset.org/schemas/v4/wxl">
-  <String Id="Caption" Value="文件资源管理器安装程序" />
-  <String Id="Title" Value="文件资源管理器" />
+  <String Id="Caption" Value="Files max 安装程序" />
+  <String Id="Title" Value="Files max" />
   <String Id="CheckingForUpdatesLabel" Value="正在检查更新" />
   <String Id="UpdateButton" Value="更新到版本 [WixStdBAUpdateAvailable]" />
   <String Id="InstallHeader" Value="欢迎" />
-  <String Id="InstallMessage" Value="安装程序将在电脑上安装文件资源管理器。点击“安装”继续，或点击“取消”退出。" />
-  <String Id="InstallMessageOptions" Value="安装程序将在电脑上安装文件资源管理器。点击“安装”继续，点击“选项”设置安装位置，或点击“取消”退出。" />
+  <String Id="InstallMessage" Value="安装程序将在电脑上安装 Files max。点击“安装”继续，或点击“取消”退出。" />
+  <String Id="InstallMessageOptions" Value="安装程序将在电脑上安装 Files max。点击“安装”继续，点击“选项”设置安装位置，或点击“取消”退出。" />
   <String Id="InstallVersion" Value="版本 [WixBundleVersion]" />
   <String Id="ConfirmCancelMessage" Value="确定要取消吗？" />
   <String Id="ExecuteUpgradeRelatedBundleMessage" Value="以前的版本" />
   <String Id="HelpHeader" Value="安装帮助" />
   <String Id="HelpText" Value="/install | /repair | /uninstall | /layout [目录] - 安装、修复、卸载，或在目录中创建安装包的本地副本。默认操作为安装。&#xA;&#xA;/passive | /quiet - 显示最少界面且不提示，或不显示界面且不提示。默认显示完整界面和提示。&#xA;&#xA;/norestart - 禁止尝试重启。默认情况下，界面会在重启前进行提示。&#xA;/log log.txt - 将日志保存到指定文件。默认会在 %TEMP% 中创建日志文件。" />
   <String Id="HelpCloseButton" Value="关闭" />
-  <String Id="InstallLicenseLinkText" Value="文件资源管理器&lt;a href=&quot;#&quot;&gt;许可条款&lt;/a&gt;。" />
+  <String Id="InstallLicenseLinkText" Value="Files max&lt;a href=&quot;#&quot;&gt;许可条款&lt;/a&gt;。" />
   <String Id="InstallAcceptCheckbox" Value="我同意许可条款和条件" />
   <String Id="InstallOptionsButton" Value="选项" />
   <String Id="InstallInstallButton" Value="安装" />
   <String Id="InstallCancelButton" Value="取消" />
   <String Id="OptionsHeader" Value="安装选项" />
   <String Id="OptionsLocationLabel" Value="安装位置：" />
-  <String Id="OptionsPerUserScopeText" Value="仅为我安装文件资源管理器" />
-  <String Id="OptionsPerMachineScopeText" Value="为所有用户安装文件资源管理器" />
+  <String Id="OptionsPerUserScopeText" Value="仅为我安装 Files max" />
+  <String Id="OptionsPerMachineScopeText" Value="为所有用户安装 Files max" />
   <String Id="OptionsBrowseButton" Value="浏览" />
   <String Id="OptionsOkButton" Value="确定" />
   <String Id="OptionsCancelButton" Value="取消" />

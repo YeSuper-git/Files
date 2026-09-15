@@ -7,6 +7,7 @@
       Manufacturer="YeSuper"
       Version="$(var.AppVersion)"
       UpgradeCode="C28D12A9-6AE7-4CF5-AB83-4B48FC7A4E6A"
+      IconSourceFile="$(var.IconFile)"
       Compressed="yes">
 
     <BootstrapperApplication>
@@ -29,7 +30,7 @@
     <Variable
         Name="InstallFolder"
         Type="formatted"
-        Value="[ProgramFiles64Folder]Files"
+        Value="[ProgramFiles64Folder]Files max"
         bal:Overridable="yes"
         Persisted="yes" />
 
@@ -55,7 +56,7 @@
           Vital="yes" />
       <MsiPackage
           Id="FilesInstallerMsi"
-          DisplayName="文件资源管理器"
+          DisplayName="Files max"
           SourceFile="$(var.MsiPath)"
           Vital="yes">
         <MsiProperty Name="INSTALLFOLDER" Value="[InstallFolder]" />

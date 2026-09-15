@@ -1,13 +1,17 @@
-# 文件资源管理器安装器
+# Files max 安装器
 
 安装器继续使用 WiX Toolset 7 的 MSI + Burn 组合：
 
-- `Files-Installer.msi` 负责应用文件、快捷方式、资源管理器右键集成、身份注册、修复和卸载。
-- `Files-Setup.exe` 负责用户可见的安装界面、运行库前置依赖、升级检测、缓存和安装器卸载入口。
+- `Files max Installer.msi` 负责应用文件、快捷方式、资源管理器右键集成、身份注册、修复和卸载。
+- `Files max Setup.exe` 负责用户可见的安装界面、运行库前置依赖、升级检测、缓存和安装器卸载入口。
 
 当前 Burn 界面使用 WiX 官方的 `hyperlinkLargeLicense` 主题，并通过
 `Files-Setup.zh-CN.wxl` 提供简体中文文本。主题只是更换 UI 资源，安装目录变量、MSI
 链路、修复、升级和卸载逻辑保持不变；安装位置仍可在“选项”页中选择。
+
+对外产品名称为 `Files max`。安装器文件名和解压后的 GitHub Actions 构建产物也使用该名称；
+`FilesDev` 身份包名称和 `Files.exe` 可执行文件名保留不变，这是为了兼容现有的 Windows
+文件关联、升级和外部位置身份注册。
 
 备用 NSIS 脚本同样使用 NSIS 官方的 Modern UI 2 和简体中文资源，保留为兼容/回滚链路。
 

@@ -3,7 +3,7 @@
     <OutputType>Package</OutputType>
     <AcceptEula>wix7</AcceptEula>
     <InstallerPlatform>x64</InstallerPlatform>
-    <OutputName>Files-Installer</OutputName>
+    <OutputName>Files max Installer</OutputName>
     <SuppressPdbOutput Condition="'$(Configuration)' == 'Release'">true</SuppressPdbOutput>
 
     <!-- The self-contained .NET publish contains a few native files whose
@@ -20,7 +20,7 @@
     <IdentityPackage Condition="'$(IdentityPackage)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\Files.Identity.msix</IdentityPackage>
     <Certificate Condition="'$(Certificate)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\Files.cer</Certificate>
     <AppVersion Condition="'$(AppVersion)' == ''">1.0.0.0</AppVersion>
-    <ProductName Condition="'$(ProductName)' == ''">Files</ProductName>
+    <ProductName Condition="'$(ProductName)' == ''">Files max</ProductName>
 
     <DefineConstants>
       $(DefineConstants);

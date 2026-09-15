@@ -8,9 +8,9 @@ param(
     [string]$IdentityPackagePath = '',
     [string]$PackageName = 'FilesDev',
     [string]$Publisher = 'CN=Files',
-    [string]$ProductName = 'Files',
+    [string]$ProductName = 'Files max',
     [string]$CertificateFileName = 'Files.cer',
-    [string]$LogFileName = 'Files-Installer-install.log',
+    [string]$LogFileName = 'Files max Installer-install.log',
     [string]$LegacyUninstallKeyName = 'Files'
 )
 
@@ -105,7 +105,7 @@ try {
             throw "Identity package removal is still pending: $($remainingPackages.PackageFullName -join ', ')"
         }
 
-        Write-Host 'Files identity removed successfully.'
+        Write-Host 'Files max identity removed successfully.'
         exit 0
     }
 
