@@ -8,6 +8,7 @@
 
     <MsiPath Condition="'$(MsiPath)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\installer\msi\Files max Installer.msi</MsiPath>
     <VCRedistPath Condition="'$(VCRedistPath)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\VC_redist.x64.exe</VCRedistPath>
+    <BootstrapperApplicationPath Condition="'$(BootstrapperApplicationPath)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\installer\ba\FilesMax.Installer.Bootstrapper.exe</BootstrapperApplicationPath>
     <AppVersion Condition="'$(AppVersion)' == ''">1.0.0.0</AppVersion>
     <ProductName Condition="'$(ProductName)' == ''">Files max</ProductName>
     <LogoFile Condition="'$(LogoFile)' == ''">$(MSBuildThisFileDirectory)..\..\..\src\Files.App\Assets\AppTiles\Dev\FilesSiameseCatLogo.png</LogoFile>
@@ -19,6 +20,7 @@
       ProductName=$(ProductName);
       MsiPath=$(MsiPath);
       VCRedistPath=$(VCRedistPath);
+      BootstrapperApplicationPath=$(BootstrapperApplicationPath);
       LogoFile=$(LogoFile);
       IconFile=$(IconFile)
     </DefineConstants>

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>FilesMax.Installer.Bootstrapper</AssemblyName>
+    <RootNamespace>FilesMax.Installer.Bootstrapper</RootNamespace>
+    <ApplicationIcon>$(MSBuildThisFileDirectory)..\..\..\src\Files.App\Assets\AppTiles\Dev\Logo.ico</ApplicationIcon>
+    <DebugType>embedded</DebugType>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+    <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+    <GenerateAssemblyCopyrightAttribute>false</GenerateAssemblyCopyrightAttribute>
+    <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.BootstrapperApplicationApi" />
+    <Resource Include="$(MSBuildThisFileDirectory)..\..\..\src\Files.App\Assets\AppTiles\Dev\FilesSiameseCatLogo.png">
+      <Link>Assets\FilesSiameseCatLogo.png</Link>
+    </Resource>
+  </ItemGroup>
+</Project>

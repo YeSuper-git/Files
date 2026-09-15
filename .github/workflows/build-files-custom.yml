@@ -38,12 +38,12 @@ jobs:
           $xmlFiles = @(
             'src\Files.App\Package.appxmanifest',
             '.github\installer\ExternalLocation.AppxManifest',
-            '.github\installer\wix\Files-Setup.Theme.xml',
-            '.github\installer\wix\Files-Setup.zh-CN.wxl',
             '.github\installer\wix\Files.Bundle.wxs',
             '.github\installer\wix\Files.Package.wxs',
             '.github\installer\wix\Files.Bundle.wixproj',
-            '.github\installer\wix\Files.Package.wixproj'
+            '.github\installer\wix\Files.Package.wixproj',
+            '.github\installer\ba\InstallerWindow.xaml',
+            '.github\installer\ba\FilesMax.Installer.Bootstrapper.csproj'
           ) | ForEach-Object { Join-Path $workspace $_ }
           foreach ($xmlFile in $xmlFiles) {
             try {
@@ -72,6 +72,11 @@ jobs:
             '.github\installer\wix\Files-Setup.ButtonSecondaryHover.png',
             '.github\installer\wix\Files-Setup.ButtonSecondarySelected.png',
             '.github\installer\ExternalLocation.AppxManifest',
+            '.github\installer\ba\Program.cs',
+            '.github\installer\ba\FilesBootstrapperApplication.cs',
+            '.github\installer\ba\InstallerWindow.xaml.cs',
+            '.github\installer\ba\ProgressWidthConverter.cs',
+            '.github\installer\ba\FilesMax.Installer.Bootstrapper.csproj',
             'Install-App.ps1'
           ) | ForEach-Object { Join-Path $workspace $_ }
           $missingFiles = @($requiredFiles | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) })
@@ -258,6 +263,8 @@ jobs:
           $setupPath = Join-Path $workspace 'Files max Setup.exe'
           $msiOutputDir = Join-Path $workspace 'artifacts\installer\msi'
           $bundleOutputDir = Join-Path $workspace 'artifacts\installer\bundle'
+          $baProject = Join-Path $workspace '.github\installer\ba\FilesMax.Installer.Bootstrapper.csproj'
+          $baOutputDir = Join-Path $workspace 'artifacts\installer\ba'
           $installScript = Join-Path $workspace 'Install-App.ps1'
           $packageProject = Join-Path $workspace '.github\installer\wix\Files.Package.wixproj'
           $bundleProject = Join-Path $workspace '.github\installer\wix\Files.Bundle.wixproj'
@@ -306,12 +313,35 @@ jobs:
             throw "MSI signing failed with exit code $LASTEXITCODE."
           }
 
+          # Build the custom WPF bootstrapper after the MSI is known to be
+          # valid. It owns the complete Files max installer UI while Burn
+          # continues to provide the trusted detect/plan/apply engine.
+          New-Item -ItemType Directory -Path $baOutputDir -Force | Out-Null
+          dotnet publish $baProject `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:PublishTrimmed=false `
+            "-p:PublishDir=$baOutputDir\" `
+            -v:minimal
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Custom bootstrapper publish failed.'
+          }
+
+          $baCandidates = @(Get-ChildItem -LiteralPath $baOutputDir -Recurse -Filter 'FilesMax.Installer.Bootstrapper.exe' -File)
+          if ($baCandidates.Count -ne 1) {
+            throw "Expected exactly one custom bootstrapper under '$baOutputDir', found $($baCandidates.Count)."
+          }
+          $baPath = $baCandidates[0].FullName
+
           dotnet build $bundleProject `
             --configuration Release `
             "-p:AppVersion=$appVersion" `
             "-p:ProductName=Files max" `
             "-p:MsiPath=$msiPath" `
             "-p:VCRedistPath=$vcRedistPath" `
+            "-p:BootstrapperApplicationPath=$baPath" `
             "-p:OutputPath=$bundleOutputDir\" `
             -v:minimal
           if ($LASTEXITCODE -ne 0) {
