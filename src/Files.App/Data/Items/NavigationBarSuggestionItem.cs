@@ -7,8 +7,7 @@ using Microsoft.UI.Xaml.Media;
 
 namespace Files.App.Data.Items
 {
-	[Obsolete("Remove once Omnibar goes out of experimental.")]
-	public sealed partial class NavigationBarSuggestionItem : ObservableObject, IOmnibarTextMemberPathProvider
+	public sealed partial class OmnibarCommandSuggestionItem : ObservableObject, IOmnibarTextMemberPathProvider
 	{
 		private ImageSource? _ActionIconSource;
 		public ImageSource? ActionIconSource { get => _ActionIconSource; set => SetProperty(ref _ActionIconSource, value); }

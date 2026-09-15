@@ -6,7 +6,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Markup;
 using Microsoft.UI.Xaml.Media;
 using WinRT;
-using static Files.App.Helpers.MenuFlyoutHelper;
+using static Files.App.Helpers.MenuFlyoutViewModelHelper;
 
 namespace Files.App.UserControls.Menus
 {
@@ -75,7 +75,7 @@ namespace Files.App.UserControls.Menus
 				return removeItem;
 			});
 
-			SetValue(MenuFlyoutHelper.ItemsSourceProperty, tagItems
+			SetValue(MenuFlyoutViewModelHelper.ItemsSourceProperty, tagItems
 				.Append(new MenuFlyoutSeparatorViewModel())
 				.Append(removeTagsViewModel));
 

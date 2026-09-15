@@ -16,7 +16,7 @@
           ThemeFile="Files-Setup.Theme.xml"
           LocalizationFile="Files-Setup.zh-CN.wxl"
           LogoFile="$(var.LogoFile)"
-          LicenseUrl=""
+          LicenseUrl="https://github.com/YeSuper-git/Files/blob/main/LICENSE-MIT"
           SuppressOptionsUI="no"
           SuppressRepair="no"
           ShowVersion="yes"

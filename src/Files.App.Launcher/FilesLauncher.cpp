@@ -86,11 +86,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		// Uninstall launcher
 		TCHAR szCmd[MAX_PATH];
 		swprintf(szCmd, _countof(szCmd) - 1, L"/c reg.exe import \"%s\"", L"%LocalAppData%\\Files\\UnsetFilesAsDefault.reg");
-		if (((int)ShellExecute(0, L"runas", L"cmd.exe", szCmd, 0, SW_HIDE) > 32))
+		if (reinterpret_cast<INT_PTR>(ShellExecute(0, L"runas", L"cmd.exe", szCmd, 0, SW_HIDE)) > 32)
 		{
 			std::cout << "Launcher unset as default" << std::endl;
 			swprintf(szCmd, _countof(szCmd) - 1, L"-command \"Start-Sleep -Seconds 5; $lfp = [System.Environment]::ExpandEnvironmentVariables('%%LocalAppData%%\\Files'); Remove-Item -Path $lfp -Recurse -Force\"");
-			if ((int)ShellExecute(0, 0, L"powershell.exe", szCmd, 0, SW_HIDE) > 32)
+			if (reinterpret_cast<INT_PTR>(ShellExecute(0, 0, L"powershell.exe", szCmd, 0, SW_HIDE)) > 32)
 			{
 				std::cout << "Launcher uninstalled" << std::endl;
 			}

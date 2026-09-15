@@ -297,7 +297,7 @@
 				TextMemberPath="Text"
 				UpdateTextOnSelect="False">
 				<controls:OmnibarMode.ItemTemplate>
-					<DataTemplate x:DataType="dataitems:NavigationBarSuggestionItem">
+					<DataTemplate x:DataType="dataitems:OmnibarCommandSuggestionItem">
 						<Grid Padding="0,0,4,0" ColumnSpacing="12">
 							<Grid.ColumnDefinitions>
 								<ColumnDefinition Width="Auto" />

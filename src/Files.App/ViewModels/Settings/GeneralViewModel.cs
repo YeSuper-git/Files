@@ -4,7 +4,7 @@
 using System.Collections.Specialized;
 using Windows.Storage;
 using Windows.System;
-using static Files.App.Helpers.MenuFlyoutHelper;
+using static Files.App.Helpers.MenuFlyoutViewModelHelper;
 using DispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue;
 
 namespace Files.App.ViewModels.Settings

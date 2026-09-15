@@ -97,17 +97,27 @@ namespace Files.App.Services
 					if (release.TryGetProperty("prerelease", out var prerelease) && prerelease.GetBoolean())
 						continue;
 
-					var metadataUri = FindAssetUri(release, VersionAssetName);
-					var installerUri = FindAssetUri(release, InstallerAssetName);
-					if (metadataUri is null || installerUri is null)
+					var installerAsset = FindAsset(release, InstallerAssetName);
+					if (installerAsset is null)
 						continue;
 
-					var metadata = await ReadMetadataAsync(metadataUri);
-					if (metadata is null || metadata.Version <= currentVersion)
+					// New releases contain only the installer. GitHub exposes the
+					// uploaded asset's SHA-256 digest through the release API, so the
+					// installer remains self-contained without a sidecar JSON file.
+					// Keep reading the old metadata asset for already-published releases.
+					var metadataAsset = FindAsset(release, VersionAssetName);
+					var metadata = metadataAsset is null
+						? null
+						: await ReadMetadataAsync(metadataAsset.DownloadUri);
+					var releaseVersion = metadata?.Version ?? ReadReleaseVersion(release);
+					if (releaseVersion is null || releaseVersion.CompareTo(currentVersion) <= 0)
 						continue;
 
-					if (_availableUpdate is null || metadata.Version > _availableUpdate.Version)
-						_availableUpdate = new UpdateInfo(metadata.Version, installerUri, metadata.Sha256);
+					if (_availableUpdate is null || releaseVersion.CompareTo(_availableUpdate.Version) > 0)
+						_availableUpdate = new UpdateInfo(
+							releaseVersion,
+							installerAsset.DownloadUri,
+							installerAsset.Sha256 ?? metadata?.Sha256);
 				}
 
 				if (_availableUpdate is not null)
@@ -257,7 +267,22 @@ namespace Files.App.Services
 			return new UpdateMetadata(version, sha256);
 		}
 
-		private static Uri? FindAssetUri(JsonElement release, string assetName)
+		private static Version? ReadReleaseVersion(JsonElement release)
+		{
+			if (!release.TryGetProperty("tag_name", out var tagNameProperty))
+				return null;
+
+			var tagName = tagNameProperty.GetString()?.Trim();
+			if (string.IsNullOrWhiteSpace(tagName))
+				return null;
+
+			if (tagName.StartsWith("v", StringComparison.OrdinalIgnoreCase))
+				tagName = tagName[1..];
+
+			return Version.TryParse(tagName, out var version) ? version : null;
+		}
+
+		private static ReleaseAsset? FindAsset(JsonElement release, string assetName)
 		{
 			if (!release.TryGetProperty("assets", out var assets))
 				return null;
@@ -268,14 +293,29 @@ namespace Files.App.Services
 					string.Equals(name.GetString(), assetName, StringComparison.OrdinalIgnoreCase) &&
 					asset.TryGetProperty("browser_download_url", out var url) &&
 					Uri.TryCreate(url.GetString(), UriKind.Absolute, out var uri))
-					return uri;
+					return new ReleaseAsset(uri, ReadAssetSha256(asset));
 			}
 
 			return null;
 		}
 
+		private static string? ReadAssetSha256(JsonElement asset)
+		{
+			if (!asset.TryGetProperty("digest", out var digestProperty))
+				return null;
+
+			var digest = digestProperty.GetString()?.Trim();
+			if (string.IsNullOrWhiteSpace(digest))
+				return null;
+
+			return digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase)
+				? digest["sha256:".Length..]
+				: digest;
+		}
+
 		public void Dispose() => _client.Dispose();
 
+		private sealed record ReleaseAsset(Uri DownloadUri, string? Sha256);
 		private sealed record UpdateMetadata(Version Version, string? Sha256);
 		private sealed record UpdateInfo(Version Version, Uri InstallerUri, string? Sha256);
 	}

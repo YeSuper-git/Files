@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Preflight installer inputs
         shell: pwsh
@@ -70,12 +70,12 @@ jobs:
           Write-Host "Installer preflight passed: $($xmlFiles.Count) XML files and $($requiredFiles.Count) required files checked."
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
 
       - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@v3
 
       - name: Setup NuGet
         uses: NuGet/setup-nuget@v3
@@ -353,10 +353,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Installer signing failed with exit code $LASTEXITCODE."
           }
-          $metadataPath = Join-Path $workspace 'Files max Setup.version.json'
-          $sha256 = (Get-FileHash -LiteralPath $setupPath -Algorithm SHA256).Hash
-          @{ version = $appVersion; product = 'Files max'; installer = 'Files max Setup.exe'; sha256 = $sha256 } |
-            ConvertTo-Json | Set-Content -LiteralPath $metadataPath -Encoding UTF8
           Remove-Item -LiteralPath $pfxPath -Force
 
           Get-ChildItem -LiteralPath $setupPath |
@@ -472,20 +468,16 @@ jobs:
           }
 
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Files max
-          path: |
-            Files max Setup.exe
-            Files max Setup.version.json
+          path: Files max Setup.exe
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            Files max Setup.exe
-            Files max Setup.version.json
+          files: Files max Setup.exe
           draft: false
           body: |
             ## Files max

@@ -8,8 +8,7 @@ using WinRT;
 
 namespace Files.App.Helpers
 {
-	[Obsolete("Must not use this helper to generate menu flyout any longer.")]
-	public sealed class MenuFlyoutHelper : DependencyObject
+	public sealed class MenuFlyoutViewModelHelper : DependencyObject
 	{
 		public interface IMenuFlyoutItemViewModel { }
 
@@ -55,7 +54,7 @@ namespace Files.App.Helpers
 
 		public static void SetItemsSource(DependencyObject obj, IEnumerable<IMenuFlyoutItemViewModel> value) => obj.SetValue(ItemsSourceProperty, value);
 
-		public static readonly DependencyProperty ItemsSourceProperty = DependencyProperty.RegisterAttached("ItemsSource", typeof(IEnumerable<IMenuFlyoutItemViewModel>), typeof(MenuFlyoutHelper), new PropertyMetadata(null, ItemsSourceChanged));
+		public static readonly DependencyProperty ItemsSourceProperty = DependencyProperty.RegisterAttached("ItemsSource", typeof(IEnumerable<IMenuFlyoutItemViewModel>), typeof(MenuFlyoutViewModelHelper), new PropertyMetadata(null, ItemsSourceChanged));
 
 		[DynamicWindowsRuntimeCast(typeof(MenuFlyout))]
 		private static void ItemsSourceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -68,7 +67,7 @@ namespace Files.App.Helpers
 
 		public static void SetIsVisible(DependencyObject d, bool value) => d.SetValue(IsVisibleProperty, value);
 
-		public static readonly DependencyProperty IsVisibleProperty = DependencyProperty.RegisterAttached("IsVisible", typeof(bool), typeof(MenuFlyoutHelper), new PropertyMetadata(false, OnIsVisiblePropertyChanged));
+		public static readonly DependencyProperty IsVisibleProperty = DependencyProperty.RegisterAttached("IsVisible", typeof(bool), typeof(MenuFlyoutViewModelHelper), new PropertyMetadata(false, OnIsVisiblePropertyChanged));
 
 		[DynamicWindowsRuntimeCast(typeof(MenuFlyout))]
 		private static void OnIsVisiblePropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)

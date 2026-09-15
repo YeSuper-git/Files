@@ -197,7 +197,7 @@ namespace Files.App.UserControls
 			// Command palette mode
 			else if (mode == OmnibarCommandPaletteMode)
 			{
-				var item = args.Item as NavigationBarSuggestionItem;
+				var item = args.Item as OmnibarCommandSuggestionItem;
 
 				// Try invoking built-in command
 				foreach (var command in Commands)

@@ -6,7 +6,8 @@ using System.Security.Principal;
 
 namespace Files.App.Storage.Watchers
 {
-	[Obsolete]
+	// This watcher is still the active compatibility implementation used by
+	// StorageTrashBinService until the newer shell notification watcher lands.
 	public class RecycleBinWatcher : ITrashWatcher
 	{
 		private readonly List<SystemIO.FileSystemWatcher> _watchers = [];
@@ -16,9 +17,6 @@ namespace Files.App.Storage.Watchers
 
 		/// <inheritdoc/>
 		public event EventHandler<SystemIO.FileSystemEventArgs>? ItemDeleted;
-
-		/// <inheritdoc/>
-		public event EventHandler<SystemIO.FileSystemEventArgs>? ItemChanged;
 
 		/// <inheritdoc/>
 		public event EventHandler<SystemIO.FileSystemEventArgs>? ItemRenamed;

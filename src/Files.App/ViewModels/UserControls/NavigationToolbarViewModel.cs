@@ -65,11 +65,11 @@ namespace Files.App.ViewModels.UserControls
 
 		public ObservableCollection<PathBoxItem> PathComponents { get; } = [];
 
-		public ObservableCollection<NavigationBarSuggestionItem> NavigationBarSuggestions { get; } = [];
+		public ObservableCollection<OmnibarCommandSuggestionItem> NavigationBarSuggestions { get; } = [];
 
 		internal ObservableCollection<OmnibarPathModeSuggestionModel> PathModeSuggestionItems { get; } = [];
 
-		internal ObservableCollection<NavigationBarSuggestionItem> OmnibarCommandPaletteModeSuggestionItems { get; } = [];
+		internal ObservableCollection<OmnibarCommandSuggestionItem> OmnibarCommandPaletteModeSuggestionItems { get; } = [];
 
 		internal ObservableCollection<SuggestionModel> OmnibarSearchModeSuggestionItems { get; } = [];
 
@@ -191,7 +191,8 @@ namespace Files.App.ViewModels.UserControls
 		public bool CanRefresh { get => _CanRefresh; set => SetProperty(ref _CanRefresh, value); }
 
 		private string? _PathControlDisplayText;
-		[Obsolete("Superseded by Omnibar.")]
+		// Kept for the legacy path box and Listary integration while both
+		// navigation surfaces remain supported.
 		public string? PathControlDisplayText { get => _PathControlDisplayText; set => SetProperty(ref _PathControlDisplayText, value); }
 
 		private bool _HasItem = false;
@@ -375,7 +376,6 @@ namespace Files.App.ViewModels.UserControls
 			}
 		}
 
-		[Obsolete("Superseded by Omnibar.")]
 		[DynamicWindowsRuntimeCast(typeof(FrameworkElement))]
 		public void PathBoxItem_DragLeave(object sender, DragEventArgs e)
 		{
@@ -392,7 +392,6 @@ namespace Files.App.ViewModels.UserControls
 				_dragOverPath = null;
 		}
 
-		[Obsolete("Superseded by Omnibar.")]
 		[DynamicWindowsRuntimeCast(typeof(FrameworkElement))]
 		public async Task PathBoxItem_Drop(object sender, DragEventArgs e)
 		{
@@ -432,7 +431,6 @@ namespace Files.App.ViewModels.UserControls
 			_lockFlag = false;
 		}
 
-		[Obsolete("Superseded by Omnibar.")]
 		[DynamicWindowsRuntimeCast(typeof(FrameworkElement))]
 		public async Task PathBoxItem_DragOver(object sender, DragEventArgs e)
 		{
@@ -515,7 +513,6 @@ namespace Files.App.ViewModels.UserControls
 			deferral.Complete();
 		}
 
-		[Obsolete("Superseded by Omnibar.")]
 		[DynamicWindowsRuntimeCast(typeof(TextBox))]
 		public void CurrentPathSetTextBox_TextChanged(object sender, TextChangedEventArgs args)
 		{
@@ -840,7 +837,6 @@ namespace Files.App.ViewModels.UserControls
 			return currentInput;
 		}
 
-		[Obsolete("Superseded by Omnibar.")]
 		public async Task CheckPathInputAsync(string currentInput, string? currentSelectedPath, IShellPage shellPage)
 		{
 			var shellViewModel = shellPage.ShellViewModel
@@ -1110,7 +1106,7 @@ namespace Files.App.ViewModels.UserControls
 
 			var (suggestionsToProcess, commandsToProcess) = await Task.Run(() =>
 			{
-				var suggestions = new List<NavigationBarSuggestionItem>();
+					var suggestions = new List<OmnibarCommandSuggestionItem>();
 
 				var commandsData = Commands
 					.Where(command => command.IsAccessibleGlobally
@@ -1122,7 +1118,7 @@ namespace Files.App.ViewModels.UserControls
 				return (suggestions, commandsData);
 			});
 
-			var newSuggestions = new List<NavigationBarSuggestionItem>(suggestionsToProcess);
+				var newSuggestions = new List<OmnibarCommandSuggestionItem>(suggestionsToProcess);
 			int processedCount = 0;
 
 			foreach (var command in commandsToProcess)
@@ -1136,7 +1132,7 @@ namespace Files.App.ViewModels.UserControls
 					continue;
 				}
 
-				var newItem = new NavigationBarSuggestionItem
+				var newItem = new OmnibarCommandSuggestionItem
 				{
 					ThemedIconStyle = command.Glyph.ToThemedIconStyle(),
 					Glyph = command.Glyph.BaseGlyph,
@@ -1157,11 +1153,11 @@ namespace Files.App.ViewModels.UserControls
 			UpdateCommandPaletteSuggestions(newSuggestions);
 		}
 
-		private void UpdateCommandPaletteSuggestions(List<NavigationBarSuggestionItem> newSuggestions)
+		private void UpdateCommandPaletteSuggestions(List<OmnibarCommandSuggestionItem> newSuggestions)
 		{
 			if (newSuggestions.Count == 0)
 			{
-				newSuggestions.Add(new NavigationBarSuggestionItem()
+					newSuggestions.Add(new OmnibarCommandSuggestionItem()
 				{
 					PrimaryDisplay = string.Format(Strings.NoCommandsFound.GetLocalizedResource(), OmnibarCommandPaletteModeText),
 					SearchText = OmnibarCommandPaletteModeText,
