@@ -12,7 +12,9 @@
     <Font Id="2" Height="-20" Weight="500" Foreground="4B5563">Segoe UI</Font>
     <Font Id="3" Height="-14" Weight="500" Foreground="202124" Background="F7F9FC">Segoe UI</Font>
 
-    <Window Width="560" Height="400" HexStyle="100a0000" FontId="0" Caption="#(loc.Caption)">
+    <!-- Include WS_MAXIMIZEBOX so the native title bar exposes a working
+         maximize button alongside minimize and close. -->
+    <Window Width="560" Height="400" HexStyle="100b0000" FontId="0" Caption="#(loc.Caption)">
         <ImageControl X="20" Y="18" Width="76" Height="76" ImageFile="logo.png" Visible="yes"/>
         <Label X="112" Y="22" Width="-20" Height="64" FontId="1" Visible="yes" DisablePrefix="yes">#(loc.Title)</Label>
 
