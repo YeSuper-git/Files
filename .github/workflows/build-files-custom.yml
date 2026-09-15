@@ -496,6 +496,15 @@ jobs:
             throw "Silent installer failed with exit code $($installerProcess.ExitCode)."
           }
           if (-not (Test-Path -LiteralPath $installedExe)) {
+            if (Test-Path -LiteralPath $installLog) {
+              Write-Host 'Burn installer log (installer returned success but the target file is missing):'
+              Get-Content -LiteralPath $installLog
+            }
+            $baErrorLog = Join-Path $env:TEMP 'FilesMax.Installer.Bootstrapper.error.log'
+            if (Test-Path -LiteralPath $baErrorLog) {
+              Write-Host 'Bootstrapper error log:'
+              Get-Content -LiteralPath $baErrorLog
+            }
             throw "Files.exe was not installed to '$installDir'."
           }
 

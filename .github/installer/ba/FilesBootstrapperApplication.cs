@@ -40,12 +40,14 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
     {
         base.OnCreate(args);
         command = args.Command;
+        LogDiagnostic($"OnCreate action={command.Action}, display={command.Display}");
     }
 
     protected override void Run()
     {
         dispatcher = Dispatcher.CurrentDispatcher;
         result = 0;
+        LogDiagnostic("Run entered");
 
         if (command is not null && command.Display is Display.Full or Display.Passive)
         {
@@ -64,19 +66,25 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
             window.Show();
         }
 
+        LogDiagnostic("Starting detect");
         engine.Detect();
         Dispatcher.Run();
+        LogDiagnostic($"Dispatcher stopped with result={result}");
         engine.Quit(result);
     }
 
     private void OnDetectPackageComplete(object? sender, DetectPackageCompleteEventArgs args)
     {
         if (string.Equals(args.PackageId, MainPackageId, StringComparison.OrdinalIgnoreCase))
+        {
             mainPackageInstalled = args.State == PackageState.Present;
+            LogDiagnostic($"Main package detect state={args.State}");
+        }
     }
 
     private void OnDetectComplete(object? sender, DetectCompleteEventArgs args)
     {
+        LogDiagnostic($"Detect complete status=0x{args.Status:X8}, display={command?.Display}, action={command?.Action}");
         RunOnUi(() =>
         {
             if (args.Status != 0)
@@ -109,6 +117,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
 
     private void OnPlanComplete(object? sender, PlanCompleteEventArgs args)
     {
+        LogDiagnostic($"Plan complete status=0x{args.Status:X8}, action={plannedAction}");
         RunOnUi(() =>
         {
             if (args.Status != 0)
@@ -126,6 +135,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
 
     private void OnApplyBegin(object? sender, ApplyBeginEventArgs args)
     {
+        LogDiagnostic("Apply begin");
         RunOnUi(() => window?.ShowProgress());
     }
 
@@ -155,6 +165,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
     {
         applying = false;
         result = args.Status;
+        LogDiagnostic($"Apply complete status=0x{args.Status:X8}");
 
         RunOnUi(() =>
         {
@@ -232,6 +243,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
 
         plannedAction = action == LaunchAction.Unknown ? LaunchAction.Install : action;
         cancelRequested = false;
+        LogDiagnostic($"Starting plan action={plannedAction}");
         window?.ShowProgress();
         engine.Plan(plannedAction, BundleScope.Default);
     }
@@ -334,8 +346,21 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
     private void CloseAndQuit(int exitCode)
     {
         result = exitCode;
+        LogDiagnostic($"CloseAndQuit exitCode={exitCode}");
         window?.AllowCloseAndClose();
         dispatcher?.BeginInvokeShutdown(DispatcherPriority.Background);
+    }
+
+    private void LogDiagnostic(string message)
+    {
+        try
+        {
+            engine.Log(LogLevel.Verbose, $"[Files max BA] {message}");
+        }
+        catch
+        {
+            // Diagnostic logging must never interfere with installation.
+        }
     }
 
     private void RunOnUi(Action action)
