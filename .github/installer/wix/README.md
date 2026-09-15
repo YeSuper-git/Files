@@ -14,6 +14,10 @@ GitHub Actions 的 Files max 发布产物现在只有一个 `Files max Setup.exe
 `Files-Setup.zh-CN.wxl` 提供简体中文文本。主题只是更换 UI 资源，安装目录变量、MSI
 链路、修复、升级和卸载逻辑保持不变；安装位置仍可在“选项”页中选择。
 
+主题中的卡片和按钮使用嵌入式 PNG 绘制圆角表面及正常、悬停、按下状态，资源由
+`tools/GenerateInstallerThemeAssets.swift` 生成并由 Bundle 内嵌。这样最终下载包仍只有一个
+`Files max Setup.exe`，不会把主题图片或版本 JSON 解压到用户下载目录。
+
 对外产品名称为 `Files max`。安装器文件名和解压后的 GitHub Actions 构建产物也使用该名称；
 `FilesDev` 身份包名称和 `Files.exe` 可执行文件名保留不变，这是为了兼容现有的 Windows
 文件关联、升级和外部位置身份注册。

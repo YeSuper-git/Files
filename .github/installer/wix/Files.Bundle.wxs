@@ -23,6 +23,19 @@
           LaunchTarget="[InstallFolder]\Files.exe"
           LaunchWorkingFolder="[InstallFolder]" />
       <Payload Name="files-max.ico" SourceFile="$(var.IconFile)" Compressed="yes" />
+      <!-- Theme surfaces are embedded in the bundle so the installer remains
+           a single self-contained executable after extraction. -->
+      <Payload Name="Files-Setup.Card.png" SourceFile="Files-Setup.Card.png" Compressed="yes" />
+      <Payload Name="Files-Setup.CardTall.png" SourceFile="Files-Setup.CardTall.png" Compressed="yes" />
+      <Payload Name="Files-Setup.ButtonPrimary.png" SourceFile="Files-Setup.ButtonPrimary.png" Compressed="yes" />
+      <Payload Name="Files-Setup.ButtonPrimaryHover.png" SourceFile="Files-Setup.ButtonPrimaryHover.png" Compressed="yes" />
+      <Payload Name="Files-Setup.ButtonPrimarySelected.png" SourceFile="Files-Setup.ButtonPrimarySelected.png" Compressed="yes" />
+      <Payload Name="Files-Setup.ButtonPrimaryWide.png" SourceFile="Files-Setup.ButtonPrimaryWide.png" Compressed="yes" />
+      <Payload Name="Files-Setup.ButtonPrimaryWideHover.png" SourceFile="Files-Setup.ButtonPrimaryWideHover.png" Compressed="yes" />
+      <Payload Name="Files-Setup.ButtonPrimaryWideSelected.png" SourceFile="Files-Setup.ButtonPrimaryWideSelected.png" Compressed="yes" />
+      <Payload Name="Files-Setup.ButtonSecondary.png" SourceFile="Files-Setup.ButtonSecondary.png" Compressed="yes" />
+      <Payload Name="Files-Setup.ButtonSecondaryHover.png" SourceFile="Files-Setup.ButtonSecondaryHover.png" Compressed="yes" />
+      <Payload Name="Files-Setup.ButtonSecondarySelected.png" SourceFile="Files-Setup.ButtonSecondarySelected.png" Compressed="yes" />
     </BootstrapperApplication>
 
     <!-- WixStdBA exposes this persisted variable on its Options page. The

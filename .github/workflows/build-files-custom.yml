@@ -60,6 +60,17 @@ jobs:
             'src\Files.App\Assets\AppTiles\Dev\Square150x150Logo.scale-100.png',
             'src\Files.App\Assets\AppTiles\Dev\Square44x44Logo.scale-100.png',
             'src\Files.App\Assets\archives\ExtensionIcon.png',
+            '.github\installer\wix\Files-Setup.Card.png',
+            '.github\installer\wix\Files-Setup.CardTall.png',
+            '.github\installer\wix\Files-Setup.ButtonPrimary.png',
+            '.github\installer\wix\Files-Setup.ButtonPrimaryHover.png',
+            '.github\installer\wix\Files-Setup.ButtonPrimarySelected.png',
+            '.github\installer\wix\Files-Setup.ButtonPrimaryWide.png',
+            '.github\installer\wix\Files-Setup.ButtonPrimaryWideHover.png',
+            '.github\installer\wix\Files-Setup.ButtonPrimaryWideSelected.png',
+            '.github\installer\wix\Files-Setup.ButtonSecondary.png',
+            '.github\installer\wix\Files-Setup.ButtonSecondaryHover.png',
+            '.github\installer\wix\Files-Setup.ButtonSecondarySelected.png',
             '.github\installer\ExternalLocation.AppxManifest',
             'Install-App.ps1'
           ) | ForEach-Object { Join-Path $workspace $_ }

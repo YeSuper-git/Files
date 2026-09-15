@@ -14,6 +14,11 @@
     <Font Id="4" Height="-20" Weight="600" Foreground="111827" Background="FFFFFF">Segoe UI</Font>
     <Font Id="5" Height="-15" Weight="500" Foreground="4B5563" Background="FFFFFF">Segoe UI</Font>
     <Font Id="6" Height="-13" Weight="500" Foreground="6B7280" Background="FFFFFF">Segoe UI</Font>
+    <!-- Graphic buttons draw their own rounded surfaces. These fonts only
+         supply the button label, so the label does not inherit a rectangular
+         native-button background. -->
+    <Font Id="7" Height="-13" Weight="600" Foreground="FFFFFF">Segoe UI</Font>
+    <Font Id="8" Height="-13" Weight="600" Foreground="202124">Segoe UI</Font>
 
     <!-- Include WS_MAXIMIZEBOX so the native title bar exposes a working
          maximize button alongside minimize and close. -->
@@ -28,16 +33,16 @@
         <Page Name="Help">
             <Label X="26" Y="124" Width="-26" Height="24" FontId="2" DisablePrefix="yes">#(loc.HelpHeader)</Label>
             <Label X="26" Y="158" Width="-26" Height="-54" FontId="3" DisablePrefix="yes">#(loc.HelpText)</Label>
-            <Button Name="HelpCloseButton" X="-26" Y="-24" Width="60" Height="30" TabStop="yes" FontId="0">
+            <Button Name="HelpCloseButton" X="-26" Y="-24" Width="64" Height="30" TabStop="yes" FontId="8" HoverFontId="8" SelectedFontId="8">
+                <ButtonImage ImageFile="Files-Setup.ButtonSecondary.png" />
+                <ButtonHoverImage ImageFile="Files-Setup.ButtonSecondaryHover.png" />
+                <ButtonSelectedImage ImageFile="Files-Setup.ButtonSecondarySelected.png" />
                 <Text>#(loc.HelpCloseButton)</Text>
                 <CloseWindowAction />
             </Button>
         </Page>
         <Page Name="Install">
-            <!-- SS_WHITERECT gives the content card a clean surface while
-                 the etched frame provides a subtle border on Win10 and Win11. -->
-            <Static X="26" Y="103" Width="-26" Height="178" HexStyle="00000006" />
-            <Static X="26" Y="103" Width="-26" Height="178" HexStyle="00000012" />
+            <ImageControl X="26" Y="103" Width="-26" Height="178" ImageFile="Files-Setup.Card.png" Visible="yes" />
             <Label X="46" Y="119" Width="-46" Height="28" FontId="4" DisablePrefix="yes">#(loc.InstallHeader)</Label>
             <Label X="46" Y="157" Width="-46" Height="52" FontId="5" DisablePrefix="yes">
                 <Text>#(loc.InstallMessage)</Text>
@@ -45,23 +50,36 @@
             <Hypertext Name="EulaHyperlink" X="46" Y="-108" Width="-46" Height="18" TabStop="yes" FontId="6" Visible="no" HideWhenDisabled="yes">#(loc.InstallLicenseLinkText)</Hypertext>
             <Label Name="InstallVersion" X="46" Y="222" Width="-46" Height="20" FontId="6" DisablePrefix="yes" VisibleCondition="WixStdBAShowVersion">#(loc.InstallVersion)</Label>
             <Checkbox Name="EulaAcceptCheckbox" X="46" Y="248" Width="-46" Height="20" TabStop="yes" FontId="5" HideWhenDisabled="no">#(loc.InstallAcceptCheckbox)</Checkbox>
-            <Button Name="InstallUpdateButton" X="26" Y="-24" Width="140" Height="30" TabStop="yes" FontId="0" EnableCondition="WixStdBAUpdateAvailable AND EulaAcceptCheckbox = 1" HideWhenDisabled="yes">#(loc.UpdateButton)</Button>
-            <Button Name="NextButton" X="-96" Y="-24" Width="64" Height="30" HexStyle="00000001" TabStop="yes" FontId="0" EnableCondition="EulaAcceptCheckbox = 1">
+            <Button Name="InstallUpdateButton" X="26" Y="-24" Width="140" Height="30" TabStop="yes" FontId="7" HoverFontId="7" SelectedFontId="7" EnableCondition="WixStdBAUpdateAvailable AND EulaAcceptCheckbox = 1" HideWhenDisabled="yes">
+                <ButtonImage ImageFile="Files-Setup.ButtonPrimaryWide.png" />
+                <ButtonHoverImage ImageFile="Files-Setup.ButtonPrimaryWideHover.png" />
+                <ButtonSelectedImage ImageFile="Files-Setup.ButtonPrimaryWideSelected.png" />
+                <Text>#(loc.UpdateButton)</Text>
+            </Button>
+            <Button Name="NextButton" X="-96" Y="-24" Width="64" Height="30" TabStop="yes" FontId="8" HoverFontId="8" SelectedFontId="8" EnableCondition="EulaAcceptCheckbox = 1">
+                <ButtonImage ImageFile="Files-Setup.ButtonSecondary.png" />
+                <ButtonHoverImage ImageFile="Files-Setup.ButtonSecondaryHover.png" />
+                <ButtonSelectedImage ImageFile="Files-Setup.ButtonSecondarySelected.png" />
                 <Text>#(loc.InstallNextButton)</Text>
                 <ChangePageAction Page="Options" Condition="EulaAcceptCheckbox = 1" />
             </Button>
-            <Button Name="InstallCancelButton" X="-26" Y="-24" Width="60" Height="30" TabStop="yes" FontId="0">
+            <Button Name="InstallCancelButton" X="-26" Y="-24" Width="64" Height="30" TabStop="yes" FontId="8" HoverFontId="8" SelectedFontId="8">
+                <ButtonImage ImageFile="Files-Setup.ButtonSecondary.png" />
+                <ButtonHoverImage ImageFile="Files-Setup.ButtonSecondaryHover.png" />
+                <ButtonSelectedImage ImageFile="Files-Setup.ButtonSecondarySelected.png" />
                 <Text>#(loc.InstallCancelButton)</Text>
                 <CloseWindowAction />
             </Button>
         </Page>
         <Page Name="Options">
-            <Static X="26" Y="103" Width="-26" Height="178" HexStyle="00000006" />
-            <Static X="26" Y="103" Width="-26" Height="178" HexStyle="00000012" />
+            <ImageControl X="26" Y="103" Width="-26" Height="178" ImageFile="Files-Setup.Card.png" Visible="yes" />
             <Label X="46" Y="119" Width="-46" Height="28" FontId="4" DisablePrefix="yes">#(loc.OptionsHeader)</Label>
             <Label X="46" Y="157" Width="-46" Height="22" FontId="5" DisablePrefix="yes">#(loc.OptionsLocationLabel)</Label>
             <Editbox Name="InstallFolder" X="46" Y="188" Width="-116" Height="28" TabStop="yes" FontId="3" FileSystemAutoComplete="yes" />
-            <Button Name="BrowseButton" X="-86" Y="186" Width="60" Height="30" TabStop="yes" FontId="0">
+            <Button Name="BrowseButton" X="-90" Y="186" Width="64" Height="30" TabStop="yes" FontId="8" HoverFontId="8" SelectedFontId="8">
+                <ButtonImage ImageFile="Files-Setup.ButtonSecondary.png" />
+                <ButtonHoverImage ImageFile="Files-Setup.ButtonSecondaryHover.png" />
+                <ButtonSelectedImage ImageFile="Files-Setup.ButtonSecondarySelected.png" />
                 <Text>#(loc.OptionsBrowseButton)</Text>
                 <BrowseDirectoryAction VariableName="InstallFolder" />
             </Button>
@@ -69,40 +87,71 @@
                 <RadioButton X="46" Y="224" Height="20" Width="-46" Value="PerUser" EnableCondition="WixBundleAuthoredScope = 2 OR WixBundleAuthoredScope = 3" HideWhenDisabled="yes" FontId="5">#(loc.OptionsPerUserScopeText)</RadioButton>
                 <RadioButton X="46" Y="248" Height="20" Width="-46" Value="PerMachine" EnableCondition="WixBundleAuthoredScope = 2 OR WixBundleAuthoredScope = 3" HideWhenDisabled="yes" FontId="5">#(loc.OptionsPerMachineScopeText)</RadioButton>
             </RadioButtons>
-            <Button Name="OptionsBackButton" X="-164" Y="-24" Width="60" Height="30" TabStop="yes" FontId="0">
+            <Button Name="OptionsBackButton" X="-164" Y="-24" Width="64" Height="30" TabStop="yes" FontId="8" HoverFontId="8" SelectedFontId="8">
+                <ButtonImage ImageFile="Files-Setup.ButtonSecondary.png" />
+                <ButtonHoverImage ImageFile="Files-Setup.ButtonSecondaryHover.png" />
+                <ButtonSelectedImage ImageFile="Files-Setup.ButtonSecondarySelected.png" />
                 <Text>#(loc.OptionsBackButton)</Text>
                 <ChangePageAction Page="Install" />
             </Button>
-            <Button Name="InstallButton" X="-96" Y="-24" Width="64" Height="30" HexStyle="00000001" TabStop="yes" FontId="0" EnableCondition="EulaAcceptCheckbox = 1 AND InstallFolder" ElevationShieldCondition='(WixBundleAuthoredScope = 1 AND NOT WixBundleElevated) OR ((WixBundleAuthoredScope = 2 OR WixBundleAuthoredScope = 3) AND WixStdBAScope = "PerMachine")'>#(loc.InstallInstallButton)</Button>
-            <Button Name="PathCancelButton" X="-26" Y="-24" Width="60" Height="30" TabStop="yes" FontId="0">
+            <Button Name="InstallButton" X="-96" Y="-24" Width="64" Height="30" TabStop="yes" FontId="7" HoverFontId="7" SelectedFontId="7" EnableCondition="EulaAcceptCheckbox = 1 AND InstallFolder" ElevationShieldCondition='(WixBundleAuthoredScope = 1 AND NOT WixBundleElevated) OR ((WixBundleAuthoredScope = 2 OR WixBundleAuthoredScope = 3) AND WixStdBAScope = "PerMachine")'>
+                <ButtonImage ImageFile="Files-Setup.ButtonPrimary.png" />
+                <ButtonHoverImage ImageFile="Files-Setup.ButtonPrimaryHover.png" />
+                <ButtonSelectedImage ImageFile="Files-Setup.ButtonPrimarySelected.png" />
+                <Text>#(loc.InstallInstallButton)</Text>
+            </Button>
+            <Button Name="PathCancelButton" X="-26" Y="-24" Width="64" Height="30" TabStop="yes" FontId="8" HoverFontId="8" SelectedFontId="8">
+                <ButtonImage ImageFile="Files-Setup.ButtonSecondary.png" />
+                <ButtonHoverImage ImageFile="Files-Setup.ButtonSecondaryHover.png" />
+                <ButtonSelectedImage ImageFile="Files-Setup.ButtonSecondarySelected.png" />
                 <Text>#(loc.InstallCancelButton)</Text>
                 <CloseWindowAction />
             </Button>
         </Page>
         <Page Name="Progress">
-            <Static X="26" Y="103" Width="-26" Height="178" HexStyle="00000006" />
-            <Static X="26" Y="103" Width="-26" Height="178" HexStyle="00000012" />
+            <ImageControl X="26" Y="103" Width="-26" Height="178" ImageFile="Files-Setup.Card.png" Visible="yes" />
             <Label X="46" Y="119" Width="-46" Height="28" FontId="4" DisablePrefix="yes">#(loc.ProgressHeader)</Label>
             <Label X="46" Y="157" Width="100" Height="20" FontId="5" DisablePrefix="yes">#(loc.ProgressLabel)</Label>
             <Label Name="OverallProgressPackageText" X="156" Y="157" Width="-46" Height="20" FontId="6" DisablePrefix="yes">#(loc.OverallProgressPackageText)</Label>
             <Progressbar Name="OverallCalculatedProgressbar" X="46" Y="195" Width="-46" Height="18" />
-            <Button Name="ProgressCancelButton" X="-26" Y="-24" Width="60" Height="30" TabStop="yes" FontId="0">#(loc.ProgressCancelButton)</Button>
+            <Button Name="ProgressCancelButton" X="-26" Y="-24" Width="64" Height="30" TabStop="yes" FontId="8" HoverFontId="8" SelectedFontId="8">
+                <ButtonImage ImageFile="Files-Setup.ButtonSecondary.png" />
+                <ButtonHoverImage ImageFile="Files-Setup.ButtonSecondaryHover.png" />
+                <ButtonSelectedImage ImageFile="Files-Setup.ButtonSecondarySelected.png" />
+                <Text>#(loc.ProgressCancelButton)</Text>
+            </Button>
         </Page>
         <Page Name="Modify">
-            <Static X="26" Y="103" Width="-26" Height="178" HexStyle="00000006" />
-            <Static X="26" Y="103" Width="-26" Height="178" HexStyle="00000012" />
+            <ImageControl X="26" Y="103" Width="-26" Height="178" ImageFile="Files-Setup.Card.png" Visible="yes" />
             <Label X="46" Y="119" Width="-46" Height="28" FontId="4" DisablePrefix="yes">#(loc.ModifyHeader)</Label>
-            <Button Name="ModifyUpdateButton" X="26" Y="-24" Width="140" Height="30" TabStop="yes" FontId="0" EnableCondition="WixStdBAUpdateAvailable" HideWhenDisabled="yes">#(loc.UpdateButton)</Button>
-            <Button Name="RepairButton" X="-164" Y="-24" Width="60" Height="30" TabStop="yes" FontId="0" HideWhenDisabled="yes" ElevationShieldCondition='(WixBundleAuthoredScope = 1 AND NOT WixBundleElevated) OR ((WixBundleAuthoredScope = 2 OR WixBundleAuthoredScope = 3) AND WixStdBAScope = "PerMachine")'>#(loc.ModifyRepairButton)</Button>
-            <Button Name="UninstallButton" X="-96" Y="-24" Width="64" Height="30" TabStop="yes" FontId="0" ElevationShieldCondition='(WixBundleAuthoredScope = 1 AND NOT WixBundleElevated) OR ((WixBundleAuthoredScope = 2 OR WixBundleAuthoredScope = 3) AND WixStdBAScope = "PerMachine")'>#(loc.ModifyUninstallButton)</Button>
-            <Button Name="ModifyCancelButton" X="-26" Y="-24" Width="60" Height="30" TabStop="yes" FontId="0">
+            <Button Name="ModifyUpdateButton" X="26" Y="-24" Width="140" Height="30" TabStop="yes" FontId="7" HoverFontId="7" SelectedFontId="7" EnableCondition="WixStdBAUpdateAvailable" HideWhenDisabled="yes">
+                <ButtonImage ImageFile="Files-Setup.ButtonPrimaryWide.png" />
+                <ButtonHoverImage ImageFile="Files-Setup.ButtonPrimaryWideHover.png" />
+                <ButtonSelectedImage ImageFile="Files-Setup.ButtonPrimaryWideSelected.png" />
+                <Text>#(loc.UpdateButton)</Text>
+            </Button>
+            <Button Name="RepairButton" X="-164" Y="-24" Width="64" Height="30" TabStop="yes" FontId="8" HoverFontId="8" SelectedFontId="8" HideWhenDisabled="yes" ElevationShieldCondition='(WixBundleAuthoredScope = 1 AND NOT WixBundleElevated) OR ((WixBundleAuthoredScope = 2 OR WixBundleAuthoredScope = 3) AND WixStdBAScope = "PerMachine")'>
+                <ButtonImage ImageFile="Files-Setup.ButtonSecondary.png" />
+                <ButtonHoverImage ImageFile="Files-Setup.ButtonSecondaryHover.png" />
+                <ButtonSelectedImage ImageFile="Files-Setup.ButtonSecondarySelected.png" />
+                <Text>#(loc.ModifyRepairButton)</Text>
+            </Button>
+            <Button Name="UninstallButton" X="-96" Y="-24" Width="64" Height="30" TabStop="yes" FontId="8" HoverFontId="8" SelectedFontId="8" ElevationShieldCondition='(WixBundleAuthoredScope = 1 AND NOT WixBundleElevated) OR ((WixBundleAuthoredScope = 2 OR WixBundleAuthoredScope = 3) AND WixStdBAScope = "PerMachine")'>
+                <ButtonImage ImageFile="Files-Setup.ButtonSecondary.png" />
+                <ButtonHoverImage ImageFile="Files-Setup.ButtonSecondaryHover.png" />
+                <ButtonSelectedImage ImageFile="Files-Setup.ButtonSecondarySelected.png" />
+                <Text>#(loc.ModifyUninstallButton)</Text>
+            </Button>
+            <Button Name="ModifyCancelButton" X="-26" Y="-24" Width="64" Height="30" TabStop="yes" FontId="8" HoverFontId="8" SelectedFontId="8">
+                <ButtonImage ImageFile="Files-Setup.ButtonSecondary.png" />
+                <ButtonHoverImage ImageFile="Files-Setup.ButtonSecondaryHover.png" />
+                <ButtonSelectedImage ImageFile="Files-Setup.ButtonSecondarySelected.png" />
                 <Text>#(loc.ModifyCancelButton)</Text>
                 <CloseWindowAction />
             </Button>
         </Page>
         <Page Name="Success">
-            <Static X="26" Y="103" Width="-26" Height="178" HexStyle="00000006" />
-            <Static X="26" Y="103" Width="-26" Height="178" HexStyle="00000012" />
+            <ImageControl X="26" Y="103" Width="-26" Height="178" ImageFile="Files-Setup.Card.png" Visible="yes" />
             <Label X="46" Y="119" Width="-46" Height="28" FontId="4" DisablePrefix="yes">
                 <Text>#(loc.SuccessHeader)</Text>
                 <Text Condition="WixBundleAction = 2">#(loc.SuccessLayoutHeader)</Text>
@@ -113,20 +162,32 @@
                 <Text Condition="WixBundleAction = 7">#(loc.SuccessModifyHeader)</Text>
                 <Text Condition="WixBundleAction = 8">#(loc.SuccessRepairHeader)</Text>
             </Label>
-            <Button Name="LaunchButton" X="-96" Y="-24" Width="64" Height="30" TabStop="yes" FontId="0" HideWhenDisabled="yes">#(loc.SuccessLaunchButton)</Button>
+            <Button Name="LaunchButton" X="-96" Y="-24" Width="64" Height="30" TabStop="yes" FontId="7" HoverFontId="7" SelectedFontId="7" HideWhenDisabled="yes">
+                <ButtonImage ImageFile="Files-Setup.ButtonPrimary.png" />
+                <ButtonHoverImage ImageFile="Files-Setup.ButtonPrimaryHover.png" />
+                <ButtonSelectedImage ImageFile="Files-Setup.ButtonPrimarySelected.png" />
+                <Text>#(loc.SuccessLaunchButton)</Text>
+            </Button>
             <Label X="46" Y="168" Width="-46" Height="34" FontId="5" DisablePrefix="yes" VisibleCondition="WixStdBARestartRequired">
                 <Text>#(loc.SuccessRestartText)</Text>
                 <Text Condition="WixBundleAction = 3">#(loc.SuccessUninstallRestartText)</Text>
             </Label>
-            <Button Name="SuccessRestartButton" X="-96" Y="-24" Width="64" Height="30" TabStop="yes" FontId="0" HideWhenDisabled="yes">#(loc.SuccessRestartButton)</Button>
-            <Button Name="SuccessCloseButton" X="-26" Y="-24" Width="60" Height="30" TabStop="yes" FontId="0">
+            <Button Name="SuccessRestartButton" X="-96" Y="-24" Width="64" Height="30" TabStop="yes" FontId="7" HoverFontId="7" SelectedFontId="7" HideWhenDisabled="yes">
+                <ButtonImage ImageFile="Files-Setup.ButtonPrimary.png" />
+                <ButtonHoverImage ImageFile="Files-Setup.ButtonPrimaryHover.png" />
+                <ButtonSelectedImage ImageFile="Files-Setup.ButtonPrimarySelected.png" />
+                <Text>#(loc.SuccessRestartButton)</Text>
+            </Button>
+            <Button Name="SuccessCloseButton" X="-26" Y="-24" Width="64" Height="30" TabStop="yes" FontId="8" HoverFontId="8" SelectedFontId="8">
+                <ButtonImage ImageFile="Files-Setup.ButtonSecondary.png" />
+                <ButtonHoverImage ImageFile="Files-Setup.ButtonSecondaryHover.png" />
+                <ButtonSelectedImage ImageFile="Files-Setup.ButtonSecondarySelected.png" />
                 <Text>#(loc.SuccessCloseButton)</Text>
                 <CloseWindowAction />
             </Button>
         </Page>
         <Page Name="Failure">
-            <Static X="26" Y="103" Width="-26" Height="220" HexStyle="00000006" />
-            <Static X="26" Y="103" Width="-26" Height="220" HexStyle="00000012" />
+            <ImageControl X="26" Y="103" Width="-26" Height="220" ImageFile="Files-Setup.CardTall.png" Visible="yes" />
             <Label X="46" Y="119" Width="-46" Height="28" FontId="4" DisablePrefix="yes">
                 <Text>#(loc.FailureHeader)</Text>
                 <Text Condition="WixBundleAction = 2">#(loc.FailureLayoutHeader)</Text>
@@ -140,8 +201,16 @@
             <Hypertext Name="FailureLogFileLink" X="46" Y="157" Width="-46" Height="42" FontId="5" TabStop="yes" HideWhenDisabled="yes">#(loc.FailureHyperlinkLogText)</Hypertext>
             <Hypertext Name="FailureMessageText" X="46" Y="207" Width="-46" Height="42" FontId="5" TabStop="yes" HideWhenDisabled="yes" />
             <Label X="46" Y="257" Width="-46" Height="30" FontId="5" DisablePrefix="yes" VisibleCondition="WixStdBARestartRequired">#(loc.FailureRestartText)</Label>
-            <Button Name="FailureRestartButton" X="-96" Y="-24" Width="64" Height="30" TabStop="yes" FontId="0" HideWhenDisabled="yes">#(loc.FailureRestartButton)</Button>
-            <Button Name="FailureCloseButton" X="-26" Y="-24" Width="60" Height="30" TabStop="yes" FontId="0">
+            <Button Name="FailureRestartButton" X="-96" Y="-24" Width="64" Height="30" TabStop="yes" FontId="7" HoverFontId="7" SelectedFontId="7" HideWhenDisabled="yes">
+                <ButtonImage ImageFile="Files-Setup.ButtonPrimary.png" />
+                <ButtonHoverImage ImageFile="Files-Setup.ButtonPrimaryHover.png" />
+                <ButtonSelectedImage ImageFile="Files-Setup.ButtonPrimarySelected.png" />
+                <Text>#(loc.FailureRestartButton)</Text>
+            </Button>
+            <Button Name="FailureCloseButton" X="-26" Y="-24" Width="64" Height="30" TabStop="yes" FontId="8" HoverFontId="8" SelectedFontId="8">
+                <ButtonImage ImageFile="Files-Setup.ButtonSecondary.png" />
+                <ButtonHoverImage ImageFile="Files-Setup.ButtonSecondaryHover.png" />
+                <ButtonSelectedImage ImageFile="Files-Setup.ButtonSecondarySelected.png" />
                 <Text>#(loc.FailureCloseButton)</Text>
                 <CloseWindowAction />
             </Button>
