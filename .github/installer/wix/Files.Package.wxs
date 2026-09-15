@@ -10,7 +10,7 @@
       Compressed="yes">
 
     <SummaryInformation Description="Files max" Manufacturer="YeSuper" />
-    <MajorUpgrade DowngradeErrorMessage="电脑中已经安装了更新版本的 Files max。" />
+    <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="电脑中已经安装了更新版本的 Files max。" />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <!-- Ask the user to close Files during repair, upgrade, or uninstall so
@@ -96,6 +96,9 @@
           <RegistryKey Key="command">
             <RegistryValue Value="&quot;[INSTALLFOLDER]Files.exe&quot; &quot;%1&quot;" Type="string" KeyPath="yes" />
           </RegistryKey>
+        </RegistryKey>
+        <RegistryKey Root="HKLM" Key="Software\YeSuper\Files">
+          <RegistryValue Name="InstallLocation" Value="[INSTALLFOLDER]" Type="string" />
         </RegistryKey>
       </Component>
 

@@ -40,18 +40,16 @@
             <Static X="36" Y="140" Width="-36" Height="294" HexStyle="00000012" />
             <Label X="64" Y="174" Width="-64" Height="34" FontId="4" DisablePrefix="yes">#(loc.InstallHeader)</Label>
             <Label X="64" Y="220" Width="-64" Height="72" FontId="5" DisablePrefix="yes">
-                <Text Condition="WixStdBASuppressOptionsUI">#(loc.InstallMessage)</Text>
-                <Text Condition="NOT WixStdBASuppressOptionsUI">#(loc.InstallMessageOptions)</Text>
+                <Text>#(loc.InstallMessage)</Text>
             </Label>
             <Hypertext Name="EulaHyperlink" X="64" Y="-142" Width="-64" Height="22" TabStop="yes" FontId="6" Visible="no" HideWhenDisabled="yes">#(loc.InstallLicenseLinkText)</Hypertext>
             <Label Name="InstallVersion" X="64" Y="312" Width="-64" Height="22" FontId="6" DisablePrefix="yes" VisibleCondition="WixStdBAShowVersion">#(loc.InstallVersion)</Label>
             <Checkbox Name="EulaAcceptCheckbox" X="64" Y="354" Width="-64" Height="28" TabStop="yes" FontId="5" HideWhenDisabled="yes">#(loc.InstallAcceptCheckbox)</Checkbox>
-            <Button Name="InstallUpdateButton" X="36" Y="-24" Width="210" Height="38" TabStop="yes" FontId="0" EnableCondition="WixStdBAUpdateAvailable" HideWhenDisabled="yes">#(loc.UpdateButton)</Button>
-            <Button Name="OptionsButton" X="-226" Y="-24" Width="86" Height="38" TabStop="yes" FontId="0" VisibleCondition="NOT WixStdBASuppressOptionsUI">
-                <Text>#(loc.InstallOptionsButton)</Text>
-                <ChangePageAction Page="Options" />
+            <Button Name="InstallUpdateButton" X="36" Y="-24" Width="210" Height="38" TabStop="yes" FontId="0" EnableCondition="WixStdBAUpdateAvailable AND EulaAcceptCheckbox = 1" HideWhenDisabled="yes">#(loc.UpdateButton)</Button>
+            <Button Name="NextButton" X="-128" Y="-24" Width="84" Height="38" HexStyle="00000001" TabStop="yes" FontId="0" EnableCondition="EulaAcceptCheckbox = 1">
+                <Text>#(loc.InstallNextButton)</Text>
+                <ChangePageAction Page="Options" Condition="EulaAcceptCheckbox = 1" />
             </Button>
-            <Button Name="InstallButton" X="-128" Y="-24" Width="84" Height="38" HexStyle="00000001" TabStop="yes" FontId="0" ElevationShieldCondition='(WixBundleAuthoredScope = 1 AND NOT WixBundleElevated) OR ((WixBundleAuthoredScope = 2 OR WixBundleAuthoredScope = 3) AND WixStdBAScope = "PerMachine")'>#(loc.InstallInstallButton)</Button>
             <Button Name="InstallCancelButton" X="-36" Y="-24" Width="80" Height="38" TabStop="yes" FontId="0">
                 <Text>#(loc.InstallCancelButton)</Text>
                 <CloseWindowAction />
@@ -71,13 +69,14 @@
                 <RadioButton X="64" Y="304" Height="28" Width="-64" Value="PerUser" EnableCondition="WixBundleAuthoredScope = 2 OR WixBundleAuthoredScope = 3" HideWhenDisabled="yes" FontId="5">#(loc.OptionsPerUserScopeText)</RadioButton>
                 <RadioButton X="64" Y="336" Height="28" Width="-64" Value="PerMachine" EnableCondition="WixBundleAuthoredScope = 2 OR WixBundleAuthoredScope = 3" HideWhenDisabled="yes" FontId="5">#(loc.OptionsPerMachineScopeText)</RadioButton>
             </RadioButtons>
-            <Button Name="OptionsOkButton" X="-128" Y="-24" Width="84" Height="38" TabStop="yes" FontId="0">
-                <Text>#(loc.OptionsOkButton)</Text>
+            <Button Name="OptionsBackButton" X="-226" Y="-24" Width="86" Height="38" TabStop="yes" FontId="0">
+                <Text>#(loc.OptionsBackButton)</Text>
                 <ChangePageAction Page="Install" />
             </Button>
-            <Button Name="OptionsCancelButton" X="-36" Y="-24" Width="80" Height="38" TabStop="yes" FontId="0">
-                <Text>#(loc.OptionsCancelButton)</Text>
-                <ChangePageAction Page="Install" Cancel="yes" />
+            <Button Name="InstallButton" X="-128" Y="-24" Width="84" Height="38" HexStyle="00000001" TabStop="yes" FontId="0" EnableCondition="EulaAcceptCheckbox = 1 AND InstallFolder" ElevationShieldCondition='(WixBundleAuthoredScope = 1 AND NOT WixBundleElevated) OR ((WixBundleAuthoredScope = 2 OR WixBundleAuthoredScope = 3) AND WixStdBAScope = "PerMachine")'>#(loc.InstallInstallButton)</Button>
+            <Button Name="PathCancelButton" X="-36" Y="-24" Width="80" Height="38" TabStop="yes" FontId="0">
+                <Text>#(loc.InstallCancelButton)</Text>
+                <CloseWindowAction />
             </Button>
         </Page>
         <Page Name="Progress">

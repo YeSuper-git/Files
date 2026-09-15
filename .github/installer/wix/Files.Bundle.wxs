@@ -29,11 +29,54 @@
          selected value is explicitly passed to the MSI so both layers agree
          on the same install directory. -->
     <Variable
+        Name="EulaAcceptCheckbox"
+        Type="numeric"
+        Value="0"
+        Persisted="no" />
+
+    <Variable
         Name="InstallFolder"
         Type="formatted"
         Value="[ProgramFiles64Folder]Files max"
         bal:Overridable="yes"
         Persisted="yes" />
+
+    <!-- Prefer the path recorded by the MSI, then fall back to the legacy
+         NSIS registration when migrating an older installation. Burn runs
+         these searches before it removes the related older bundle. -->
+    <util:RegistrySearch
+        Id="PreviousInstallFolderSearch"
+        Root="HKLM"
+        Key="Software\YeSuper\Files"
+        Value="InstallLocation"
+        Variable="PreviousInstallFolder"
+        Result="value"
+        Bitness="always64" />
+
+    <util:RegistrySearch
+        Id="LegacyInstallFolderSearch"
+        Root="HKLM"
+        Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\Files"
+        Value="InstallLocation"
+        Variable="LegacyInstallFolder"
+        Result="value"
+        Bitness="always64" />
+
+    <SetVariable
+        Id="UsePreviousInstallFolder"
+        Variable="InstallFolder"
+        Type="string"
+        Value="[PreviousInstallFolder]"
+        Condition="NOT WixBundleInstalled AND PreviousInstallFolder"
+        After="PreviousInstallFolderSearch" />
+
+    <SetVariable
+        Id="UseLegacyInstallFolder"
+        Variable="InstallFolder"
+        Type="string"
+        Value="[LegacyInstallFolder]"
+        Condition="NOT WixBundleInstalled AND NOT PreviousInstallFolder AND LegacyInstallFolder"
+        After="LegacyInstallFolderSearch" />
 
     <util:RegistrySearch
         Id="VCRedistInstalled"
