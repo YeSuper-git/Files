@@ -13,9 +13,11 @@
     <!-- The custom WPF bootstrapper owns the complete wizard surface. This
          keeps Burn's reliable install engine and MSI chain, while replacing
          WixStdBA's native controls with the exact Files max design. The BA is
-         published as a self-contained single-file executable, so the final
-         download still contains only one setup executable. -->
-    <BootstrapperApplication SourceFile="$(var.BootstrapperApplicationPath)" />
+         published self-contained and its runtime payloads are embedded into
+         the one final setup executable. -->
+    <BootstrapperApplication SourceFile="$(var.BootstrapperApplicationPath)">
+      <PayloadGroupRef Id="FilesMaxBootstrapperPayloads" />
+    </BootstrapperApplication>
 
     <!-- WixStdBA exposes this persisted variable on its Options page. The
          selected value is explicitly passed to the MSI so both layers agree

@@ -9,6 +9,7 @@
     <MsiPath Condition="'$(MsiPath)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\installer\msi\Files max Installer.msi</MsiPath>
     <VCRedistPath Condition="'$(VCRedistPath)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\VC_redist.x64.exe</VCRedistPath>
     <BootstrapperApplicationPath Condition="'$(BootstrapperApplicationPath)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\installer\ba\FilesMax.Installer.Bootstrapper.exe</BootstrapperApplicationPath>
+    <BootstrapperApplicationPayloadsPath Condition="'$(BootstrapperApplicationPayloadsPath)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\installer\GeneratedBootstrapperPayloads.wxs</BootstrapperApplicationPayloadsPath>
     <AppVersion Condition="'$(AppVersion)' == ''">1.0.0.0</AppVersion>
     <ProductName Condition="'$(ProductName)' == ''">Files max</ProductName>
     <LogoFile Condition="'$(LogoFile)' == ''">$(MSBuildThisFileDirectory)..\..\..\src\Files.App\Assets\AppTiles\Dev\FilesSiameseCatLogo.png</LogoFile>
@@ -28,6 +29,7 @@
 
   <ItemGroup>
     <Compile Remove="Files.Package.wxs" />
+    <Compile Include="$(BootstrapperApplicationPayloadsPath)" Condition="Exists('$(BootstrapperApplicationPayloadsPath)')" />
     <PackageReference Include="WixToolset.BootstrapperApplications.wixext" />
     <PackageReference Include="WixToolset.Util.wixext" />
   </ItemGroup>

@@ -265,6 +265,7 @@ jobs:
           $bundleOutputDir = Join-Path $workspace 'artifacts\installer\bundle'
           $baProject = Join-Path $workspace '.github\installer\ba\FilesMax.Installer.Bootstrapper.csproj'
           $baOutputDir = Join-Path $workspace 'artifacts\installer\ba'
+          $baPayloadWxs = Join-Path $workspace 'artifacts\installer\GeneratedBootstrapperPayloads.wxs'
           $installScript = Join-Path $workspace 'Install-App.ps1'
           $packageProject = Join-Path $workspace '.github\installer\wix\Files.Package.wixproj'
           $bundleProject = Join-Path $workspace '.github\installer\wix\Files.Bundle.wixproj'
@@ -321,7 +322,7 @@ jobs:
             --configuration Release `
             --runtime win-x64 `
             --self-contained true `
-            -p:PublishSingleFile=true `
+            -p:PublishSingleFile=false `
             -p:PublishTrimmed=false `
             "-p:PublishDir=$baOutputDir\" `
             -v:minimal
@@ -335,6 +336,54 @@ jobs:
           }
           $baPath = $baCandidates[0].FullName
 
+          # A managed BA is launched by Burn in its own extracted directory.
+          # Keep the published BA as a normal self-contained folder and add
+          # every published dependency to the BA payload group. In
+          # particular, mbanative.dll must be beside the BA at runtime.
+          $nativeMba = Get-ChildItem -LiteralPath $baOutputDir -Recurse -Filter 'mbanative.dll' -File |
+            Select-Object -First 1
+          if (-not $nativeMba) {
+            throw "The published custom bootstrapper does not contain mbanative.dll under '$baOutputDir'."
+          }
+          $nativeMbaAtRoot = Join-Path $baOutputDir 'mbanative.dll'
+          if ($nativeMba.FullName -ne $nativeMbaAtRoot) {
+            Copy-Item -LiteralPath $nativeMba.FullName -Destination $nativeMbaAtRoot -Force
+          }
+
+          $baPayloadWxs = Join-Path $workspace 'artifacts\installer\GeneratedBootstrapperPayloads.wxs'
+          $xmlSettings = New-Object System.Xml.XmlWriterSettings
+          $xmlSettings.Indent = $true
+          $xmlSettings.OmitXmlDeclaration = $false
+          $xmlWriter = [System.Xml.XmlWriter]::Create($baPayloadWxs, $xmlSettings)
+          $xmlWriter.WriteStartDocument()
+          $xmlWriter.WriteStartElement('Wix', 'http://wixtoolset.org/schemas/v4/wxs')
+          $xmlWriter.WriteStartElement('Fragment')
+          $xmlWriter.WriteStartElement('PayloadGroup')
+          $xmlWriter.WriteAttributeString('Id', 'FilesMaxBootstrapperPayloads')
+          foreach ($baFile in Get-ChildItem -LiteralPath $baOutputDir -Recurse -File) {
+            $relativeName = [System.IO.Path]::GetRelativePath($baOutputDir, $baFile.FullName).Replace('\', '/')
+            $xmlWriter.WriteStartElement('Payload')
+            $xmlWriter.WriteAttributeString('SourceFile', $baFile.FullName)
+            $xmlWriter.WriteAttributeString('Name', $relativeName)
+            $xmlWriter.WriteEndElement()
+          }
+          $xmlWriter.WriteEndElement()
+          $xmlWriter.WriteEndElement()
+          $xmlWriter.WriteEndElement()
+          $xmlWriter.WriteEndDocument()
+          $xmlWriter.Close()
+
+          foreach ($requiredBaFile in @(
+              'FilesMax.Installer.Bootstrapper.dll',
+              'FilesMax.Installer.Bootstrapper.deps.json',
+              'FilesMax.Installer.Bootstrapper.runtimeconfig.json',
+              'WixToolset.BootstrapperApplicationApi.dll',
+              'mbanative.dll')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $baOutputDir $requiredBaFile))) {
+              throw "Required custom bootstrapper payload '$requiredBaFile' was not published at the BA root."
+            }
+          }
+
           dotnet build $bundleProject `
             --configuration Release `
             "-p:AppVersion=$appVersion" `
@@ -342,6 +391,7 @@ jobs:
             "-p:MsiPath=$msiPath" `
             "-p:VCRedistPath=$vcRedistPath" `
             "-p:BootstrapperApplicationPath=$baPath" `
+            "-p:BootstrapperApplicationPayloadsPath=$baPayloadWxs" `
             "-p:OutputPath=$bundleOutputDir\" `
             -v:minimal
           if ($LASTEXITCODE -ne 0) {
@@ -411,8 +461,13 @@ jobs:
           $installFolderArgument = 'InstallFolder="{0}"' -f $installDir
           $installLog = Join-Path $env:TEMP 'Files max Installer-install.log'
 
-          $installerProcess = Start-Process -FilePath $setupPath -ArgumentList '/quiet', '/norestart', '/log', $installLog, $installFolderArgument -Wait -PassThru
+          $installLogArgument = '/log="{0}"' -f $installLog
+          $installerProcess = Start-Process -FilePath $setupPath -ArgumentList '/quiet', '/norestart', $installLogArgument, $installFolderArgument -Wait -PassThru
           if ($installerProcess.ExitCode -ne 0) {
+            if (Test-Path -LiteralPath $installLog) {
+              Write-Host 'Burn installer log:'
+              Get-Content -LiteralPath $installLog
+            }
             # MSI deferred custom actions can inherit the Windows Installer
             # service temp directory instead of the runner user's temp
             # directory. Dump both locations so identity-registration errors
