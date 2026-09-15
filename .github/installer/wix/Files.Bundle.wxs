@@ -22,6 +22,7 @@
           ShowVersion="yes"
           LaunchTarget="[InstallFolder]\Files.exe"
           LaunchWorkingFolder="[InstallFolder]" />
+      <Payload Name="files-max.ico" SourceFile="$(var.IconFile)" Compressed="yes" />
     </BootstrapperApplication>
 
     <!-- WixStdBA exposes this persisted variable on its Options page. The

@@ -17,7 +17,7 @@
 
     <!-- Include WS_MAXIMIZEBOX so the native title bar exposes a working
          maximize button alongside minimize and close. -->
-    <Window Width="760" Height="500" AutoResize="yes" MinimumWidth="760" MinimumHeight="500" HexStyle="100b0000" FontId="0" Caption="#(loc.Caption)">
+    <Window Width="760" Height="500" AutoResize="yes" MinimumWidth="760" MinimumHeight="500" HexStyle="100b0000" FontId="0" Caption="#(loc.Caption)" IconFile="files-max.ico">
         <ImageControl X="36" Y="28" Width="86" Height="86" ImageFile="logo.png" Visible="yes"/>
         <Label X="145" Y="36" Width="-36" Height="42" FontId="1" Visible="yes" DisablePrefix="yes">#(loc.Title)</Label>
         <Label X="145" Y="82" Width="-36" Height="26" FontId="2" Visible="yes" DisablePrefix="yes">#(loc.Subtitle)</Label>
