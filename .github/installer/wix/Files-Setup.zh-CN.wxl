@@ -2,6 +2,7 @@
 <WixLocalization Culture="zh-CN" Language="2052" xmlns="http://wixtoolset.org/schemas/v4/wxl">
   <String Id="Caption" Value="Files max 安装程序" />
   <String Id="Title" Value="Files max" />
+  <String Id="Subtitle" Value="Windows 安装程序" />
   <String Id="CheckingForUpdatesLabel" Value="正在检查更新" />
   <String Id="UpdateButton" Value="更新到版本 [WixStdBAUpdateAvailable]" />
   <String Id="InstallHeader" Value="欢迎" />
