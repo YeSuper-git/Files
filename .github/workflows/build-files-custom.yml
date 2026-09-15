@@ -465,9 +465,9 @@ jobs:
           $installLog = Join-Path $env:TEMP 'files-max-installer-install.log'
           $smokeStartedAt = Get-Date
 
-          & $setupPath '/quiet' '/norestart' '/log' $installLog $installFolderArgument
-          $installerExitCode = $LASTEXITCODE
-          if ($installerExitCode -ne 0) {
+          $installLogArgument = '/log={0}' -f $installLog
+          $installerProcess = Start-Process -FilePath $setupPath -ArgumentList '/quiet', '/norestart', $installLogArgument, $installFolderArgument -WorkingDirectory $env:GITHUB_WORKSPACE -Wait -PassThru
+          if ($installerProcess.ExitCode -ne 0) {
             if (Test-Path -LiteralPath $installLog) {
               Write-Host 'Burn installer log:'
               Get-Content -LiteralPath $installLog
@@ -486,7 +486,7 @@ jobs:
               Write-Host "Installer diagnostic log: $($diagnosticLog.FullName)"
               Get-Content -LiteralPath $diagnosticLog.FullName
             }
-            throw "Silent installer failed with exit code $installerExitCode."
+            throw "Silent installer failed with exit code $($installerProcess.ExitCode)."
           }
           if (-not (Test-Path -LiteralPath $installedExe)) {
             throw "Files.exe was not installed to '$installDir'."
