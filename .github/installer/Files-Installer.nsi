@@ -5,16 +5,43 @@ SetCompressor /SOLID lzma
 InstallDir "$PROGRAMFILES64\Files"
 InstallDirRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "InstallLocation"
 
-Name "Files"
+!define MUI_ABORTWARNING
+!define MUI_UNABORTWARNING
+!define MUI_ICON "${PAYLOAD_DIR}\Assets\AppTiles\Dev\Logo.ico"
+!define MUI_UNICON "${PAYLOAD_DIR}\Assets\AppTiles\Dev\Logo.ico"
+!define MUI_WELCOMEPAGE_TITLE "欢迎使用文件资源管理器安装向导"
+!define MUI_WELCOMEPAGE_TEXT "此向导将引导您完成文件资源管理器的安装。\r\n\r\n建议在开始安装前关闭其他应用。"
+!define MUI_DIRECTORYPAGE_TEXT_TOP "请选择文件资源管理器的安装位置。"
+!define MUI_DIRECTORYPAGE_TEXT_DESTINATION "安装文件夹："
+!define MUI_FINISHPAGE_TITLE "文件资源管理器安装完成"
+!define MUI_FINISHPAGE_TEXT "文件资源管理器已经安装到您的电脑。"
+!define MUI_UNCONFIRMPAGE_TEXT_TOP "请选择是否要从电脑中卸载文件资源管理器。"
+
+!include MUI2.nsh
+
+Name "文件资源管理器"
 OutFile "${OUTPUT_EXE}"
-BrandingText "Files"
+BrandingText "文件资源管理器"
 ShowInstDetails nevershow
 ShowUninstDetails nevershow
 
+!insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_DIRECTORY
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
+
+!insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
+!define MUI_FINISHPAGE_TITLE "文件资源管理器卸载完成"
+!define MUI_FINISHPAGE_TEXT "文件资源管理器已经从您的电脑中卸载。"
+!insertmacro MUI_UNPAGE_FINISH
+
+!insertmacro MUI_LANGUAGE "SimpChinese"
+
 VIProductVersion "${APP_VERSION}"
-VIAddVersionKey /LANG=2052 "ProductName" "Files"
+VIAddVersionKey /LANG=2052 "ProductName" "文件资源管理器"
 VIAddVersionKey /LANG=2052 "CompanyName" "YeSuper"
-VIAddVersionKey /LANG=2052 "FileDescription" "Files installer"
+VIAddVersionKey /LANG=2052 "FileDescription" "文件资源管理器安装程序"
 VIAddVersionKey /LANG=2052 "FileVersion" "${APP_VERSION}"
 VIAddVersionKey /LANG=2052 "ProductVersion" "${APP_VERSION}"
 
@@ -38,11 +65,11 @@ Section "Install"
     StrCpy $InstallScript "$INSTDIR\Install-App.ps1"
     StrCpy $IdentityPackage "$INSTDIR\Files.Identity.msix"
 
-    DetailPrint "Registering Files..."
+    DetailPrint "正在注册文件资源管理器..."
     nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$InstallScript" -Mode Install -InstallDirectory "$INSTDIR" -IdentityPackagePath "$IdentityPackage"'
     Pop $0
     ${If} $0 != 0
-        Abort "Files installation failed. See %TEMP%\Files-Installer-install.log for details."
+        Abort "文件资源管理器安装失败。详情请查看 %TEMP%\Files-Installer-install.log。"
     ${EndIf}
 
     CreateDirectory "$SMPROGRAMS\Files"
@@ -50,7 +77,7 @@ Section "Install"
     !insertmacro InstallFilesShellIntegration
 
     WriteUninstaller "$INSTDIR\Uninstall.exe"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "DisplayName" "Files"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "DisplayName" "文件资源管理器"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "DisplayVersion" "${APP_VERSION}"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "Publisher" "YeSuper"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "InstallLocation" "$INSTDIR"
@@ -66,11 +93,11 @@ Section "Uninstall"
     StrCpy $InstallScript "$INSTDIR\Install-App.ps1"
     StrCpy $IdentityPackage "$INSTDIR\Files.Identity.msix"
 
-    DetailPrint "Unregistering Files..."
+    DetailPrint "正在注销文件资源管理器..."
     nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$InstallScript" -Mode Uninstall -InstallDirectory "$INSTDIR" -IdentityPackagePath "$IdentityPackage"'
     Pop $0
     ${If} $0 != 0
-        MessageBox MB_ICONEXCLAMATION|MB_OK "Files identity cleanup failed. Close Files and run the uninstaller again. No files were removed."
+        MessageBox MB_ICONEXCLAMATION|MB_OK "文件资源管理器身份清理失败。请关闭文件资源管理器后重新运行卸载程序。未删除任何文件。"
         Abort
     ${EndIf}
 

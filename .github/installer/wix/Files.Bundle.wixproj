@@ -10,13 +10,15 @@
     <VCRedistPath Condition="'$(VCRedistPath)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\VC_redist.x64.exe</VCRedistPath>
     <AppVersion Condition="'$(AppVersion)' == ''">1.0.0.0</AppVersion>
     <ProductName Condition="'$(ProductName)' == ''">Files</ProductName>
+    <LogoFile Condition="'$(LogoFile)' == ''">$(MSBuildThisFileDirectory)..\..\..\src\Files.App\Assets\AppTiles\Dev\Large310x310Logo.scale-400.png</LogoFile>
 
     <DefineConstants>
       $(DefineConstants);
       AppVersion=$(AppVersion);
       ProductName=$(ProductName);
       MsiPath=$(MsiPath);
-      VCRedistPath=$(VCRedistPath)
+      VCRedistPath=$(VCRedistPath);
+      LogoFile=$(LogoFile)
     </DefineConstants>
   </PropertyGroup>
 

@@ -9,8 +9,8 @@
       Scope="perMachine"
       Compressed="yes">
 
-    <SummaryInformation Description="Files" Manufacturer="YeSuper" />
-    <MajorUpgrade DowngradeErrorMessage="A newer version of Files is already installed." />
+    <SummaryInformation Description="文件资源管理器" Manufacturer="YeSuper" />
+    <MajorUpgrade DowngradeErrorMessage="电脑中已经安装了更新版本的文件资源管理器。" />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <!-- Ask the user to close Files during repair, upgrade, or uninstall so
@@ -18,7 +18,7 @@
     <util:CloseApplication
         Id="CloseFilesApplication"
         Target="Files.exe"
-        Description="Files is running. Close it before continuing."
+        Description="文件资源管理器正在运行。请先关闭它再继续。"
         PromptToContinue="yes"
         RebootPrompt="no"
         CloseMessage="yes"
@@ -158,7 +158,7 @@
       <Custom Action="UnregisterFilesIdentity" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot;" />
     </InstallExecuteSequence>
 
-    <Feature Id="MainFeature" Title="Files" Level="1">
+    <Feature Id="MainFeature" Title="文件资源管理器" Level="1">
       <ComponentGroupRef Id="ApplicationFiles" />
       <ComponentRef Id="InstallerSupportFiles" />
       <ComponentRef Id="StartMenuShortcut" />

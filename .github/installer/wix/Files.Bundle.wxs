@@ -11,7 +11,10 @@
 
     <BootstrapperApplication>
       <bal:WixStandardBootstrapperApplication
-          Theme="hyperlinkLicense"
+          Theme="hyperlinkLargeLicense"
+          ThemeFile="Files-Setup.Theme.xml"
+          LocalizationFile="Files-Setup.zh-CN.wxl"
+          LogoFile="$(var.LogoFile)"
           LicenseUrl=""
           SuppressOptionsUI="no"
           SuppressRepair="no"
@@ -52,7 +55,7 @@
           Vital="yes" />
       <MsiPackage
           Id="FilesInstallerMsi"
-          DisplayName="Files"
+          DisplayName="文件资源管理器"
           SourceFile="$(var.MsiPath)"
           Vital="yes">
         <MsiProperty Name="INSTALLFOLDER" Value="[InstallFolder]" />
