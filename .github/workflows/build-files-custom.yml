@@ -486,6 +486,13 @@ jobs:
               Write-Host "Installer diagnostic log: $($diagnosticLog.FullName)"
               Get-Content -LiteralPath $diagnosticLog.FullName
             }
+            $applicationEvents = Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $smokeStartedAt.AddMinutes(-1) } -ErrorAction SilentlyContinue |
+              Where-Object { $_.Message -match 'FilesMax|Bootstrapper|hostfxr|\.NET Runtime|Application Error|SideBySide' } |
+              Select-Object -First 20
+            foreach ($applicationEvent in $applicationEvents) {
+              Write-Host "Windows application event: $($applicationEvent.ProviderName) $($applicationEvent.Id)"
+              Write-Host $applicationEvent.Message
+            }
             throw "Silent installer failed with exit code $($installerProcess.ExitCode)."
           }
           if (-not (Test-Path -LiteralPath $installedExe)) {
