@@ -3,6 +3,7 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <OutputType>WinExe</OutputType>
     <AcceptEula>wix7</AcceptEula>
+    <Nullable>enable</Nullable>
     <AssemblyName>FilesMax.Installer.Bootstrapper</AssemblyName>
     <RootNamespace>FilesMax.Installer.Bootstrapper</RootNamespace>
     <ApplicationIcon>$(MSBuildThisFileDirectory)..\..\..\src\Files.App\Assets\AppTiles\Dev\Logo.ico</ApplicationIcon>

@@ -145,7 +145,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         args.Cancel = cancelRequested;
     }
 
-    private void OnError(object? sender, ErrorEventArgs args)
+    private void OnError(object? sender, WixToolset.BootstrapperApplicationApi.ErrorEventArgs args)
     {
         lastError = args.ErrorMessage;
         args.Result = args.Recommendation;
