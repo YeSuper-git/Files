@@ -212,10 +212,14 @@ jobs:
             throw 'WiX MSI build failed.'
           }
 
-          $msiPath = Join-Path $msiOutputDir 'Files-Installer.msi'
-          if (-not (Test-Path -LiteralPath $msiPath)) {
-            throw "WiX MSI was not produced at '$msiPath'."
+          # WiX may place localized outputs in a culture subdirectory (for
+          # example, msi\zh-CN) depending on the SDK version. Resolve the
+          # actual file instead of assuming it is directly under OutputPath.
+          $msiCandidates = @(Get-ChildItem -LiteralPath $msiOutputDir -Recurse -Filter 'Files-Installer.msi' -File)
+          if ($msiCandidates.Count -ne 1) {
+            throw "Expected exactly one WiX MSI under '$msiOutputDir', found $($msiCandidates.Count)."
           }
+          $msiPath = $msiCandidates[0].FullName
 
           # WiX reads the VERSIONINFO language from every PE file. A small
           # number of native .NET runtime files publish a non-numeric language
@@ -248,10 +252,11 @@ jobs:
             throw 'WiX Burn bundle build failed.'
           }
 
-          $builtBundlePath = Join-Path $bundleOutputDir 'Files-Setup.exe'
-          if (-not (Test-Path -LiteralPath $builtBundlePath)) {
-            throw "WiX Burn bundle was not produced at '$builtBundlePath'."
+          $bundleCandidates = @(Get-ChildItem -LiteralPath $bundleOutputDir -Recurse -Filter 'Files-Setup.exe' -File)
+          if ($bundleCandidates.Count -ne 1) {
+            throw "Expected exactly one WiX Burn bundle under '$bundleOutputDir', found $($bundleCandidates.Count)."
           }
+          $builtBundlePath = $bundleCandidates[0].FullName
 
           # Burn bundles must be signed in two stages. Signing the final EXE
           # directly leaves the attached container offsets invalid, which
