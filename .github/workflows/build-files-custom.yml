@@ -500,6 +500,13 @@ jobs:
               Write-Host 'Burn installer log (installer returned success but the target file is missing):'
               Get-Content -LiteralPath $installLog
             }
+            $burnLogs = Get-ChildItem -Path $env:TEMP -Filter 'Files_max_*.log' -File -ErrorAction SilentlyContinue |
+              Where-Object { $_.LastWriteTime -ge $smokeStartedAt.AddMinutes(-1) } |
+              Sort-Object LastWriteTime
+            foreach ($burnLog in $burnLogs) {
+              Write-Host "Burn log: $($burnLog.FullName)"
+              Get-Content -LiteralPath $burnLog.FullName
+            }
             $baErrorLog = Join-Path $env:TEMP 'FilesMax.Installer.Bootstrapper.error.log'
             if (Test-Path -LiteralPath $baErrorLog) {
               Write-Host 'Bootstrapper error log:'
