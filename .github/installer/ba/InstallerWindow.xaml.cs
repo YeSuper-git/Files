@@ -170,7 +170,7 @@ public partial class InstallerWindow : Window
             SelectedPath = InstallFolder,
         };
 
-        if (dialog.ShowDialog() == DialogResult.OK)
+        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             SetInstallFolder(dialog.SelectedPath);
     }
 
