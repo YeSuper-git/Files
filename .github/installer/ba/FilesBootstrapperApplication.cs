@@ -44,6 +44,26 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
     {
         base.OnCreate(args);
         command = args.Command;
+
+        // A custom BA must explicitly apply overridable command-line
+        // variables. WixStdBA does this internally, but Burn does not
+        // automatically copy values such as InstallFolder into the engine
+        // variable store for a custom application.
+        try
+        {
+            var parsedCommand = command.ParseCommandLine();
+            if (parsedCommand.Variables.TryGetValue(InstallFolderVariable, out var installFolder) &&
+                !string.IsNullOrWhiteSpace(installFolder))
+            {
+                engine.SetVariableString(InstallFolderVariable, installFolder, formatted: false);
+                LogDiagnostic($"Applied command-line InstallFolder={installFolder}");
+            }
+        }
+        catch (Exception exception)
+        {
+            LogDiagnostic($"Could not apply command-line variables: {exception.Message}");
+        }
+
         LogDiagnostic($"OnCreate action={command.Action}, display={command.Display}");
     }
 
