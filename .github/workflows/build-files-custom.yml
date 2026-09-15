@@ -14,6 +14,61 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Preflight installer inputs
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $workspace = $env:GITHUB_WORKSPACE
+
+          # Catch PowerShell parser errors before the expensive Windows App
+          # SDK publish. This specifically protects MSI custom actions, which
+          # otherwise fail only after the application has been packaged.
+          $scriptPath = Join-Path $workspace 'Install-App.ps1'
+          $tokens = $null
+          $parseErrors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            $scriptPath,
+            [ref]$tokens,
+            [ref]$parseErrors)
+          if ($parseErrors.Count -gt 0) {
+            $details = $parseErrors | ForEach-Object { $_.Message }
+            throw "Install-App.ps1 has PowerShell syntax errors: $($details -join '; ')"
+          }
+
+          $xmlFiles = @(
+            'src\Files.App\Package.appxmanifest',
+            '.github\installer\ExternalLocation.AppxManifest',
+            '.github\installer\wix\Files-Setup.Theme.xml',
+            '.github\installer\wix\Files-Setup.zh-CN.wxl',
+            '.github\installer\wix\Files.Bundle.wxs',
+            '.github\installer\wix\Files.Package.wxs',
+            '.github\installer\wix\Files.Bundle.wixproj',
+            '.github\installer\wix\Files.Package.wixproj'
+          ) | ForEach-Object { Join-Path $workspace $_ }
+          foreach ($xmlFile in $xmlFiles) {
+            try {
+              [xml](Get-Content -Raw -LiteralPath $xmlFile) | Out-Null
+            } catch {
+              throw "Invalid installer XML '$xmlFile': $($_.Exception.Message)"
+            }
+          }
+
+          $requiredFiles = @(
+            'src\Files.App\Assets\AppTiles\Dev\Logo.ico',
+            'src\Files.App\Assets\AppTiles\Dev\FilesSiameseCatLogo.png',
+            'src\Files.App\Assets\AppTiles\Dev\StoreLogo.scale-100.png',
+            'src\Files.App\Assets\AppTiles\Dev\Square150x150Logo.scale-100.png',
+            'src\Files.App\Assets\AppTiles\Dev\Square44x44Logo.scale-100.png',
+            'src\Files.App\Assets\archives\ExtensionIcon.png',
+            '.github\installer\ExternalLocation.AppxManifest',
+            'Install-App.ps1'
+          ) | ForEach-Object { Join-Path $workspace $_ }
+          $missingFiles = @($requiredFiles | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) })
+          if ($missingFiles.Count -gt 0) {
+            throw "Required installer inputs are missing: $($missingFiles -join ', ')"
+          }
+          Write-Host "Installer preflight passed: $($xmlFiles.Count) XML files and $($requiredFiles.Count) required files checked."
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
