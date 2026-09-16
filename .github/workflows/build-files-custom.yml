@@ -9,6 +9,7 @@ permissions:
 jobs:
   build:
     runs-on: windows-2025
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -90,6 +91,14 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~\.nuget\packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets', '**/*.slnx', '**/packages.config') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v3
 
@@ -105,6 +114,34 @@ jobs:
           nuget restore "$env:GITHUB_WORKSPACE\src\Files.App.Launcher\Files.App.Launcher.vcxproj" `
             -SolutionDirectory "$env:GITHUB_WORKSPACE" `
             -Verbosity quiet
+
+      - name: Preflight custom bootstrapper build
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $workspace = $env:GITHUB_WORKSPACE
+          $baProject = Join-Path $workspace '.github\installer\ba\FilesMax.Installer.Bootstrapper.csproj'
+          $preflightOutput = Join-Path $workspace 'artifacts\installer\ba-preflight'
+          New-Item -ItemType Directory -Path $preflightOutput -Force | Out-Null
+
+          # Compile the complete managed bootstrapper before publishing the
+          # large Files application. This catches C#/XAML/API errors in
+          # seconds instead of after the expensive application publish.
+          dotnet build $baProject `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=false `
+            -p:PublishTrimmed=false `
+            "-p:OutputPath=$preflightOutput\" `
+            -v:minimal
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Custom bootstrapper preflight build failed.'
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $preflightOutput 'FilesMax.Installer.Bootstrapper.dll'))) {
+            throw 'Custom bootstrapper preflight output is incomplete.'
+          }
+          Write-Host 'Custom bootstrapper preflight build passed.'
 
       - name: Build launcher
         shell: pwsh
@@ -322,6 +359,7 @@ jobs:
             --configuration Release `
             --runtime win-x64 `
             --self-contained true `
+            --no-restore `
             -p:PublishSingleFile=false `
             -p:PublishTrimmed=false `
             "-p:PublishDir=$baOutputDir\" `
@@ -360,14 +398,32 @@ jobs:
           $xmlWriter.WriteStartElement('Fragment')
           $xmlWriter.WriteStartElement('PayloadGroup')
           $xmlWriter.WriteAttributeString('Id', 'FilesMaxBootstrapperPayloads')
-          foreach ($baFile in Get-ChildItem -LiteralPath $baOutputDir -Recurse -File) {
-            if ($baFile.FullName -ieq $baPath) {
-              continue
+          $mainBootstrapperName = [System.IO.Path]::GetFileName($baPath)
+          $payloadEntries = @(
+            foreach ($baFile in Get-ChildItem -LiteralPath $baOutputDir -Recurse -File) {
+              # The BA executable is supplied by SourceFile. Never add a
+              # second copy by basename, even if a publish layout changes
+              # the path casing or creates another output folder.
+              if ($baFile.Name -ieq $mainBootstrapperName) {
+                continue
+              }
+              $relativeName = [System.IO.Path]::GetRelativePath($baOutputDir, $baFile.FullName).Replace('/', '\')
+              [pscustomobject]@{
+                SourceFile = $baFile.FullName
+                Name = $relativeName
+              }
             }
-            $relativeName = [System.IO.Path]::GetRelativePath($baOutputDir, $baFile.FullName).Replace('/', '\')
+          )
+          $duplicatePayloads = @($payloadEntries | Group-Object -Property Name | Where-Object Count -gt 1)
+          if ($duplicatePayloads.Count -gt 0) {
+            $duplicateNames = $duplicatePayloads | ForEach-Object { $_.Name }
+            $xmlWriter.Close()
+            throw "Bootstrapper payload names are not unique: $($duplicateNames -join ', ')"
+          }
+          foreach ($payloadEntry in $payloadEntries) {
             $xmlWriter.WriteStartElement('Payload')
-            $xmlWriter.WriteAttributeString('SourceFile', $baFile.FullName)
-            $xmlWriter.WriteAttributeString('Name', $relativeName)
+            $xmlWriter.WriteAttributeString('SourceFile', $payloadEntry.SourceFile)
+            $xmlWriter.WriteAttributeString('Name', $payloadEntry.Name)
             $xmlWriter.WriteEndElement()
           }
           $xmlWriter.WriteEndElement()
