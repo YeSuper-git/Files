@@ -3,6 +3,10 @@ name: Build Files max
 on:
   workflow_dispatch:
 
+concurrency:
+  group: files-max-installer-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
@@ -106,14 +110,24 @@ jobs:
         uses: NuGet/setup-nuget@v3
 
       - name: Restore
-        run: msbuild ${{ github.workspace }}\Files.slnx -t:Restore -p:Configuration=Release -p:Platform=x64
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          msbuild "${{ github.workspace }}\Files.slnx" -t:Restore -p:Configuration=Release -p:Platform=x64
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Solution restore failed.'
+          }
 
       - name: Restore launcher dependencies
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           nuget restore "$env:GITHUB_WORKSPACE\src\Files.App.Launcher\Files.App.Launcher.vcxproj" `
             -SolutionDirectory "$env:GITHUB_WORKSPACE" `
             -Verbosity quiet
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Launcher dependency restore failed.'
+          }
 
       - name: Preflight custom bootstrapper build
         shell: pwsh
@@ -138,10 +152,75 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw 'Custom bootstrapper preflight build failed.'
           }
-          if (-not (Test-Path -LiteralPath (Join-Path $preflightOutput 'FilesMax.Installer.Bootstrapper.dll'))) {
+          $preflightAssembly = Get-ChildItem -LiteralPath $preflightOutput -Recurse -Filter 'FilesMax.Installer.Bootstrapper.dll' -File |
+            Select-Object -First 1
+          if (-not $preflightAssembly) {
             throw 'Custom bootstrapper preflight output is incomplete.'
           }
           Write-Host 'Custom bootstrapper preflight build passed.'
+
+      - name: Preflight external installer tools
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $workspace = $env:GITHUB_WORKSPACE
+          $artifactDir = Join-Path $workspace 'artifacts'
+          New-Item -ItemType Directory -Path $artifactDir -Force | Out-Null
+
+          $makeAppx = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\makeappx.exe' |
+            Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe' |
+            Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $makeAppx -or -not $signtool) {
+            throw 'Windows SDK makeappx.exe or signtool.exe was not found.'
+          }
+
+          # Download external prerequisites before the expensive Files
+          # publish. Retry transient network failures without rerunning the
+          # complete workflow.
+          $vcRedistPath = Join-Path $artifactDir 'VC_redist.x64.exe'
+          $downloaded = $false
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            try {
+              Invoke-WebRequest `
+                -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' `
+                -OutFile $vcRedistPath `
+                -UseBasicParsing
+              if ((Test-Path -LiteralPath $vcRedistPath) -and (Get-Item $vcRedistPath).Length -ge 1MB) {
+                $downloaded = $true
+                break
+              }
+              throw 'Downloaded VC++ Redistributable is incomplete.'
+            }
+            catch {
+              if ($attempt -eq 3) {
+                throw "Microsoft Visual C++ Redistributable download failed after $attempt attempts: $($_.Exception.Message)"
+              }
+              Write-Host "VC++ Redistributable download attempt $attempt failed; retrying."
+              Start-Sleep -Seconds 5
+            }
+          }
+          if (-not $downloaded) {
+            throw 'Microsoft Visual C++ Redistributable was not downloaded.'
+          }
+
+          $wixToolDir = Join-Path $artifactDir 'wix-cli'
+          dotnet tool install wix --version 7.0.0 --tool-path $wixToolDir
+          if ($LASTEXITCODE -ne 0) {
+            throw 'WiX command-line tool installation failed during preflight.'
+          }
+          $wixTool = Join-Path $wixToolDir 'wix.exe'
+          if (-not (Test-Path -LiteralPath $wixTool)) {
+            throw "WiX command-line tool was not installed at '$wixTool'."
+          }
+          & $wixTool eula accept wix7
+          if ($LASTEXITCODE -ne 0) {
+            throw 'WiX command-line tool EULA acceptance failed during preflight.'
+          }
+
+          "FILES_MAX_VC_REDIST_PATH=$vcRedistPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "FILES_MAX_WIX_TOOL=$wixTool" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host 'External installer tools preflight passed.'
 
       - name: Build launcher
         shell: pwsh
@@ -151,6 +230,9 @@ jobs:
             -p:Configuration=Release `
             -p:Platform=x64 `
             -v:minimal
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Files.App.Launcher build failed.'
+          }
           if (-not (Test-Path -LiteralPath "$env:GITHUB_WORKSPACE\src\Files.App\Assets\FilesOpenDialog\Files.App.Launcher.exe")) {
             throw 'Files.App.Launcher.exe was not produced.'
           }
@@ -175,6 +257,9 @@ jobs:
             "-p:PublishDir=$publishDir\" `
             -v:minimal
 
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Unpackaged Files application publish failed.'
+          }
           if (-not (Test-Path -LiteralPath (Join-Path $publishDir 'Files.exe'))) {
             throw 'Unpackaged Files.exe was not produced.'
           }
@@ -212,6 +297,9 @@ jobs:
             "-p:PublishDir=$serverPublishDir\" `
             -v:minimal
 
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Files.App.Server publish failed.'
+          }
           $serverExe = Get-ChildItem -LiteralPath $serverPublishDir -Filter 'Files.App.Server.exe' -File | Select-Object -First 1
           if (-not $serverExe) {
             throw 'Files.App.Server.exe was not produced.'
@@ -230,8 +318,15 @@ jobs:
           $identityDir = Join-Path $workspace 'artifacts\identity'
           $identityPackage = Join-Path $workspace 'artifacts\Files.Identity.msix'
           $certificatePath = Join-Path $workspace 'artifacts\Files.cer'
-          $vcRedistPath = Join-Path $workspace 'artifacts\VC_redist.x64.exe'
+          $vcRedistPath = $env:FILES_MAX_VC_REDIST_PATH
           $pfxPath = Join-Path $workspace 'artifacts\sign.pfx'
+          $wixTool = $env:FILES_MAX_WIX_TOOL
+          if (-not (Test-Path -LiteralPath $vcRedistPath)) {
+            throw "Preflight VC++ Redistributable is missing at '$vcRedistPath'."
+          }
+          if (-not (Test-Path -LiteralPath $wixTool)) {
+            throw "Preflight WiX command-line tool is missing at '$wixTool'."
+          }
 
           $sourcePackageManifest = Join-Path $workspace 'src\Files.App\Package.appxmanifest'
           [xml]$sourceManifest = Get-Content -LiteralPath $sourcePackageManifest
@@ -264,6 +359,25 @@ jobs:
             throw 'Windows SDK makeappx.exe or signtool.exe was not found.'
           }
 
+          function Invoke-SignFile {
+            param(
+              [Parameter(Mandatory = $true)][string]$Path,
+              [Parameter(Mandatory = $true)][string]$Description
+            )
+
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              & $signtool sign /f $pfxPath /p $pfxPasswordText /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $Path
+              if ($LASTEXITCODE -eq 0) {
+                return
+              }
+              if ($attempt -lt 3) {
+                Write-Host "$Description timestamp/signing attempt $attempt failed; retrying."
+                Start-Sleep -Seconds 5
+              }
+            }
+            throw "$Description signing failed after 3 attempts."
+          }
+
           & $makeAppx pack /o /d $identityDir /nv /p $identityPackage
           if ($LASTEXITCODE -ne 0) {
             throw "Identity package creation failed with exit code $LASTEXITCODE."
@@ -284,18 +398,7 @@ jobs:
           Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $pfxPassword | Out-Null
           Export-Certificate -Cert $cert -FilePath $certificatePath -Type CERT | Out-Null
 
-          & $signtool sign /f $pfxPath /p $pfxPasswordText /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $identityPackage
-          if ($LASTEXITCODE -ne 0) {
-            throw "Identity package signing failed with exit code $LASTEXITCODE."
-          }
-
-          Invoke-WebRequest `
-            -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' `
-            -OutFile $vcRedistPath `
-            -UseBasicParsing
-          if (-not (Test-Path -LiteralPath $vcRedistPath) -or (Get-Item $vcRedistPath).Length -lt 1MB) {
-            throw 'Microsoft Visual C++ Redistributable download failed.'
-          }
+          Invoke-SignFile -Path $identityPackage -Description 'Identity package'
 
           $setupPath = Join-Path $workspace 'Files max Setup.exe'
           $msiOutputDir = Join-Path $workspace 'artifacts\installer\msi'
@@ -346,10 +449,7 @@ jobs:
           [void][Runtime.InteropServices.Marshal]::ReleaseComObject($msiTransaction)
           [void][Runtime.InteropServices.Marshal]::ReleaseComObject($msiDatabase)
 
-          & $signtool sign /f $pfxPath /p $pfxPasswordText /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $msiPath
-          if ($LASTEXITCODE -ne 0) {
-            throw "MSI signing failed with exit code $LASTEXITCODE."
-          }
+          Invoke-SignFile -Path $msiPath -Description 'MSI'
 
           # Build the custom WPF bootstrapper after the MSI is known to be
           # valid. It owns the complete Files max installer UI while Burn
@@ -466,19 +566,6 @@ jobs:
           # Burn bundles must be signed in two stages. Signing the final EXE
           # directly leaves the attached container offsets invalid, which
           # makes Burn unable to extract the MSI or VC++ redistributable.
-          $wixToolDir = Join-Path $workspace 'artifacts\wix-cli'
-          dotnet tool install wix --version 7.0.0 --tool-path $wixToolDir
-          if ($LASTEXITCODE -ne 0) {
-            throw 'WiX command-line tool installation failed.'
-          }
-          $wixTool = Join-Path $wixToolDir 'wix.exe'
-          if (-not (Test-Path -LiteralPath $wixTool)) {
-            throw "WiX command-line tool was not installed at '$wixTool'."
-          }
-          & $wixTool eula accept wix7
-          if ($LASTEXITCODE -ne 0) {
-            throw 'WiX command-line tool EULA acceptance failed.'
-          }
           $enginePath = Join-Path $bundleOutputDir 'Files max Installer-Engine.exe'
           $reattachedBundlePath = Join-Path $bundleOutputDir 'Files max Setup-signed.exe'
 
@@ -487,10 +574,7 @@ jobs:
             throw "Burn engine detach failed with exit code $LASTEXITCODE."
           }
 
-          & $signtool sign /f $pfxPath /p $pfxPasswordText /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $enginePath
-          if ($LASTEXITCODE -ne 0) {
-            throw "Burn engine signing failed with exit code $LASTEXITCODE."
-          }
+          Invoke-SignFile -Path $enginePath -Description 'Burn engine'
 
           & $wixTool burn reattach $builtBundlePath -engine $enginePath -out $reattachedBundlePath
           if ($LASTEXITCODE -ne 0) {
@@ -499,10 +583,7 @@ jobs:
 
           Copy-Item -LiteralPath $reattachedBundlePath -Destination $setupPath -Force
 
-          & $signtool sign /f $pfxPath /p $pfxPasswordText /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com $setupPath
-          if ($LASTEXITCODE -ne 0) {
-            throw "Installer signing failed with exit code $LASTEXITCODE."
-          }
+          Invoke-SignFile -Path $setupPath -Description 'Final installer'
           Remove-Item -LiteralPath $pfxPath -Force
 
           Get-ChildItem -LiteralPath $setupPath |
