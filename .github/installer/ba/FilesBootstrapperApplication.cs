@@ -152,12 +152,12 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         {
             if (args.Status != 0)
             {
-                ShowFailure("无法准备安装操作。" + FormatLastError());
+                ShowFailure("无法准备操作。" + FormatLastError(), GetActionFailureHeader());
                 return;
             }
 
             applying = true;
-            window?.ShowProgress();
+            ShowProgress();
             var parentHandle = window is null
                 ? GetDesktopWindow()
                 : new WindowInteropHelper(window).Handle;
@@ -168,7 +168,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
     private void OnApplyBegin(object? sender, ApplyBeginEventArgs args)
     {
         LogDiagnostic("Apply begin");
-        RunOnUi(() => window?.ShowProgress());
+        RunOnUi(ShowProgress);
     }
 
     private void OnProgress(object? sender, ProgressEventArgs args)
@@ -203,7 +203,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         {
             if (args.Status != 0)
             {
-                ShowFailure("安装操作失败。" + FormatLastError());
+                ShowFailure(GetActionFailureMessage() + FormatLastError(), GetActionFailureHeader());
                 return;
             }
 
@@ -216,15 +216,15 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
             window?.SetBusy(false);
             if (plannedAction is LaunchAction.Uninstall or LaunchAction.UnsafeUninstall)
             {
-                window?.ShowComplete("卸载成功完成", canLaunch: false);
+                window?.ShowComplete("卸载成功完成", "Files max 已经卸载完成。", canLaunch: false);
             }
             else if (plannedAction == LaunchAction.Repair)
             {
-                window?.ShowComplete("修复成功完成", canLaunch: true);
+                window?.ShowComplete("修复成功完成", "Files max 已经修复完成。", canLaunch: true);
             }
             else
             {
-                window?.ShowComplete("安装成功完成", canLaunch: true);
+                window?.ShowComplete("安装成功完成", "Files max 已经安装完成。", canLaunch: true);
             }
         });
     }
@@ -276,8 +276,27 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         plannedAction = action == LaunchAction.Unknown ? LaunchAction.Install : action;
         cancelRequested = false;
         LogDiagnostic($"Starting plan action={plannedAction}");
-        window?.ShowProgress();
+        ShowProgress();
         engine.Plan(plannedAction, BundleScope.Default);
+    }
+
+    private void ShowProgress()
+    {
+        if (window is null)
+            return;
+
+        if (plannedAction is LaunchAction.Uninstall or LaunchAction.UnsafeUninstall)
+        {
+            window.ShowProgress("卸载进度", "正在卸载 Files max……");
+        }
+        else if (plannedAction == LaunchAction.Repair)
+        {
+            window.ShowProgress("修复进度", "正在修复 Files max……");
+        }
+        else
+        {
+            window.ShowProgress("安装进度", "正在准备安装……");
+        }
     }
 
     private LaunchAction GetCommandAction()
@@ -355,18 +374,39 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
 
     private string GetPackageMessage(string packageId)
     {
-        return string.Equals(packageId, MainPackageId, StringComparison.OrdinalIgnoreCase)
-            ? "正在安装 Files max……"
-            : "正在安装运行库……";
+        var packageName = string.Equals(packageId, MainPackageId, StringComparison.OrdinalIgnoreCase)
+            ? "Files max"
+            : "运行库";
+
+        return plannedAction switch
+        {
+            LaunchAction.Uninstall or LaunchAction.UnsafeUninstall => $"正在卸载 {packageName}……",
+            LaunchAction.Repair => $"正在修复 {packageName}……",
+            _ => $"正在安装 {packageName}……",
+        };
     }
+
+    private string GetActionFailureMessage() => plannedAction switch
+    {
+        LaunchAction.Uninstall or LaunchAction.UnsafeUninstall => "卸载操作失败。",
+        LaunchAction.Repair => "修复操作失败。",
+        _ => "安装操作失败。",
+    };
+
+    private string GetActionFailureHeader() => plannedAction switch
+    {
+        LaunchAction.Uninstall or LaunchAction.UnsafeUninstall => "卸载失败",
+        LaunchAction.Repair => "修复失败",
+        _ => "安装失败",
+    };
 
     private string FormatLastError() => string.IsNullOrWhiteSpace(lastError) ? string.Empty : $"\n{lastError}";
 
-    private void ShowFailure(string message)
+    private void ShowFailure(string message, string? header = null)
     {
         if (window is not null)
         {
-            window.ShowFailure(message);
+            window.ShowFailure(message, header);
             window.SetBusy(false);
         }
         else

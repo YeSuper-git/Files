@@ -19,9 +19,10 @@
         <local:ProgressWidthConverter x:Key="ProgressWidthConverter" />
 
         <Style x:Key="SecondaryButtonStyle" TargetType="{x:Type Button}">
-            <Setter Property="Width" Value="74" />
+            <Setter Property="MinWidth" Value="74" />
             <Setter Property="Height" Value="46" />
             <Setter Property="Margin" Value="0,0,10,0" />
+            <Setter Property="Padding" Value="18,0" />
             <Setter Property="Foreground" Value="#202124" />
             <Setter Property="FontFamily" Value="Segoe UI" />
             <Setter Property="FontSize" Value="16" />
@@ -264,13 +265,18 @@
             <Grid Grid.Row="0"
                   Background="#F7F9FC"
                   MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-                <TextBlock Margin="20,0,0,0"
-                           VerticalAlignment="Center"
-                           Foreground="#4B5563"
-                           FontFamily="Segoe UI"
-                           FontSize="14"
-                           FontWeight="SemiBold"
-                           Text="Files max 安装程序" />
+                <StackPanel Margin="14,0,0,0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Image Width="24"
+                           Height="24"
+                           Margin="0,0,8,0"
+                           Source="/FilesMax.Installer.Bootstrapper;component/Assets/FilesSiameseCatLogo.png" />
+                    <TextBlock VerticalAlignment="Center"
+                               Foreground="#4B5563"
+                               FontFamily="Segoe UI"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Text="Files max 安装程序" />
+                </StackPanel>
                 <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
                     <Button x:Name="MinimizeButton" Click="MinimizeButton_Click" Style="{StaticResource TitleBarButtonStyle}">
                         <Path Width="12" Height="12" Data="M1,9 L11,9" Stroke="#657083" StrokeThickness="1.4" />
@@ -365,7 +371,12 @@
 
                     <Grid x:Name="ProgressPage" Visibility="Collapsed">
                         <StackPanel>
-                            <TextBlock Foreground="#111827" FontFamily="Segoe UI" FontSize="26" FontWeight="SemiBold" Text="安装进度" />
+                            <TextBlock x:Name="ProgressHeaderText"
+                                       Foreground="#111827"
+                                       FontFamily="Segoe UI"
+                                       FontSize="26"
+                                       FontWeight="SemiBold"
+                                       Text="安装进度" />
                             <TextBlock x:Name="ProgressMessageText"
                                        Margin="0,18,0,0"
                                        Foreground="#4B5563"
@@ -385,7 +396,12 @@
 
                     <Grid x:Name="FailurePage" Visibility="Collapsed">
                         <StackPanel>
-                            <TextBlock Foreground="#111827" FontFamily="Segoe UI" FontSize="26" FontWeight="SemiBold" Text="安装失败" />
+                            <TextBlock x:Name="FailureHeaderText"
+                                       Foreground="#111827"
+                                       FontFamily="Segoe UI"
+                                       FontSize="26"
+                                       FontWeight="SemiBold"
+                                       Text="安装失败" />
                             <TextBlock x:Name="FailureMessageText"
                                        Margin="0,18,0,0"
                                        Foreground="#4B5563"

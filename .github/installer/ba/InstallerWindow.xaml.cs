@@ -76,12 +76,13 @@ public partial class InstallerWindow : Window
         CompleteDescriptionText.Text = "请选择要执行的操作。";
     }
 
-    public void ShowProgress()
+    public void ShowProgress(string header, string message)
     {
         ContentCard.Height = 190;
         SetPage(ProgressPage, ProgressActions);
+        ProgressHeaderText.Text = string.IsNullOrWhiteSpace(header) ? "安装进度" : header;
         InstallProgressBar.Value = 0;
-        ProgressMessageText.Text = "正在准备安装……";
+        ProgressMessageText.Text = string.IsNullOrWhiteSpace(message) ? "正在准备……" : message;
         ProgressActions.IsEnabled = true;
     }
 
@@ -92,20 +93,21 @@ public partial class InstallerWindow : Window
             ProgressMessageText.Text = message;
     }
 
-    public void ShowComplete(string header, bool canLaunch)
+    public void ShowComplete(string header, string description, bool canLaunch)
     {
         ContentCard.Height = 190;
         SetPage(CompletePage, CompleteActions);
         CompleteHeaderText.Text = header;
-        CompleteDescriptionText.Text = "Files max 已经安装完成。";
+        CompleteDescriptionText.Text = description;
         LaunchButton.Visibility = canLaunch ? Visibility.Visible : Visibility.Collapsed;
         LaunchButton.IsEnabled = canLaunch;
     }
 
-    public void ShowFailure(string message)
+    public void ShowFailure(string message, string? header = null)
     {
         ContentCard.Height = 249;
         SetPage(FailurePage, FailureActions);
+        FailureHeaderText.Text = string.IsNullOrWhiteSpace(header) ? "安装失败" : header;
         FailureMessageText.Text = string.IsNullOrWhiteSpace(message)
             ? "安装程序遇到问题，请查看日志后重试。"
             : message;
