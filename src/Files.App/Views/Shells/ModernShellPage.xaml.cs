@@ -455,7 +455,7 @@ namespace Files.App.Views.Shells
 
 			if (navArgs is not null && navArgs.AssociatedTabInstance is not null)
 			{
-					itemDisplayFrame.Navigate(
+				itemDisplayFrame.Navigate(
 					sourcePageType,
 					navArgs,
 					new SuppressNavigationTransitionInfo());
@@ -480,7 +480,7 @@ namespace Files.App.Views.Shells
 				if (string.IsNullOrEmpty(navigationPath))
 					return;
 
-					itemDisplayFrame.Navigate(
+				itemDisplayFrame.Navigate(
 					sourcePageType,
 					new NavigationArguments()
 					{
