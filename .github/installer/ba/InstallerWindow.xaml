@@ -462,7 +462,7 @@
                 </StackPanel>
 
                 <StackPanel x:Name="CompleteActions" HorizontalAlignment="Right" VerticalAlignment="Bottom" Orientation="Horizontal" Visibility="Collapsed">
-                    <Button x:Name="LaunchButton" Content="启动并关闭" Click="LaunchButton_Click" Style="{StaticResource PrimaryButtonStyle}" />
+                    <Button x:Name="LaunchButton" MinWidth="112" Content="启动并关闭" Click="LaunchButton_Click" Style="{StaticResource PrimaryButtonStyle}" />
                     <Button x:Name="CompleteCloseButton" Content="仅关闭" Click="CompleteCloseButton_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0" />
                 </StackPanel>
 

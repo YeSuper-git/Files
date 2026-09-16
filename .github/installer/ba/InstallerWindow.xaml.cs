@@ -64,7 +64,7 @@ public partial class InstallerWindow : Window
 
     public void ShowOptions()
     {
-        ContentCard.Height = 190;
+        ContentCard.Height = 216;
         SetPage(OptionsPage, OptionsActions);
         InstallButton.IsEnabled = LicenseAccepted && !string.IsNullOrWhiteSpace(InstallFolder);
     }
@@ -147,7 +147,11 @@ public partial class InstallerWindow : Window
         FailureActions.Visibility = Visibility.Collapsed;
         page.Visibility = Visibility.Visible;
         actions.Visibility = Visibility.Visible;
-        Height = page == WelcomePage || page == FailurePage ? 556 : 498;
+        Height = page == WelcomePage || page == FailurePage
+            ? 556
+            : page == OptionsPage
+                ? 524
+                : 498;
     }
 
     private void LicenseCheckBox_Changed(object sender, RoutedEventArgs e)

@@ -350,14 +350,35 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
 
     private string ReadInstallFolder()
     {
+        string value;
         try
         {
-            return engine.GetVariableString(InstallFolderVariable);
+            value = engine.GetVariableString(InstallFolderVariable);
         }
         catch
         {
-            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Files max");
+            value = string.Empty;
         }
+
+        // The Bundle variable is declared as formatted for Burn/MSI, but a
+        // custom BA can still receive the unexpanded token before the user
+        // starts the plan. Never expose that token in the editable path box
+        // or pass it to FolderBrowserDialog.
+        if (string.IsNullOrWhiteSpace(value) ||
+            (value.StartsWith("[", StringComparison.Ordinal) && value.Contains(']')))
+        {
+            return GetDefaultInstallFolder();
+        }
+
+        return value;
+    }
+
+    private static string GetDefaultInstallFolder()
+    {
+        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        return Path.Combine(
+            string.IsNullOrWhiteSpace(programFiles) ? @"C:\Program Files" : programFiles,
+            "Files max");
     }
 
     private string GetBundleVersion()
