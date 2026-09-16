@@ -14,4 +14,5 @@ public sealed class ResourceWorkspaceState
     public string LibraryPath { get; set; } = string.Empty;
     public List<string> RecentLibraries { get; set; } = [];
     public ResourceSettings Settings { get; set; } = new();
+    public Dictionary<string, string> PosterOverrides { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }

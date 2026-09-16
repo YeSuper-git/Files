@@ -39,6 +39,8 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
 
     public IReadOnlyList<string> RecentLibraries => _state.RecentLibraries;
 
+    public IReadOnlyDictionary<string, string> PosterOverrides => _state.PosterOverrides;
+
     public void SetLibraryPath(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -63,6 +65,42 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
         PersistState();
     }
 
+    public string? GetPosterOverride(string itemPath)
+    {
+        try
+        {
+            var normalizedPath = Path.GetFullPath(itemPath.Trim());
+            return _state.PosterOverrides.TryGetValue(normalizedPath, out var posterPath) && File.Exists(posterPath)
+                ? posterPath
+                : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public void SetPosterOverride(string itemPath, string posterPath)
+    {
+        if (string.IsNullOrWhiteSpace(itemPath) || string.IsNullOrWhiteSpace(posterPath))
+            return;
+
+        try
+        {
+            var normalizedItemPath = Path.GetFullPath(itemPath.Trim());
+            var normalizedPosterPath = Path.GetFullPath(posterPath.Trim());
+            if (!File.Exists(normalizedPosterPath))
+                return;
+
+            _state.PosterOverrides[normalizedItemPath] = normalizedPosterPath;
+            PersistState();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Unable to save poster override for {ItemPath}", itemPath);
+        }
+    }
+
     private ResourceWorkspaceState LoadState()
     {
         try
@@ -77,6 +115,8 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
                     state.Settings.Normalize();
                     state.RecentLibraries ??= [];
                     state.RecentLibraries = NormalizeRecentLibraries(state.RecentLibraries);
+                    state.PosterOverrides ??= new(StringComparer.OrdinalIgnoreCase);
+                    state.PosterOverrides = NormalizePosterOverrides(state.PosterOverrides);
                     return state;
                 }
             }
@@ -108,6 +148,27 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
             catch
             {
                 // Ignore one malformed recent path and keep the remaining state.
+            }
+        }
+
+        return normalized;
+    }
+
+    private static Dictionary<string, string> NormalizePosterOverrides(IReadOnlyDictionary<string, string>? overrides)
+    {
+        var normalized = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in overrides ?? new Dictionary<string, string>())
+        {
+            if (string.IsNullOrWhiteSpace(pair.Key) || string.IsNullOrWhiteSpace(pair.Value))
+                continue;
+
+            try
+            {
+                normalized[Path.GetFullPath(pair.Key.Trim())] = Path.GetFullPath(pair.Value.Trim());
+            }
+            catch
+            {
+                // Ignore one malformed override and keep the remaining state.
             }
         }
 

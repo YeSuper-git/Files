@@ -115,6 +115,13 @@ namespace Files.App.Views.Shells
 				return;
 
 #if FILES_RESOURCE_MANAGER
+			// The resource library has its own hierarchy and must not be replaced
+			// by a drive-backed path navigation from the global address bar.
+			if (ItemDisplayFrame?.Content is ResourceManager.ResourceLibraryPage)
+				return;
+#endif
+
+#if FILES_RESOURCE_MANAGER
 			if (InstanceViewModel.IsResourceManagerMode &&
 				!ResourceManagerPathScope.IsWithinLibrary(e.ItemPath, InstanceViewModel.ResourceLibraryPath))
 				return;
@@ -346,16 +353,21 @@ namespace Files.App.Views.Shells
 		public override void NavigateToResourceManager()
 		{
 			var libraryPath = _resourceWorkspaceService.LibraryPath;
+			InstanceViewModel.IsResourceManagerMode = false;
+			InstanceViewModel.ResourceLibraryPath = null;
+			ToolbarViewModel.PathControlDisplayText = "资源管理";
+			ToolbarViewModel.CanNavigateToParent = false;
 			if (!string.IsNullOrWhiteSpace(libraryPath) && Directory.Exists(libraryPath))
 			{
-				InstanceViewModel.IsResourceManagerMode = true;
-				InstanceViewModel.ResourceLibraryPath = libraryPath;
+				// The resource library is a dedicated application view. It must not
+				// reuse the drive-backed native layout, otherwise the configured path
+				// is shown as a normal child of its drive.
 				ItemDisplayFrame.Navigate(
-					InstanceViewModel.FolderSettings.GetLayoutType(libraryPath),
+					typeof(ResourceManager.ResourceLibraryPage),
 					new NavigationArguments()
 					{
-						NavPathParam = libraryPath,
-						IsResourceManagerMode = true,
+						NavPathParam = "ResourceManager",
+						IsResourceManagerMode = false,
 						ResourceLibraryPath = libraryPath,
 						AssociatedTabInstance = this
 					},
@@ -409,6 +421,11 @@ namespace Files.App.Views.Shells
 
 		public override void NavigateToPath(string? navigationPath, Type? sourcePageType, NavigationArguments? navArgs = null)
 		{
+#if FILES_RESOURCE_MANAGER
+			if (ItemDisplayFrame?.Content is ResourceManager.ResourceLibraryPage)
+				return;
+#endif
+
 			var shellViewModel = ShellViewModel!;
 			shellViewModel.FilesAndFoldersFilter = null;
 			var isResourceManagerMode = false;

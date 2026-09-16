@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Files.App.Views.ResourceManager.ResourceLibraryPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:Files.App.ViewModels.ResourceManager"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Grid Padding="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <StackPanel>
+                <TextBlock Text="资源管理" Style="{StaticResource SubtitleTextBlockStyle}" />
+                <TextBlock x:Name="LibraryPathText" Margin="0,4,0,0" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="BackButton" Content="返回" Click="OnBack" IsEnabled="False" />
+                <Button Content="根目录" Click="OnRoot" />
+                <Button Content="刷新" Click="OnRefresh" />
+                <Button Content="更换路径" Click="OnChooseLibrary" />
+                <Button Content="资源工具" Click="OnOpenTools" />
+            </StackPanel>
+        </Grid>
+
+        <TextBlock x:Name="BreadcrumbText" Grid.Row="1" Margin="0,0,0,12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+
+        <Border Grid.Row="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="12">
+            <Grid>
+                <ProgressRing x:Name="LoadingRing" Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" IsActive="False" />
+                <GridView
+                    x:Name="BrowserGrid"
+                    Padding="12"
+                    IsItemClickEnabled="True"
+                    ItemsSource="{x:Bind BrowserItems, Mode=OneWay}"
+                    ItemClick="OnBrowserItemClick"
+                    SelectionMode="None">
+                    <GridView.ItemContainerStyle>
+                        <Style TargetType="GridViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                            <Setter Property="Padding" Value="4" />
+                        </Style>
+                    </GridView.ItemContainerStyle>
+                    <GridView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ResourceBrowserItemViewModel">
+                            <Border
+                                Width="{x:Bind CardWidth}"
+                                Padding="0"
+                                DataContext="{x:Bind}"
+                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                RightTapped="OnBrowserItemRightTapped">
+                                <StackPanel>
+                                    <Border Height="{x:Bind PosterHeight}" CornerRadius="10,10,0,0" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                        <Grid>
+                                            <Image Source="{x:Bind Poster, Mode=OneWay}" Stretch="UniformToFill" Visibility="{x:Bind PosterVisibility}" />
+                                            <FontIcon Glyph="{x:Bind FallbackGlyph}" FontSize="42" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorTertiaryBrush}" Visibility="{x:Bind FallbackVisibility}" />
+                                            <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Padding="7,3" Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}" CornerRadius="5">
+                                                <TextBlock Text="{x:Bind KindLabel}" FontSize="12" />
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                    <StackPanel Padding="12,10,12,12">
+                                        <TextBlock Text="{x:Bind Name}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Margin="0,3,0,0" Text="{x:Bind Subtitle}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </GridView.ItemTemplate>
+                </GridView>
+                <TextBlock x:Name="EmptyText" HorizontalAlignment="Center" VerticalAlignment="Center" Text="当前层级没有可展示的资源" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed" />
+            </Grid>
+        </Border>
+
+        <TextBlock x:Name="StatusText" Grid.Row="3" Margin="0,10,0,0" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+    </Grid>
+</Page>
