@@ -120,6 +120,8 @@ namespace Files.App.Views.Shells
 			if (ItemDisplayFrame?.Content is ResourceManager.ResourceLibraryPage)
 				return;
 #endif
+			if (ItemDisplayFrame is not { } itemDisplayFrame)
+				return;
 
 #if FILES_RESOURCE_MANAGER
 			if (InstanceViewModel.IsResourceManagerMode &&
@@ -127,7 +129,7 @@ namespace Files.App.Views.Shells
 				return;
 #endif
 
-			ItemDisplayFrame.Navigate(InstanceViewModel.FolderSettings.GetLayoutType(e.ItemPath), new NavigationArguments()
+			itemDisplayFrame.Navigate(InstanceViewModel.FolderSettings.GetLayoutType(e.ItemPath), new NavigationArguments()
 			{
 				NavPathParam = e.ItemPath,
 				IsResourceManagerMode = InstanceViewModel.IsResourceManagerMode,
@@ -425,6 +427,8 @@ namespace Files.App.Views.Shells
 			if (ItemDisplayFrame?.Content is ResourceManager.ResourceLibraryPage)
 				return;
 #endif
+			if (ItemDisplayFrame is not { } itemDisplayFrame)
+				return;
 
 			var shellViewModel = ShellViewModel!;
 			shellViewModel.FilesAndFoldersFilter = null;
@@ -451,7 +455,7 @@ namespace Files.App.Views.Shells
 
 			if (navArgs is not null && navArgs.AssociatedTabInstance is not null)
 			{
-				ItemDisplayFrame.Navigate(
+					itemDisplayFrame.Navigate(
 					sourcePageType,
 					navArgs,
 					new SuppressNavigationTransitionInfo());
@@ -476,7 +480,7 @@ namespace Files.App.Views.Shells
 				if (string.IsNullOrEmpty(navigationPath))
 					return;
 
-				ItemDisplayFrame.Navigate(
+					itemDisplayFrame.Navigate(
 					sourcePageType,
 					new NavigationArguments()
 					{
