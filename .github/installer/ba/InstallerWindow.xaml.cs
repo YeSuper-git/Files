@@ -9,6 +9,7 @@ namespace FilesMax.Installer.Bootstrapper;
 
 public partial class InstallerWindow : Window
 {
+    private const double WindowCornerRadius = 14;
     private bool allowClose;
     private bool suppressFolderChanged;
 
@@ -206,6 +207,19 @@ public partial class InstallerWindow : Window
         MaximizeIcon.Data = WindowState == WindowState.Maximized
             ? Geometry.Parse("M4,3 H10 V9 M8,11 H2 V5")
             : Geometry.Parse("M4,9 L10,3 M6,3 H10 V7 M2,6 V11 H7");
+    }
+
+    private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var width = OuterFrame.ActualWidth;
+        var height = OuterFrame.ActualHeight;
+        if (width <= 0 || height <= 0)
+            return;
+
+        OuterFrame.Clip = new RectangleGeometry(
+            new Rect(0, 0, width, height),
+            WindowCornerRadius,
+            WindowCornerRadius);
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

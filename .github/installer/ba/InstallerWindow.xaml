@@ -11,11 +11,15 @@
         ResizeMode="CanResizeWithGrip"
         AllowsTransparency="True"
         Background="Transparent"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
         ShowInTaskbar="True"
         Title="Files max 安装程序"
         StateChanged="Window_StateChanged"
+        SizeChanged="Window_SizeChanged"
         Closing="Window_Closing">
     <Window.Resources>
+        <FontFamily x:Key="InstallerFontFamily">Microsoft YaHei UI</FontFamily>
         <local:ProgressWidthConverter x:Key="ProgressWidthConverter" />
 
         <Style x:Key="SecondaryButtonStyle" TargetType="{x:Type Button}">
@@ -24,7 +28,7 @@
             <Setter Property="Margin" Value="0,0,10,0" />
             <Setter Property="Padding" Value="18,0" />
             <Setter Property="Foreground" Value="#202124" />
-            <Setter Property="FontFamily" Value="Segoe UI" />
+            <Setter Property="FontFamily" Value="{StaticResource InstallerFontFamily}" />
             <Setter Property="FontSize" Value="16" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Background" Value="#FFFFFF" />
@@ -37,7 +41,8 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="9">
+                                CornerRadius="9"
+                                ClipToBounds="True">
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
                                               RecognizesAccessKey="True" />
@@ -73,7 +78,8 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="9">
+                                CornerRadius="9"
+                                ClipToBounds="True">
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
                                               RecognizesAccessKey="True" />
@@ -141,7 +147,7 @@
             <Setter Property="Height" Value="51" />
             <Setter Property="Padding" Value="14,0" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Setter Property="FontFamily" Value="Segoe UI" />
+            <Setter Property="FontFamily" Value="{StaticResource InstallerFontFamily}" />
             <Setter Property="FontSize" Value="16" />
             <Setter Property="Foreground" Value="#202124" />
             <Setter Property="Background" Value="#FFFFFF" />
@@ -154,7 +160,8 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="9">
+                                CornerRadius="9"
+                                ClipToBounds="True">
                             <ScrollViewer x:Name="PART_ContentHost" Margin="0" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -173,7 +180,7 @@
         </Style>
 
         <Style x:Key="LicenseCheckBoxStyle" TargetType="{x:Type CheckBox}">
-            <Setter Property="FontFamily" Value="Segoe UI" />
+            <Setter Property="FontFamily" Value="{StaticResource InstallerFontFamily}" />
             <Setter Property="FontSize" Value="15" />
             <Setter Property="Foreground" Value="#4B5563" />
             <Setter Property="Template">
@@ -247,7 +254,8 @@
             BorderBrush="#D1D9E6"
             BorderThickness="1"
             CornerRadius="14"
-            ClipToBounds="True">
+            ClipToBounds="True"
+            SnapsToDevicePixels="True">
         <Border.Effect>
             <DropShadowEffect BlurRadius="18"
                               ShadowDepth="0"
@@ -266,13 +274,21 @@
                   Background="#F7F9FC"
                   MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <StackPanel Margin="14,0,0,0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Image Width="24"
-                           Height="24"
-                           Margin="0,0,8,0"
-                           Source="/FilesMax.Installer.Bootstrapper;component/Assets/FilesSiameseCatLogo.png" />
+                    <Border Width="24"
+                            Height="24"
+                            Margin="0,0,8,0"
+                            CornerRadius="6"
+                            ClipToBounds="True">
+                        <Image Width="24"
+                               Height="24"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               SnapsToDevicePixels="True"
+                               UseLayoutRounding="True"
+                               Source="/FilesMax.Installer.Bootstrapper;component/Assets/FilesSiameseCatLogo.png" />
+                    </Border>
                     <TextBlock VerticalAlignment="Center"
                                Foreground="#4B5563"
-                               FontFamily="Segoe UI"
+                               FontFamily="{StaticResource InstallerFontFamily}"
                                FontSize="14"
                                FontWeight="SemiBold"
                                Text="Files max 安装程序" />
@@ -300,21 +316,29 @@
             </Grid>
 
             <Grid Grid.Row="1" Margin="40,0,40,0">
-                <Image Width="84"
-                       Height="84"
-                       HorizontalAlignment="Left"
-                       VerticalAlignment="Top"
-                       Margin="0,32,0,0"
-                       Source="/FilesMax.Installer.Bootstrapper;component/Assets/FilesSiameseCatLogo.png" />
+                <Border Width="84"
+                        Height="84"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top"
+                        Margin="0,32,0,0"
+                        CornerRadius="14"
+                        ClipToBounds="True">
+                    <Image Width="84"
+                           Height="84"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           SnapsToDevicePixels="True"
+                           UseLayoutRounding="True"
+                           Source="/FilesMax.Installer.Bootstrapper;component/Assets/FilesSiameseCatLogo.png" />
+                </Border>
                 <StackPanel Margin="108,35,0,0" VerticalAlignment="Top">
                     <TextBlock Foreground="#111827"
-                               FontFamily="Segoe UI"
+                               FontFamily="{StaticResource InstallerFontFamily}"
                                FontSize="38"
                                FontWeight="SemiBold"
                                Text="Files max" />
                     <TextBlock Margin="0,2,0,0"
                                Foreground="#6B7280"
-                               FontFamily="Segoe UI"
+                               FontFamily="{StaticResource InstallerFontFamily}"
                                FontSize="21"
                                Text="Windows 安装程序" />
                 </StackPanel>
@@ -327,21 +351,22 @@
                     Background="#FFFFFF"
                     BorderBrush="#D8DEE9"
                     BorderThickness="1"
-                    CornerRadius="14">
+                    CornerRadius="14"
+                    ClipToBounds="True">
                 <Grid Margin="28">
                     <Grid x:Name="WelcomePage">
                         <StackPanel>
-                            <TextBlock Foreground="#111827" FontFamily="Segoe UI" FontSize="26" FontWeight="SemiBold" Text="欢迎" />
+                            <TextBlock Foreground="#111827" FontFamily="{StaticResource InstallerFontFamily}" FontSize="26" FontWeight="SemiBold" Text="欢迎" />
                             <TextBlock Margin="0,13,0,0"
                                        Foreground="#4B5563"
-                                       FontFamily="Segoe UI"
+                                       FontFamily="{StaticResource InstallerFontFamily}"
                                        FontSize="16"
                                        TextWrapping="Wrap"
                                        Text="安装程序将在电脑上安装 Files max。点击“下一步”继续，或点击“取消”退出。" />
                             <TextBlock x:Name="WelcomeVersionText"
                                        Margin="0,20,0,0"
                                        Foreground="#6B7280"
-                                       FontFamily="Segoe UI"
+                                       FontFamily="{StaticResource InstallerFontFamily}"
                                        FontSize="14"
                                        Text="版本" />
                             <CheckBox x:Name="LicenseCheckBox"
@@ -355,8 +380,8 @@
 
                     <Grid x:Name="OptionsPage" Visibility="Collapsed">
                         <StackPanel>
-                            <TextBlock Foreground="#111827" FontFamily="Segoe UI" FontSize="26" FontWeight="SemiBold" Text="安装选项" />
-                            <TextBlock Margin="0,17,0,0" Foreground="#4B5563" FontFamily="Segoe UI" FontSize="16" Text="安装位置：" />
+                            <TextBlock Foreground="#111827" FontFamily="{StaticResource InstallerFontFamily}" FontSize="26" FontWeight="SemiBold" Text="安装选项" />
+                            <TextBlock Margin="0,17,0,0" Foreground="#4B5563" FontFamily="{StaticResource InstallerFontFamily}" FontSize="16" Text="安装位置：" />
                             <Grid Margin="0,12,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -373,14 +398,14 @@
                         <StackPanel>
                             <TextBlock x:Name="ProgressHeaderText"
                                        Foreground="#111827"
-                                       FontFamily="Segoe UI"
+                                       FontFamily="{StaticResource InstallerFontFamily}"
                                        FontSize="26"
                                        FontWeight="SemiBold"
                                        Text="安装进度" />
                             <TextBlock x:Name="ProgressMessageText"
                                        Margin="0,18,0,0"
                                        Foreground="#4B5563"
-                                       FontFamily="Segoe UI"
+                                       FontFamily="{StaticResource InstallerFontFamily}"
                                        FontSize="15"
                                        Text="正在准备安装……" />
                             <ProgressBar x:Name="InstallProgressBar" Margin="0,18,0,0" Maximum="100" Style="{StaticResource ModernProgressBarStyle}" />
@@ -389,8 +414,8 @@
 
                     <Grid x:Name="CompletePage" Visibility="Collapsed">
                         <StackPanel>
-                            <TextBlock x:Name="CompleteHeaderText" Foreground="#111827" FontFamily="Segoe UI" FontSize="26" FontWeight="SemiBold" Text="安装成功" />
-                            <TextBlock x:Name="CompleteDescriptionText" Margin="0,18,0,0" Foreground="#4B5563" FontFamily="Segoe UI" FontSize="15" Text="Files max 已经安装完成。" />
+                            <TextBlock x:Name="CompleteHeaderText" Foreground="#111827" FontFamily="{StaticResource InstallerFontFamily}" FontSize="26" FontWeight="SemiBold" Text="安装成功" />
+                            <TextBlock x:Name="CompleteDescriptionText" Margin="0,18,0,0" Foreground="#4B5563" FontFamily="{StaticResource InstallerFontFamily}" FontSize="15" Text="Files max 已经安装完成。" />
                         </StackPanel>
                     </Grid>
 
@@ -398,14 +423,14 @@
                         <StackPanel>
                             <TextBlock x:Name="FailureHeaderText"
                                        Foreground="#111827"
-                                       FontFamily="Segoe UI"
+                                       FontFamily="{StaticResource InstallerFontFamily}"
                                        FontSize="26"
                                        FontWeight="SemiBold"
                                        Text="安装失败" />
                             <TextBlock x:Name="FailureMessageText"
                                        Margin="0,18,0,0"
                                        Foreground="#4B5563"
-                                       FontFamily="Segoe UI"
+                                       FontFamily="{StaticResource InstallerFontFamily}"
                                        FontSize="15"
                                        TextWrapping="Wrap"
                                        Text="安装程序遇到问题，请查看日志后重试。" />
