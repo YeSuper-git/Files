@@ -38,9 +38,10 @@ namespace Files.App
 			AppWindow.TitleBar.ButtonPressedBackgroundColor = Colors.Transparent;
 			AppWindow.TitleBar.ButtonHoverBackgroundColor = Colors.Transparent;
 
-			// Deferred: reads the .ico from disk
-			DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
-				AppWindow.SetIcon(AppLifecycleHelper.AppIconPath));
+			// Set the icon before the window is first shown. Windows 11 can cache
+			// the taskbar icon during initial activation, so deferring this call
+			// can leave the default square executable icon in the taskbar.
+			AppWindow.SetIcon(AppLifecycleHelper.AppIconPath);
 		}
 
 		public void ShowSplashScreen()
