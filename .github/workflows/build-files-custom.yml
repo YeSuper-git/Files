@@ -668,13 +668,11 @@ jobs:
           Get-ChildItem -LiteralPath $setupPath |
             Select-Object Name, @{N = 'MB'; E = { [math]::Round($_.Length / 1MB, 1) }}
 
-      - name: Upload candidate installer
-        uses: actions/upload-artifact@v7
+      - name: Save candidate installer for smoke test
+        uses: actions/cache/save@v5
         with:
-          name: Files max candidate
           path: Files max Setup.exe
-          if-no-files-found: error
-          retention-days: 1
+          key: files-max-candidate-${{ github.run_id }}
 
   smoke-test:
     name: Smoke test installer
@@ -683,27 +681,23 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Download candidate installer
-        uses: actions/download-artifact@v7
+      - name: Restore candidate installer from internal cache
+        uses: actions/cache/restore@v5
         with:
-          name: Files max candidate
-          path: ${{ github.workspace }}
+          path: Files max Setup.exe
+          key: files-max-candidate-${{ github.run_id }}
 
-      - name: Normalize installer path
+      - name: Validate candidate installer
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $workspace = $env:GITHUB_WORKSPACE
-          $candidates = @(Get-ChildItem -LiteralPath $workspace -Recurse -Filter 'Files max Setup.exe' -File)
-          if ($candidates.Count -ne 1) {
-            throw "Expected exactly one downloaded installer, found $($candidates.Count)."
-          }
           $setupPath = Join-Path $workspace 'Files max Setup.exe'
-          if ($candidates[0].FullName -ne $setupPath) {
-            Copy-Item -LiteralPath $candidates[0].FullName -Destination $setupPath -Force
+          if (-not (Test-Path -LiteralPath $setupPath -PathType Leaf)) {
+            throw "Candidate installer was not restored: $setupPath"
           }
           if ((Get-Item -LiteralPath $setupPath).Length -lt 1MB) {
-            throw "Downloaded installer is unexpectedly small: $setupPath"
+            throw "Candidate installer is unexpectedly small: $setupPath"
           }
           Write-Host "Smoke-test installer: $setupPath"
 
