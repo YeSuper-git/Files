@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       fast_build:
-        description: '快速测试构建：关闭 ReadyToRun，减少发布耗时'
+        description: '快速测试构建：关闭 ReadyToRun 和服务端裁剪分析，减少发布耗时'
         required: false
         type: boolean
         default: true
@@ -107,7 +107,7 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Cache NuGet packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~\.nuget\packages
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets', '**/*.slnx', '**/packages.config') }}
@@ -124,7 +124,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          msbuild "${{ github.workspace }}\Files.slnx" -t:Restore -p:Configuration=Release -p:Platform=x64
+          msbuild "${{ github.workspace }}\Files.slnx" -m -t:Restore -p:Configuration=Release -p:Platform=x64
           if ($LASTEXITCODE -ne 0) {
             throw 'Solution restore failed.'
           }
@@ -170,6 +170,7 @@ jobs:
           # large Files application. This catches C#/XAML/API errors in
           # seconds instead of after the expensive application publish.
           dotnet build $baProject `
+            -m `
             --configuration Release `
             --runtime win-x64 `
             --self-contained true `
@@ -266,10 +267,20 @@ jobs:
           "FILES_MAX_WIX_TOOL=$wixTool" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host 'External installer tools preflight passed.'
 
+      - name: Restore publish output cache
+        id: restore-publish
+        uses: actions/cache@v5
+        with:
+          path: |
+            artifacts/publish
+            artifacts/server-publish
+          key: ${{ runner.os }}-files-max-publish-${{ inputs.fast_build }}-${{ hashFiles('src/**/*', 'Directory.*', 'global.json', 'NuGet.config', 'Files.slnx') }}
+
       - name: Build launcher
         shell: pwsh
         run: |
           msbuild "$env:GITHUB_WORKSPACE\src\Files.App.Launcher\Files.App.Launcher.vcxproj" `
+            -m `
             -t:Build `
             -p:Configuration=Release `
             -p:Platform=x64 `
@@ -283,29 +294,37 @@ jobs:
 
       - name: Publish unpackaged application
         shell: pwsh
+        env:
+          FILES_MAX_PUBLISH_CACHE_HIT: ${{ steps.restore-publish.outputs.cache-hit }}
         run: |
           $ErrorActionPreference = 'Stop'
           $publishDir = Join-Path $env:GITHUB_WORKSPACE 'artifacts\publish'
           $publishReadyToRun = if ($env:FILES_MAX_FAST_BUILD -eq 'true') { 'false' } else { 'true' }
+          $publishTrimmed = if ($env:FILES_MAX_FAST_BUILD -eq 'true') { 'false' } else { 'true' }
           New-Item -ItemType Directory -Path $publishDir -Force | Out-Null
 
-          msbuild "$env:GITHUB_WORKSPACE\src\Files.App\Files.App.csproj" `
-            -t:Publish `
-            -p:Configuration=Release `
-            -p:Platform=x64 `
-            -p:RuntimeIdentifier=win-x64 `
-            -p:SelfContained=true `
-            -p:WindowsPackageType=None `
-            -p:FilesExternalLocationBuild=true `
-            -p:FilesResourceManagerBuild=true `
-            "-p:PublishReadyToRun=$publishReadyToRun" `
-            "-p:PublishReadyToRunComposite=$publishReadyToRun" `
-            -p:GenerateAppxPackageOnBuild=false `
-            "-p:PublishDir=$publishDir\" `
-            -v:minimal
+          if ($env:FILES_MAX_PUBLISH_CACHE_HIT -eq 'true') {
+            Write-Host 'Publish output cache hit; skipping the full Files application publish.'
+          } else {
+            msbuild "$env:GITHUB_WORKSPACE\src\Files.App\Files.App.csproj" `
+              -m `
+              -t:Publish `
+              -p:Configuration=Release `
+              -p:Platform=x64 `
+              -p:RuntimeIdentifier=win-x64 `
+              -p:SelfContained=true `
+              -p:WindowsPackageType=None `
+              -p:FilesExternalLocationBuild=true `
+              -p:FilesResourceManagerBuild=true `
+              "-p:PublishReadyToRun=$publishReadyToRun" `
+              "-p:PublishReadyToRunComposite=$publishReadyToRun" `
+              -p:GenerateAppxPackageOnBuild=false `
+              "-p:PublishDir=$publishDir\" `
+              -v:minimal
 
-          if ($LASTEXITCODE -ne 0) {
-            throw 'Unpackaged Files application publish failed.'
+            if ($LASTEXITCODE -ne 0) {
+              throw 'Unpackaged Files application publish failed.'
+            }
           }
           if (-not (Test-Path -LiteralPath (Join-Path $publishDir 'Files.exe'))) {
             throw 'Unpackaged Files.exe was not produced.'
@@ -335,19 +354,25 @@ jobs:
 
           $serverPublishDir = Join-Path $env:GITHUB_WORKSPACE 'artifacts\server-publish'
           New-Item -ItemType Directory -Path $serverPublishDir -Force | Out-Null
-          msbuild "$env:GITHUB_WORKSPACE\src\Files.App.Server\Files.App.Server.csproj" `
-            -t:Publish `
-            -p:Configuration=Release `
-            -p:Platform=x64 `
-            -p:RuntimeIdentifier=win-x64 `
-            -p:SelfContained=true `
-            "-p:PublishReadyToRun=$publishReadyToRun" `
-            "-p:PublishReadyToRunComposite=$publishReadyToRun" `
-            "-p:PublishDir=$serverPublishDir\" `
-            -v:minimal
+          if ($env:FILES_MAX_PUBLISH_CACHE_HIT -eq 'true') {
+            Write-Host 'Server publish output cache hit; skipping the server publish.'
+          } else {
+            msbuild "$env:GITHUB_WORKSPACE\src\Files.App.Server\Files.App.Server.csproj" `
+              -m `
+              -t:Publish `
+              -p:Configuration=Release `
+              -p:Platform=x64 `
+              -p:RuntimeIdentifier=win-x64 `
+              -p:SelfContained=true `
+              "-p:PublishTrimmed=$publishTrimmed" `
+              "-p:PublishReadyToRun=$publishReadyToRun" `
+              "-p:PublishReadyToRunComposite=$publishReadyToRun" `
+              "-p:PublishDir=$serverPublishDir\" `
+              -v:minimal
 
-          if ($LASTEXITCODE -ne 0) {
-            throw 'Files.App.Server publish failed.'
+            if ($LASTEXITCODE -ne 0) {
+              throw 'Files.App.Server publish failed.'
+            }
           }
           $serverExe = Get-ChildItem -LiteralPath $serverPublishDir -Filter 'Files.App.Server.exe' -File | Select-Object -First 1
           if (-not $serverExe) {
@@ -462,6 +487,7 @@ jobs:
           New-Item -ItemType Directory -Path $msiOutputDir, $bundleOutputDir -Force | Out-Null
 
           dotnet build $packageProject `
+            -m `
             --configuration Release `
             --no-restore `
             "-p:AppVersion=$appVersion" `
@@ -506,6 +532,7 @@ jobs:
           # continues to provide the trusted detect/plan/apply engine.
           New-Item -ItemType Directory -Path $baOutputDir -Force | Out-Null
           dotnet publish $baProject `
+            -m `
             --configuration Release `
             --runtime win-x64 `
             --self-contained true `
@@ -594,6 +621,7 @@ jobs:
           }
 
           dotnet build $bundleProject `
+            -m `
             --configuration Release `
             --no-restore `
             "-p:AppVersion=$appVersion" `
