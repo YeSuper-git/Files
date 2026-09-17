@@ -121,6 +121,34 @@ function Register-ExternalLocationIdentity {
     throw "External-location identity registration failed after 3 attempts: $($lastRegistrationError.Exception.Message)"
 }
 
+function Remove-LegacyUninstallRegistration {
+    param([Parameter(Mandatory)][string]$KeyName)
+
+    $subKeyPath = "Software\Microsoft\Windows\CurrentVersion\Uninstall\$KeyName"
+    foreach ($registryView in @(
+        [Microsoft.Win32.RegistryView]::Registry64,
+        [Microsoft.Win32.RegistryView]::Registry32
+    )) {
+        $baseKey = $null
+        $existingKey = $null
+        try {
+            $baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
+                [Microsoft.Win32.RegistryHive]::LocalMachine,
+                $registryView)
+            $existingKey = $baseKey.OpenSubKey($subKeyPath)
+            if ($existingKey) {
+                $existingKey.Dispose()
+                $existingKey = $null
+                $baseKey.DeleteSubKeyTree($subKeyPath)
+                Write-InstallLog "Removed legacy uninstall registration from $registryView view: $KeyName"
+            }
+        } finally {
+            if ($existingKey) { $existingKey.Dispose() }
+            if ($baseKey) { $baseKey.Dispose() }
+        }
+    }
+}
+
 function Invoke-ProcessChecked {
     param(
         [Parameter(Mandatory)][string]$FileName,
@@ -281,11 +309,7 @@ try {
 
     $stage = '清理旧版卸载注册'
     if (-not [string]::IsNullOrWhiteSpace($LegacyUninstallKeyName)) {
-        $legacyUninstallKey = Join-Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall' $LegacyUninstallKeyName
-        if (Test-Path -LiteralPath $legacyUninstallKey) {
-            Write-InstallLog "Removing legacy installer registration: $LegacyUninstallKeyName"
-            Remove-Item -LiteralPath $legacyUninstallKey -Recurse -Force -ErrorAction Stop
-        }
+        Remove-LegacyUninstallRegistration -KeyName $LegacyUninstallKeyName
     }
 
     Write-InstallLog "Files external-location installation completed: $($installedApp.PackageFullName)"

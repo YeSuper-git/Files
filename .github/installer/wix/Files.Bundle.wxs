@@ -36,41 +36,76 @@
         Persisted="yes" />
 
     <!-- Prefer the path recorded by the MSI, then fall back to the legacy
-         NSIS registration when migrating an older installation. Burn runs
-         these searches before it removes the related older bundle. -->
+         NSIS registration when migrating an older installation. The legacy
+         installer was 32-bit, so search both registry views; otherwise a
+         previous Files installation can be missed on a 64-bit Windows host. -->
     <util:RegistrySearch
-        Id="PreviousInstallFolderSearch"
+        Id="PreviousInstallFolderSearch64"
         Root="HKLM"
         Key="Software\YeSuper\Files"
         Value="InstallLocation"
-        Variable="PreviousInstallFolder"
+        Variable="PreviousInstallFolder64"
         Result="value"
         Bitness="always64" />
 
     <util:RegistrySearch
-        Id="LegacyInstallFolderSearch"
+        Id="PreviousInstallFolderSearch32"
+        Root="HKLM"
+        Key="Software\YeSuper\Files"
+        Value="InstallLocation"
+        Variable="PreviousInstallFolder32"
+        Result="value"
+        Bitness="always32" />
+
+    <util:RegistrySearch
+        Id="LegacyInstallFolderSearch64"
         Root="HKLM"
         Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\Files"
         Value="InstallLocation"
-        Variable="LegacyInstallFolder"
+        Variable="LegacyInstallFolder64"
         Result="value"
         Bitness="always64" />
 
-    <SetVariable
-        Id="UsePreviousInstallFolder"
-        Variable="InstallFolder"
-        Type="string"
-        Value="[PreviousInstallFolder]"
-        Condition="NOT WixBundleInstalled AND PreviousInstallFolder"
-        After="PreviousInstallFolderSearch" />
+    <util:RegistrySearch
+        Id="LegacyInstallFolderSearch32"
+        Root="HKLM"
+        Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\Files"
+        Value="InstallLocation"
+        Variable="LegacyInstallFolder32"
+        Result="value"
+        Bitness="always32" />
 
     <SetVariable
-        Id="UseLegacyInstallFolder"
+        Id="UsePreviousInstallFolder64"
         Variable="InstallFolder"
         Type="string"
-        Value="[LegacyInstallFolder]"
-        Condition="NOT WixBundleInstalled AND NOT PreviousInstallFolder AND LegacyInstallFolder"
-        After="LegacyInstallFolderSearch" />
+        Value="[PreviousInstallFolder64]"
+        Condition="NOT WixBundleInstalled AND PreviousInstallFolder64"
+        After="PreviousInstallFolderSearch64" />
+
+    <SetVariable
+        Id="UsePreviousInstallFolder32"
+        Variable="InstallFolder"
+        Type="string"
+        Value="[PreviousInstallFolder32]"
+        Condition="NOT WixBundleInstalled AND NOT PreviousInstallFolder64 AND PreviousInstallFolder32"
+        After="PreviousInstallFolderSearch32" />
+
+    <SetVariable
+        Id="UseLegacyInstallFolder64"
+        Variable="InstallFolder"
+        Type="string"
+        Value="[LegacyInstallFolder64]"
+        Condition="NOT WixBundleInstalled AND NOT PreviousInstallFolder64 AND NOT PreviousInstallFolder32 AND LegacyInstallFolder64"
+        After="LegacyInstallFolderSearch64" />
+
+    <SetVariable
+        Id="UseLegacyInstallFolder32"
+        Variable="InstallFolder"
+        Type="string"
+        Value="[LegacyInstallFolder32]"
+        Condition="NOT WixBundleInstalled AND NOT PreviousInstallFolder64 AND NOT PreviousInstallFolder32 AND NOT LegacyInstallFolder64 AND LegacyInstallFolder32"
+        After="LegacyInstallFolderSearch32" />
 
     <util:RegistrySearch
         Id="VCRedistInstalled"
