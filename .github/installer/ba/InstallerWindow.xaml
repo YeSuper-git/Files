@@ -467,7 +467,7 @@
 
             <Grid Grid.Row="3" Margin="40,0,40,24">
                 <StackPanel x:Name="WelcomeActions" HorizontalAlignment="Right" VerticalAlignment="Bottom" Orientation="Horizontal">
-                    <Button x:Name="NextButton" Content="下一步" Click="NextButton_Click" Style="{StaticResource SecondaryButtonStyle}" IsEnabled="False" />
+                    <Button x:Name="NextButton" Content="下一步" Click="NextButton_Click" Style="{StaticResource PrimaryButtonStyle}" IsEnabled="False" />
                     <Button x:Name="WelcomeCancelButton" Content="取消" Click="CancelButton_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0" />
                 </StackPanel>
 
