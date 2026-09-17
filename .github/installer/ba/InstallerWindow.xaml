@@ -38,7 +38,7 @@
 
         <Style x:Key="SecondaryButtonStyle" TargetType="{x:Type Button}">
             <Setter Property="MinWidth" Value="74" />
-            <Setter Property="Height" Value="46" />
+            <Setter Property="Height" Value="42" />
             <Setter Property="Margin" Value="0,0,10,0" />
             <Setter Property="Padding" Value="18,0" />
             <Setter Property="Foreground" Value="#202124" />
