@@ -6,15 +6,16 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:FilesMax.Installer.Bootstrapper"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Width="705"
         Height="556"
         MinWidth="705"
         MinHeight="498"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
-        ResizeMode="NoResize"
-        AllowsTransparency="True"
-        Background="Transparent"
+        ResizeMode="CanResize"
+        AllowsTransparency="False"
+        Background="#F7F9FC"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         ShowInTaskbar="True"
@@ -22,6 +23,15 @@
         StateChanged="Window_StateChanged"
         SizeChanged="Window_SizeChanged"
         Closing="Window_Closing">
+    <shell:WindowChrome.WindowChrome>
+        <!-- Keep resize hit testing without WPF's visible diagonal grip. The
+             title bar remains application-owned and is dragged explicitly. -->
+        <shell:WindowChrome CaptionHeight="0"
+                            ResizeBorderThickness="6"
+                            CornerRadius="14"
+                            GlassFrameThickness="0"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
     <Window.Resources>
         <FontFamily x:Key="InstallerFontFamily">Microsoft YaHei UI</FontFamily>
         <local:ProgressWidthConverter x:Key="ProgressWidthConverter" />
@@ -260,12 +270,6 @@
             CornerRadius="14"
             ClipToBounds="True"
             SnapsToDevicePixels="True">
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="18"
-                              ShadowDepth="0"
-                              Opacity="0.16"
-                              Color="#70809A" />
-        </Border.Effect>
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="51" />

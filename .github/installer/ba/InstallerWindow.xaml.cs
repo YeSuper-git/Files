@@ -6,12 +6,26 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Forms;
+using System.Windows.Interop;
 
 namespace FilesMax.Installer.Bootstrapper;
 
 public partial class InstallerWindow : Window
 {
     private const double WindowCornerRadius = 14;
+    private const int DwmWindowCornerPreference = 33;
+    private const int DwmWindowBorderColor = 34;
+    private const uint DwmCornerDoNotRound = 1;
+    private const uint DwmCornerRound = 2;
+    private const uint DwmColorNone = 0xFFFFFFFE;
+
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll", PreserveSig = true)]
+    private static extern int DwmSetWindowAttribute(
+        IntPtr hwnd,
+        int attribute,
+        ref uint value,
+        uint valueSize);
+
     private bool allowClose;
     private bool suppressFolderChanged;
     private double displayedProgress;
@@ -20,6 +34,7 @@ public partial class InstallerWindow : Window
     {
         InitializeComponent();
         InstallFolderTextBox.Text = string.Empty;
+        ApplyDwmWindowPolicy();
     }
 
     public event EventHandler? NextRequested;
@@ -236,6 +251,8 @@ public partial class InstallerWindow : Window
         MaximizeIcon.Data = WindowState == WindowState.Maximized
             ? Geometry.Parse("M4,3 H10 V9 M8,11 H2 V5")
             : Geometry.Parse("M4,9 L10,3 M6,3 H10 V7 M2,6 V11 H7");
+
+        UpdateWindowFrame();
     }
 
     private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -245,10 +262,57 @@ public partial class InstallerWindow : Window
         if (width <= 0 || height <= 0)
             return;
 
+        UpdateWindowFrame();
+    }
+
+    private void UpdateWindowFrame()
+    {
+        var width = OuterFrame.ActualWidth;
+        var height = OuterFrame.ActualHeight;
+        if (width <= 0 || height <= 0)
+            return;
+
+        var radius = WindowState == WindowState.Maximized ? 0 : WindowCornerRadius;
         OuterFrame.Clip = new RectangleGeometry(
             new Rect(0, 0, width, height),
-            WindowCornerRadius,
-            WindowCornerRadius);
+            radius,
+            radius);
+
+        ApplyDwmWindowPolicy();
+    }
+
+    private void ApplyDwmWindowPolicy()
+    {
+        try
+        {
+            var hwnd = new WindowInteropHelper(this).EnsureHandle();
+            var preference = WindowState == WindowState.Maximized
+                ? DwmCornerDoNotRound
+                : DwmCornerRound;
+            DwmSetWindowAttribute(
+                hwnd,
+                DwmWindowCornerPreference,
+                ref preference,
+                sizeof(uint));
+
+            // Let the application-owned OuterFrame draw the one-pixel border
+            // so DWM cannot add a second, differently antialiased border.
+            var borderColor = DwmColorNone;
+            DwmSetWindowAttribute(
+                hwnd,
+                DwmWindowBorderColor,
+                ref borderColor,
+                sizeof(uint));
+        }
+        catch (DllNotFoundException)
+        {
+            // DWM is available on supported Windows desktop versions; keep a
+            // graceful fallback for older or unusual hosts.
+        }
+        catch (EntryPointNotFoundException)
+        {
+            // The Win11-only attributes are unavailable on older hosts.
+        }
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
