@@ -200,11 +200,12 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type CheckBox}">
-                        <StackPanel Orientation="Horizontal">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <Border x:Name="CheckSurface"
                                     Width="20"
                                     Height="20"
                                     Margin="0,0,10,0"
+                                    VerticalAlignment="Center"
                                     CornerRadius="4"
                                     BorderThickness="1.5"
                                     BorderBrush="#9BA7B8"
@@ -217,7 +218,9 @@
                                       StrokeEndLineCap="Round"
                                       Visibility="Collapsed" />
                             </Border>
-                            <ContentPresenter VerticalAlignment="Center" RecognizesAccessKey="True" />
+                            <ContentPresenter VerticalAlignment="Center"
+                                              Margin="0,0,0,1"
+                                              RecognizesAccessKey="True" />
                         </StackPanel>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
@@ -378,7 +381,7 @@
                                        FontSize="14"
                                        Text="版本" />
                             <CheckBox x:Name="LicenseCheckBox"
-                                      Margin="0,13,0,0"
+                                      Margin="0,8,0,0"
                                       Checked="LicenseCheckBox_Changed"
                                       Unchecked="LicenseCheckBox_Changed"
                                       Content="我同意许可条款和条件"
