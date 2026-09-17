@@ -130,7 +130,7 @@
          LocalSystem would register the package for the wrong account. -->
     <SetProperty
         Id="RegisterFilesIdentity"
-        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppScript]&quot; -Mode Install -InstallDirectory &quot;[INSTALLFOLDER]&quot; -LogFileName &quot;Files max Installer-script.log&quot; -ErrorFileName &quot;Files max Installer-error.log&quot;"
+        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppScript]&quot; -Mode Install -InstallDirectory &quot;[INSTALLFOLDER]\&quot; -LogFileName &quot;Files max Installer-script.log&quot; -ErrorFileName &quot;Files max Installer-error.log&quot;"
         Before="RegisterFilesIdentity"
         Sequence="execute"
         Condition="NOT Installed OR REINSTALL~=&quot;ALL&quot;" />

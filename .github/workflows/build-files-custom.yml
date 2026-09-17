@@ -69,6 +69,16 @@ jobs:
             }
           }
 
+          # INSTALLFOLDER is a Directory property and therefore expands with
+          # a trailing backslash. When that value is quoted for a Windows
+          # custom action, the backslash would escape the closing quote and
+          # corrupt the following PowerShell arguments. Keep the doubled
+          # separator here as a regression guard for MSI command-line parsing.
+          $packageWix = Get-Content -Raw -LiteralPath (Join-Path $workspace '.github\installer\wix\Files.Package.wxs')
+          if (-not $packageWix.Contains('-InstallDirectory &quot;[INSTALLFOLDER]\&quot;')) {
+            throw 'Files.Package.wxs must escape the trailing INSTALLFOLDER separator in the PowerShell custom action.'
+          }
+
           $requiredFiles = @(
             'src\Files.App\Assets\AppTiles\Dev\Logo.ico',
             'src\Files.App\Assets\AppTiles\Dev\FilesSiameseCatLogo.png',
