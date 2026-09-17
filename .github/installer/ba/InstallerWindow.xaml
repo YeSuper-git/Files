@@ -13,21 +13,21 @@
         MinHeight="498"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
-        ResizeMode="CanResize"
+        ResizeMode="NoResize"
         AllowsTransparency="False"
         Background="#F7F9FC"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         ShowInTaskbar="True"
         Title="Files max 安装程序"
-        StateChanged="Window_StateChanged"
         SizeChanged="Window_SizeChanged"
         Closing="Window_Closing">
     <shell:WindowChrome.WindowChrome>
-        <!-- Keep resize hit testing without WPF's visible diagonal grip. The
-             title bar remains application-owned and is dragged explicitly. -->
+        <!-- The installer is a fixed-size wizard. The title bar remains
+             application-owned so only the custom minimize and close buttons
+             are exposed. -->
         <shell:WindowChrome CaptionHeight="0"
-                            ResizeBorderThickness="6"
+                            ResizeBorderThickness="0"
                             CornerRadius="14"
                             GlassFrameThickness="0"
                             UseAeroCaptionButtons="False" />
@@ -307,17 +307,6 @@
                 <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
                     <Button x:Name="MinimizeButton" Click="MinimizeButton_Click" Style="{StaticResource TitleBarButtonStyle}">
                         <Path Width="12" Height="12" Data="M1,9 L11,9" Stroke="#657083" StrokeThickness="1.4" />
-                    </Button>
-                    <Button x:Name="MaximizeButton" Click="MaximizeButton_Click" Style="{StaticResource TitleBarButtonStyle}">
-                        <Path x:Name="MaximizeIcon"
-                              Width="12"
-                              Height="12"
-                              Data="M4,9 L10,3 M6,3 H10 V7 M2,6 V11 H7"
-                              Stroke="#657083"
-                              StrokeThickness="1.3"
-                              StrokeStartLineCap="Round"
-                              StrokeEndLineCap="Round"
-                              StrokeLineJoin="Round" />
                     </Button>
                     <Button x:Name="CloseButton" Click="CloseButton_Click" Style="{StaticResource CloseTitleBarButtonStyle}">
                         <Path Width="12" Height="12" Data="M2,2 L10,10 M10,2 L2,10" Stroke="#657083" StrokeThickness="1.4" />

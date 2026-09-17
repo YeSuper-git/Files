@@ -15,7 +15,6 @@ public partial class InstallerWindow : Window
     private const double WindowCornerRadius = 14;
     private const int DwmWindowCornerPreference = 33;
     private const int DwmWindowBorderColor = 34;
-    private const uint DwmCornerDoNotRound = 1;
     private const uint DwmCornerRound = 2;
     private const uint DwmColorNone = 0xFFFFFFFE;
 
@@ -241,20 +240,6 @@ public partial class InstallerWindow : Window
 
     private void MinimizeButton_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 
-    private void MaximizeButton_Click(object sender, RoutedEventArgs e)
-    {
-        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
-    }
-
-    private void Window_StateChanged(object? sender, EventArgs e)
-    {
-        MaximizeIcon.Data = WindowState == WindowState.Maximized
-            ? Geometry.Parse("M4,3 H10 V9 M8,11 H2 V5")
-            : Geometry.Parse("M4,9 L10,3 M6,3 H10 V7 M2,6 V11 H7");
-
-        UpdateWindowFrame();
-    }
-
     private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         var width = OuterFrame.ActualWidth;
@@ -272,11 +257,10 @@ public partial class InstallerWindow : Window
         if (width <= 0 || height <= 0)
             return;
 
-        var radius = WindowState == WindowState.Maximized ? 0 : WindowCornerRadius;
         OuterFrame.Clip = new RectangleGeometry(
             new Rect(0, 0, width, height),
-            radius,
-            radius);
+            WindowCornerRadius,
+            WindowCornerRadius);
 
         ApplyDwmWindowPolicy();
     }
@@ -286,9 +270,7 @@ public partial class InstallerWindow : Window
         try
         {
             var hwnd = new WindowInteropHelper(this).EnsureHandle();
-            var preference = WindowState == WindowState.Maximized
-                ? DwmCornerDoNotRound
-                : DwmCornerRound;
+            var preference = DwmCornerRound;
             DwmSetWindowAttribute(
                 hwnd,
                 DwmWindowCornerPreference,
@@ -318,10 +300,7 @@ public partial class InstallerWindow : Window
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ClickCount == 2)
-        {
-            MaximizeButton_Click(sender, e);
             return;
-        }
 
         if (e.LeftButton == MouseButtonState.Pressed)
             DragMove();
