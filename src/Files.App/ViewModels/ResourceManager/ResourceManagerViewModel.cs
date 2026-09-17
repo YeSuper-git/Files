@@ -18,16 +18,17 @@ public sealed partial class ResourceManagerViewModel : ObservableObject
     private readonly ILogger<ResourceManagerViewModel> _logger;
     private CancellationTokenSource? _operationCancellation;
 
-    [ObservableProperty] private string _libraryPath = string.Empty;
-    [ObservableProperty] private bool _isScanning;
-    [ObservableProperty] private bool _isOperating;
-    [ObservableProperty] private string _statusMessage = "选择一个本地文件夹作为资源库";
-    [ObservableProperty] private ResourceScanResult? _scanResult;
-    [ObservableProperty] private ResourceFolder? _selectedFolder;
-    [ObservableProperty] private string _currentFilter = "全部";
-    [ObservableProperty] private string _searchKeyword = string.Empty;
-    [ObservableProperty] private ResourceSettings _settings = new();
-    [ObservableProperty] private bool _hasPendingOps;
+    // Partial properties keep the generated bindings AOT-compatible for WinUI 3.
+    [ObservableProperty] public partial string LibraryPath { get; set; } = string.Empty;
+    [ObservableProperty] public partial bool IsScanning { get; set; }
+    [ObservableProperty] public partial bool IsOperating { get; set; }
+    [ObservableProperty] public partial string StatusMessage { get; set; } = "选择一个本地文件夹作为资源库";
+    [ObservableProperty] public partial ResourceScanResult? ScanResult { get; set; }
+    [ObservableProperty] public partial ResourceFolder? SelectedFolder { get; set; }
+    [ObservableProperty] public partial string CurrentFilter { get; set; } = "全部";
+    [ObservableProperty] public partial string SearchKeyword { get; set; } = string.Empty;
+    [ObservableProperty] public partial ResourceSettings Settings { get; set; } = new();
+    [ObservableProperty] public partial bool HasPendingOps { get; set; }
 
     public ObservableCollection<ResourceFolder> DisplayFolders { get; } = [];
     public ObservableCollection<ResourceFileOperation> PendingOperations { get; } = [];
@@ -39,8 +40,8 @@ public sealed partial class ResourceManagerViewModel : ObservableObject
         _operations = operations;
         _workspace = workspace;
         _logger = logger;
-        _libraryPath = workspace.LibraryPath;
-        _settings = workspace.Settings.Clone();
+        LibraryPath = workspace.LibraryPath;
+        Settings = workspace.Settings.Clone();
     }
 
     public void SetLibraryPath(string path)

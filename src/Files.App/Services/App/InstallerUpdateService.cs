@@ -18,7 +18,7 @@ namespace Files.App.Services
 	/// Updates an external-location installation through the same traditional
 	/// installer that users run for a fresh installation.
 	/// </summary>
-	public sealed class InstallerUpdateService : ObservableObject, IUpdateService, IDisposable
+	public sealed partial class InstallerUpdateService : ObservableObject, IUpdateService, IDisposable
 	{
 		private const string ReleasesApiUrl = "https://api.github.com/repos/YeSuper-git/Files/releases?per_page=20";
 
