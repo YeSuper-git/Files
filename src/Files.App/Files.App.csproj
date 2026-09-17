@@ -158,6 +158,7 @@
         <PackageReference Include="SevenZipSharp" />
         <PackageReference Include="SharpZipLib" />
         <PackageReference Include="SQLitePCLRaw.bundle_green" />
+        <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" />
         <PackageReference Include="System.Drawing.Common" />
         <PackageReference Include="Microsoft.WindowsAppSDK" />
         <PackageReference Include="Microsoft.Graphics.Win2D" />

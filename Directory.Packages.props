@@ -33,6 +33,9 @@
     <PackageVersion Include="SevenZipSharp" Version="1.0.3" />
     <PackageVersion Include="SharpZipLib" Version="1.4.2" />
     <PackageVersion Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
+    <!-- Keep the native SQLite payload on the patched version while the
+         bundle package catches up with the latest native dependency. -->
+    <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.13" />
     <PackageVersion Include="Microsoft.WindowsAppSDK" Version="2.4.0" />
     <PackageVersion Include="Microsoft.Windows.AI.MachineLearning" Version="2.1.74" />
     <PackageVersion Include="Microsoft.WindowsAppSDK.AI" Version="2.4.4" />
