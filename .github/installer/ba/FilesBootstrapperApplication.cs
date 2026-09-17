@@ -139,16 +139,25 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
                 return;
             }
 
-            if (command.Action is LaunchAction.Uninstall or LaunchAction.UnsafeUninstall or LaunchAction.Repair or LaunchAction.Layout or LaunchAction.Cache)
+            var requestedAction = GetCommandAction();
+            if (requestedAction is LaunchAction.Uninstall or LaunchAction.UnsafeUninstall or LaunchAction.Repair or LaunchAction.Layout or LaunchAction.Cache)
             {
-                StartPlan(command.Action);
+                StartPlan(requestedAction);
                 return;
             }
 
+            // PackageState.Present only tells us that an MSI with this package
+            // identity is already registered. It does not mean that the
+            // incoming bundle is the same version, and it must not force a
+            // direct launch of a newer installer into maintenance mode.
+            // Burn's Install plan performs the normal upgrade/repair decision
+            // after the user confirms the install page. Repair and uninstall
+            // launched from Apps & features still arrive above with an
+            // explicit action and keep their dedicated flows.
             if (mainPackageInstalled)
-                ShowModify();
-            else
-                ShowWelcome();
+                LogDiagnostic($"Existing MSI detected for direct {requestedAction} launch; showing the install/upgrade page.");
+
+            ShowWelcome();
         });
     }
 
