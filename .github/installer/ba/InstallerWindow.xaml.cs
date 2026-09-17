@@ -1,8 +1,10 @@
 using System;
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Forms;
 
 namespace FilesMax.Installer.Bootstrapper;
@@ -12,6 +14,7 @@ public partial class InstallerWindow : Window
     private const double WindowCornerRadius = 14;
     private bool allowClose;
     private bool suppressFolderChanged;
+    private double displayedProgress;
 
     public InstallerWindow()
     {
@@ -82,14 +85,34 @@ public partial class InstallerWindow : Window
         ContentCard.Height = 190;
         SetPage(ProgressPage, ProgressActions);
         ProgressHeaderText.Text = string.IsNullOrWhiteSpace(header) ? "安装进度" : header;
+        InstallProgressBar.BeginAnimation(RangeBase.ValueProperty, null);
+        displayedProgress = 0;
         InstallProgressBar.Value = 0;
+        ProgressPercentText.Text = "0%";
         ProgressMessageText.Text = string.IsNullOrWhiteSpace(message) ? "正在准备……" : message;
         ProgressActions.IsEnabled = true;
     }
 
     public void SetProgress(int percentage, string message)
     {
-        InstallProgressBar.Value = Math.Clamp(percentage, 0, 100);
+        var targetProgress = Math.Clamp(percentage, 0, 100);
+        var animation = new DoubleAnimation
+        {
+            From = displayedProgress,
+            To = targetProgress,
+            Duration = TimeSpan.FromMilliseconds(220),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+            FillBehavior = FillBehavior.HoldEnd,
+        };
+        InstallProgressBar.BeginAnimation(RangeBase.ValueProperty, animation, HandoffBehavior.SnapshotAndReplace);
+        displayedProgress = targetProgress;
+        ProgressPercentText.Text = $"{targetProgress}%";
+        if (!string.IsNullOrWhiteSpace(message))
+            ProgressMessageText.Text = message;
+    }
+
+    public void SetProgressMessage(string message)
+    {
         if (!string.IsNullOrWhiteSpace(message))
             ProgressMessageText.Text = message;
     }
@@ -106,7 +129,7 @@ public partial class InstallerWindow : Window
 
     public void ShowFailure(string message, string? header = null)
     {
-        ContentCard.Height = 249;
+        ContentCard.Height = 330;
         SetPage(FailurePage, FailureActions);
         FailureHeaderText.Text = string.IsNullOrWhiteSpace(header) ? "安装失败" : header;
         FailureMessageText.Text = string.IsNullOrWhiteSpace(message)
@@ -147,11 +170,13 @@ public partial class InstallerWindow : Window
         FailureActions.Visibility = Visibility.Collapsed;
         page.Visibility = Visibility.Visible;
         actions.Visibility = Visibility.Visible;
-        Height = page == WelcomePage || page == FailurePage
+        Height = page == WelcomePage
             ? 556
-            : page == OptionsPage
-                ? 524
-                : 498;
+            : page == FailurePage
+                ? 650
+                : page == OptionsPage
+                    ? 524
+                    : 498;
     }
 
     private void LicenseCheckBox_Changed(object sender, RoutedEventArgs e)

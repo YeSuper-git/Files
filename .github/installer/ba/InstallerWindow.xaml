@@ -408,7 +408,24 @@
                                        FontFamily="{StaticResource InstallerFontFamily}"
                                        FontSize="15"
                                        Text="正在准备安装……" />
-                            <ProgressBar x:Name="InstallProgressBar" Margin="0,18,0,0" Maximum="100" Style="{StaticResource ModernProgressBarStyle}" />
+                            <Grid Margin="0,18,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ProgressBar x:Name="InstallProgressBar"
+                                             Grid.Column="0"
+                                             Maximum="100"
+                                             Style="{StaticResource ModernProgressBarStyle}" />
+                                <TextBlock x:Name="ProgressPercentText"
+                                           Grid.Column="1"
+                                           Margin="12,0,0,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="#6B7280"
+                                           FontFamily="{StaticResource InstallerFontFamily}"
+                                           FontSize="14"
+                                           Text="0%" />
+                            </Grid>
                         </StackPanel>
                     </Grid>
 
@@ -420,21 +437,30 @@
                     </Grid>
 
                     <Grid x:Name="FailurePage" Visibility="Collapsed">
-                        <StackPanel>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
                             <TextBlock x:Name="FailureHeaderText"
                                        Foreground="#111827"
                                        FontFamily="{StaticResource InstallerFontFamily}"
                                        FontSize="26"
                                        FontWeight="SemiBold"
                                        Text="安装失败" />
-                            <TextBlock x:Name="FailureMessageText"
-                                       Margin="0,18,0,0"
-                                       Foreground="#4B5563"
-                                       FontFamily="{StaticResource InstallerFontFamily}"
-                                       FontSize="15"
-                                       TextWrapping="Wrap"
-                                       Text="安装程序遇到问题，请查看日志后重试。" />
-                        </StackPanel>
+                            <ScrollViewer Grid.Row="1"
+                                          Margin="0,18,0,0"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <TextBlock x:Name="FailureMessageText"
+                                           Foreground="#4B5563"
+                                           FontFamily="{StaticResource InstallerFontFamily}"
+                                           FontSize="14"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
+                                           Text="安装程序遇到问题，请查看日志后重试。" />
+                            </ScrollViewer>
+                        </Grid>
                     </Grid>
                 </Grid>
             </Border>
