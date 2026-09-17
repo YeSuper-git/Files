@@ -27,7 +27,7 @@ namespace Files.App.ViewModels.Dialogs
 			{
 				try
 				{
-					item.ItemIcon = await imageService.GetImageModelFromPathAsync(item.SourcePath, 64u);
+					item.ItemIcon = await imageService.GetImageFromPathAsync(item.SourcePath, 64u);
 				}
 				catch (Exception)
 				{

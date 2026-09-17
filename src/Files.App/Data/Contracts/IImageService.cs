@@ -18,10 +18,8 @@ namespace Files.App.Data.Contracts
 		/// <returns>A <see cref="Task"/> that represents the asynchronous operation. If successful, value is <see cref="IImage"/> representation of the icon, otherwise null.</returns>
 		Task<IImage?> GetIconAsync(IStorable storable, CancellationToken cancellationToken);
 
-		[Obsolete("Use GetIconAsync() instead.")]
-		Task<IImage?> GetImageModelFromDataAsync(byte[]? rawData);
+		Task<IImage?> GetImageFromDataAsync(byte[]? rawData);
 
-		[Obsolete("Use GetIconAsync() instead.")]
-		Task<IImage?> GetImageModelFromPathAsync(string filePath, uint thumbnailSize = 64u);
+		Task<IImage?> GetImageFromPathAsync(string filePath, uint thumbnailSize = 64u);
 	}
 }

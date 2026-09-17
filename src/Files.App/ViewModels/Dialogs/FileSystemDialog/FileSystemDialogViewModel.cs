@@ -256,7 +256,7 @@ namespace Files.App.ViewModels.Dialogs.FileSystemDialog
 					{
 						try
 						{
-							item.ItemIcon = await imagingService.GetImageModelFromPathAsync(item.SourcePath!, 64u);
+							item.ItemIcon = await imagingService.GetImageFromPathAsync(item.SourcePath!, 64u);
 						}
 						catch (Exception)
 						{
