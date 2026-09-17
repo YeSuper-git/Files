@@ -16,7 +16,7 @@ public partial class InstallerWindow : Window
     private const int DwmWindowCornerPreference = 33;
     private const int DwmWindowBorderColor = 34;
     private const uint DwmCornerRound = 2;
-    private const uint DwmColorNone = 0xFFFFFFFE;
+    private const uint DwmBorderColor = 0x00E6D9D1;
 
     [System.Runtime.InteropServices.DllImport("dwmapi.dll", PreserveSig = true)]
     private static extern int DwmSetWindowAttribute(
@@ -257,43 +257,49 @@ public partial class InstallerWindow : Window
         if (width <= 0 || height <= 0)
             return;
 
-        OuterFrame.Clip = new RectangleGeometry(
-            new Rect(0, 0, width, height),
-            WindowCornerRadius,
-            WindowCornerRadius);
-
-        ApplyDwmWindowPolicy();
+        var nativeFrameApplied = ApplyDwmWindowPolicy();
+        OuterFrame.BorderThickness = nativeFrameApplied ? new Thickness(0) : new Thickness(1);
+        OuterFrame.Clip = nativeFrameApplied
+            ? null
+            : new RectangleGeometry(
+                new Rect(0, 0, width, height),
+                WindowCornerRadius,
+                WindowCornerRadius);
     }
 
-    private void ApplyDwmWindowPolicy()
+    private bool ApplyDwmWindowPolicy()
     {
         try
         {
             var hwnd = new WindowInteropHelper(this).EnsureHandle();
             var preference = DwmCornerRound;
-            DwmSetWindowAttribute(
+            var cornerResult = DwmSetWindowAttribute(
                 hwnd,
                 DwmWindowCornerPreference,
                 ref preference,
                 sizeof(uint));
 
-            // Let the application-owned OuterFrame draw the one-pixel border
-            // so DWM cannot add a second, differently antialiased border.
-            var borderColor = DwmColorNone;
-            DwmSetWindowAttribute(
+            // Let DWM draw the one-pixel border together with the rounded
+            // corners. This keeps the radius and antialiasing on one layer.
+            var borderColor = DwmBorderColor;
+            var borderResult = DwmSetWindowAttribute(
                 hwnd,
                 DwmWindowBorderColor,
                 ref borderColor,
                 sizeof(uint));
+
+            return cornerResult == 0 && borderResult == 0;
         }
         catch (DllNotFoundException)
         {
             // DWM is available on supported Windows desktop versions; keep a
             // graceful fallback for older or unusual hosts.
+            return false;
         }
         catch (EntryPointNotFoundException)
         {
             // The Win11-only attributes are unavailable on older hosts.
+            return false;
         }
     }
 

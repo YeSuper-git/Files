@@ -28,7 +28,7 @@
              are exposed. -->
         <shell:WindowChrome CaptionHeight="0"
                             ResizeBorderThickness="0"
-                            CornerRadius="14"
+                            CornerRadius="0"
                             GlassFrameThickness="0"
                             UseAeroCaptionButtons="False" />
     </shell:WindowChrome.WindowChrome>
@@ -270,8 +270,6 @@
             Background="#F7F9FC"
             BorderBrush="#D1D9E6"
             BorderThickness="1"
-            CornerRadius="14"
-            ClipToBounds="True"
             SnapsToDevicePixels="True">
         <Grid>
             <Grid.RowDefinitions>
