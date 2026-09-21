@@ -27,7 +27,6 @@ public partial class InstallerWindow : Window
 
     private bool allowClose;
     private bool suppressFolderChanged;
-    private double displayedProgress;
 
     public InstallerWindow()
     {
@@ -73,34 +72,27 @@ public partial class InstallerWindow : Window
 
     public void ShowWelcome()
     {
-        ContentCard.Height = 249;
-        SetPage(WelcomePage, WelcomeActions);
+        SetPage(WelcomePage, WelcomeActions, "第 1 步，共 3 步");
         LicenseCheckBox.IsChecked = false;
         NextButton.IsEnabled = false;
     }
 
     public void ShowOptions()
     {
-        ContentCard.Height = 216;
-        SetPage(OptionsPage, OptionsActions);
+        SetPage(OptionsPage, OptionsActions, "第 2 步，共 3 步");
         InstallButton.IsEnabled = LicenseAccepted && !string.IsNullOrWhiteSpace(InstallFolder);
     }
 
     public void ShowModify()
     {
-        ContentCard.Height = 190;
-        SetPage(CompletePage, ModifyActions);
-        CompleteHeaderText.Text = "修改安装";
-        CompleteDescriptionText.Text = "请选择要执行的操作。";
+        SetPage(ModifyPage, ModifyActions, "管理已安装的应用");
     }
 
     public void ShowProgress(string header, string message)
     {
-        ContentCard.Height = 190;
-        SetPage(ProgressPage, ProgressActions);
-        ProgressHeaderText.Text = string.IsNullOrWhiteSpace(header) ? "安装进度" : header;
+        SetPage(ProgressPage, ProgressActions, "正在处理，请稍候");
+        ProgressHeaderText.Text = string.IsNullOrWhiteSpace(header) ? "正在安装" : header;
         InstallProgressBar.BeginAnimation(RangeBase.ValueProperty, null);
-        displayedProgress = 0;
         InstallProgressBar.Value = 0;
         ProgressPercentText.Text = "0%";
         ProgressMessageText.Text = string.IsNullOrWhiteSpace(message) ? "正在准备……" : message;
@@ -112,14 +104,13 @@ public partial class InstallerWindow : Window
         var targetProgress = Math.Clamp(percentage, 0, 100);
         var animation = new DoubleAnimation
         {
-            From = displayedProgress,
+            From = InstallProgressBar.Value,
             To = targetProgress,
-            Duration = TimeSpan.FromMilliseconds(220),
+            Duration = TimeSpan.FromMilliseconds(SystemParameters.ClientAreaAnimation ? 220 : 0),
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
             FillBehavior = FillBehavior.HoldEnd,
         };
         InstallProgressBar.BeginAnimation(RangeBase.ValueProperty, animation, HandoffBehavior.SnapshotAndReplace);
-        displayedProgress = targetProgress;
         ProgressPercentText.Text = $"{targetProgress}%";
         if (!string.IsNullOrWhiteSpace(message))
             ProgressMessageText.Text = message;
@@ -133,18 +124,18 @@ public partial class InstallerWindow : Window
 
     public void ShowComplete(string header, string description, bool canLaunch)
     {
-        ContentCard.Height = 190;
-        SetPage(CompletePage, CompleteActions);
+        SetPage(CompletePage, CompleteActions, "操作已完成");
         CompleteHeaderText.Text = header;
         CompleteDescriptionText.Text = description;
         LaunchButton.Visibility = canLaunch ? Visibility.Visible : Visibility.Collapsed;
         LaunchButton.IsEnabled = canLaunch;
+        CompleteCloseButton.Content = canLaunch ? "仅关闭" : "关闭";
+        CompleteCloseButton.Style = (Style)FindResource(canLaunch ? "SecondaryButtonStyle" : "PrimaryButtonStyle");
     }
 
     public void ShowFailure(string message, string? header = null)
     {
-        ContentCard.Height = 330;
-        SetPage(FailurePage, FailureActions);
+        SetPage(FailurePage, FailureActions, "操作未完成");
         FailureHeaderText.Text = string.IsNullOrWhiteSpace(header) ? "安装失败" : header;
         FailureMessageText.Text = string.IsNullOrWhiteSpace(message)
             ? "安装程序遇到问题，请查看日志后重试。"
@@ -169,10 +160,11 @@ public partial class InstallerWindow : Window
         Close();
     }
 
-    private void SetPage(FrameworkElement page, FrameworkElement actions)
+    private void SetPage(FrameworkElement page, FrameworkElement actions, string step)
     {
         WelcomePage.Visibility = Visibility.Collapsed;
         OptionsPage.Visibility = Visibility.Collapsed;
+        ModifyPage.Visibility = Visibility.Collapsed;
         ProgressPage.Visibility = Visibility.Collapsed;
         CompletePage.Visibility = Visibility.Collapsed;
         FailurePage.Visibility = Visibility.Collapsed;
@@ -184,13 +176,7 @@ public partial class InstallerWindow : Window
         FailureActions.Visibility = Visibility.Collapsed;
         page.Visibility = Visibility.Visible;
         actions.Visibility = Visibility.Visible;
-        Height = page == WelcomePage
-            ? 556
-            : page == FailurePage
-                ? 650
-                : page == OptionsPage
-                    ? 524
-                    : 498;
+        StepText.Text = step;
     }
 
     private void LicenseCheckBox_Changed(object sender, RoutedEventArgs e)

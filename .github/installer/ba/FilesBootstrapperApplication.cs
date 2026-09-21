@@ -242,15 +242,15 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
             window?.SetBusy(false);
             if (plannedAction is LaunchAction.Uninstall or LaunchAction.UnsafeUninstall)
             {
-                window?.ShowComplete("卸载成功完成", "Files max 已经卸载完成。", canLaunch: false);
+                window?.ShowComplete("卸载完成", "Files max 已从这台电脑移除。", canLaunch: false);
             }
             else if (plannedAction == LaunchAction.Repair)
             {
-                window?.ShowComplete("修复成功完成", "Files max 已经修复完成。", canLaunch: true);
+                window?.ShowComplete("修复完成", "Files max 已修复完成，可以重新启动应用。", canLaunch: true);
             }
             else
             {
-                window?.ShowComplete("安装成功完成", "Files max 已经安装完成。", canLaunch: true);
+                window?.ShowComplete("安装完成", "Files max 已安装完成，可以开始使用了。", canLaunch: true);
             }
         });
     }
@@ -317,15 +317,15 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
 
         if (plannedAction is LaunchAction.Uninstall or LaunchAction.UnsafeUninstall)
         {
-            window.ShowProgress("卸载进度", "正在卸载 Files max……");
+            window.ShowProgress("正在卸载", "正在卸载 Files max……");
         }
         else if (plannedAction == LaunchAction.Repair)
         {
-            window.ShowProgress("修复进度", "正在修复 Files max……");
+            window.ShowProgress("正在修复", "正在修复 Files max……");
         }
         else
         {
-            window.ShowProgress("安装进度", "正在准备安装……");
+            window.ShowProgress("正在安装", "正在准备安装……");
         }
     }
 
