@@ -408,28 +408,34 @@ jobs:
           $publishTrimmed = if ($env:FILES_MAX_FAST_BUILD -eq 'true') { 'false' } else { 'true' }
           New-Item -ItemType Directory -Path $publishDir -Force | Out-Null
 
-          if ($env:FILES_MAX_PUBLISH_CACHE_HIT -eq 'true') {
-            Write-Host 'Publish output cache hit; skipping the full Files application publish.'
-          } else {
-            msbuild "$env:GITHUB_WORKSPACE\src\Files.App\Files.App.csproj" `
-              -m `
-              -t:Publish `
-              -p:Configuration=Release `
-              -p:Platform=x64 `
-              -p:RuntimeIdentifier=win-x64 `
-              -p:SelfContained=true `
-              -p:WindowsPackageType=None `
-              -p:FilesExternalLocationBuild=true `
-              -p:FilesResourceManagerBuild=true `
-              "-p:PublishReadyToRun=$publishReadyToRun" `
-              "-p:PublishReadyToRunComposite=$publishReadyToRun" `
-              -p:GenerateAppxPackageOnBuild=false `
-              "-p:PublishDir=$publishDir\" `
-              -v:minimal
+          $appPublishTimer = [System.Diagnostics.Stopwatch]::StartNew()
+          try {
+            if ($env:FILES_MAX_PUBLISH_CACHE_HIT -eq 'true') {
+              Write-Host 'Publish output cache hit; skipping the full Files application publish.'
+            } else {
+              msbuild "$env:GITHUB_WORKSPACE\src\Files.App\Files.App.csproj" `
+                -m `
+                -t:Publish `
+                -p:Configuration=Release `
+                -p:Platform=x64 `
+                -p:RuntimeIdentifier=win-x64 `
+                -p:SelfContained=true `
+                -p:WindowsPackageType=None `
+                -p:FilesExternalLocationBuild=true `
+                -p:FilesResourceManagerBuild=true `
+                "-p:PublishReadyToRun=$publishReadyToRun" `
+                "-p:PublishReadyToRunComposite=$publishReadyToRun" `
+                -p:GenerateAppxPackageOnBuild=false `
+                "-p:PublishDir=$publishDir\" `
+                -v:minimal
 
-            if ($LASTEXITCODE -ne 0) {
-              throw 'Unpackaged Files application publish failed.'
+              if ($LASTEXITCODE -ne 0) {
+                throw 'Unpackaged Files application publish failed.'
+              }
             }
+          } finally {
+            $appPublishTimer.Stop()
+            Write-Host "Files application publish phase: $($appPublishTimer.Elapsed); cacheHit=$($env:FILES_MAX_PUBLISH_CACHE_HIT)."
           }
           if (-not (Test-Path -LiteralPath (Join-Path $publishDir 'Files.exe'))) {
             throw 'Unpackaged Files.exe was not produced.'
@@ -462,33 +468,50 @@ jobs:
 
           $serverPublishDir = Join-Path $env:GITHUB_WORKSPACE 'artifacts\server-publish'
           New-Item -ItemType Directory -Path $serverPublishDir -Force | Out-Null
-          if ($env:FILES_MAX_PUBLISH_CACHE_HIT -eq 'true') {
-            Write-Host 'Server publish output cache hit; skipping the server publish.'
-          } else {
-            msbuild "$env:GITHUB_WORKSPACE\src\Files.App.Server\Files.App.Server.csproj" `
-              -m `
-              -t:Publish `
-              -p:Configuration=Release `
-              -p:Platform=x64 `
-              -p:RuntimeIdentifier=win-x64 `
-              -p:SelfContained=true `
-              "-p:PublishTrimmed=$publishTrimmed" `
-              "-p:PublishReadyToRun=$publishReadyToRun" `
-              "-p:PublishReadyToRunComposite=$publishReadyToRun" `
-              "-p:PublishDir=$serverPublishDir\" `
-              -v:minimal
+          $serverPublishTimer = [System.Diagnostics.Stopwatch]::StartNew()
+          try {
+            if ($env:FILES_MAX_PUBLISH_CACHE_HIT -eq 'true') {
+              Write-Host 'Server publish output cache hit; skipping the server publish.'
+            } else {
+              msbuild "$env:GITHUB_WORKSPACE\src\Files.App.Server\Files.App.Server.csproj" `
+                -m `
+                -t:Publish `
+                -p:Configuration=Release `
+                -p:Platform=x64 `
+                -p:RuntimeIdentifier=win-x64 `
+                -p:SelfContained=true `
+                "-p:PublishTrimmed=$publishTrimmed" `
+                "-p:PublishReadyToRun=$publishReadyToRun" `
+                "-p:PublishReadyToRunComposite=$publishReadyToRun" `
+                "-p:PublishDir=$serverPublishDir\" `
+                -v:minimal
 
-            if ($LASTEXITCODE -ne 0) {
-              throw 'Files.App.Server publish failed.'
+              if ($LASTEXITCODE -ne 0) {
+                throw 'Files.App.Server publish failed.'
+              }
             }
+          } finally {
+            $serverPublishTimer.Stop()
+            Write-Host "Files server publish phase: $($serverPublishTimer.Elapsed); cacheHit=$($env:FILES_MAX_PUBLISH_CACHE_HIT)."
           }
           $serverExe = Get-ChildItem -LiteralPath $serverPublishDir -Filter 'Files.App.Server.exe' -File | Select-Object -First 1
           if (-not $serverExe) {
             throw 'Files.App.Server.exe was not produced.'
           }
           $serverPayloadDir = Join-Path $publishDir 'Files.App.Server'
-          New-Item -ItemType Directory -Path $serverPayloadDir -Force | Out-Null
-          Copy-Item -Path (Join-Path $serverPublishDir '*') -Destination $serverPayloadDir -Recurse -Force
+          $serverPayloadExe = Join-Path $serverPayloadDir 'Files.App.Server.exe'
+          if ($env:FILES_MAX_PUBLISH_CACHE_HIT -eq 'true' -and (Test-Path -LiteralPath $serverPayloadExe -PathType Leaf)) {
+            Write-Host 'Server payload is already present in the restored publish cache; skipping redundant copy.'
+          } else {
+            $payloadCopyTimer = [System.Diagnostics.Stopwatch]::StartNew()
+            try {
+              New-Item -ItemType Directory -Path $serverPayloadDir -Force | Out-Null
+              Copy-Item -Path (Join-Path $serverPublishDir '*') -Destination $serverPayloadDir -Recurse -Force
+            } finally {
+              $payloadCopyTimer.Stop()
+              Write-Host "Files server payload copy phase: $($payloadCopyTimer.Elapsed)."
+            }
+          }
           Write-Host "Self-contained runtime files: $($runtimeFiles.Name -join ', ')"
 
       - name: Build external-location identity package and installer
