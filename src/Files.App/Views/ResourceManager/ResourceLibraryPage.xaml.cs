@@ -14,6 +14,7 @@ using Microsoft.UI.Xaml.Navigation;
 using System.Diagnostics;
 using System.IO;
 using Windows.Storage;
+using WinRT;
 
 namespace Files.App.Views.ResourceManager;
 
@@ -182,6 +183,7 @@ public sealed partial class ResourceLibraryPage : Page
     private void OnOpenTools(object sender, RoutedEventArgs e)
         => _contentPageContext.ShellPage?.NavigateToResourceManagerTools();
 
+    [DynamicWindowsRuntimeCast(typeof(FrameworkElement))]
     private async void OnBrowserItemRightTapped(object sender, RightTappedRoutedEventArgs e)
     {
         if (sender is not FrameworkElement element || element.DataContext is not ResourceBrowserItemViewModel item)

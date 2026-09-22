@@ -11,6 +11,7 @@ using Files.App.ViewModels.ResourceManager;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using WinRT;
 
 namespace Files.App.Views.ResourceManager;
 
@@ -82,6 +83,7 @@ public sealed partial class ResourceManagerPage : Page
 
     private void SetStatus(string msg) => StatusText.Text = msg;
 
+    [DynamicWindowsRuntimeCast(typeof(Microsoft.UI.Xaml.Media.Brush))]
     private void ApplyFilter(string? kw = null)
     {
         FolderList.Items.Clear();
@@ -156,6 +158,7 @@ public sealed partial class ResourceManagerPage : Page
         finally { ScanProgress.Visibility = Visibility.Collapsed; EndOperation(operation); }
     }
 
+    [DynamicWindowsRuntimeCast(typeof(Microsoft.UI.Xaml.Media.Brush))]
     private void AddCard(string label, int value, Windows.UI.Color? color = null)
     {
         var b = new Border { Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"], CornerRadius = new CornerRadius(8), Padding = new Thickness(16, 12, 16, 12) };
@@ -166,9 +169,12 @@ public sealed partial class ResourceManagerPage : Page
         s.Children.Add(v); b.Child = s; SummaryCards.Children.Add(b);
     }
 
+    [DynamicWindowsRuntimeCast(typeof(RadioButton))]
     private void OnFilterChecked(object s, RoutedEventArgs e) { if (s is RadioButton rb && rb.Tag is string f) { _filter = f; ApplyFilter(SearchBox.Text); } }
     private void OnSearchChanged(AutoSuggestBox s, AutoSuggestBoxTextChangedEventArgs e) => ApplyFilter(s.Text);
 
+    [DynamicWindowsRuntimeCast(typeof(ListViewItem))]
+    [DynamicWindowsRuntimeCast(typeof(Microsoft.UI.Xaml.Media.Brush))]
     private void OnFolderSelected(object s, SelectionChangedEventArgs e)
     {
         if (FolderList.SelectedItem is ListViewItem item && item.Tag is ResourceFolder folder)
@@ -188,6 +194,7 @@ public sealed partial class ResourceManagerPage : Page
         else DetailPanel.Visibility = Visibility.Collapsed;
     }
 
+    [DynamicWindowsRuntimeCast(typeof(Microsoft.UI.Xaml.Media.Brush))]
     private void AddDetail(string label, string value, bool small = false)
     {
         DetailContent.Children.Add(new TextBlock { Text = label, FontSize = 12, Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"] });
@@ -195,6 +202,7 @@ public sealed partial class ResourceManagerPage : Page
         DetailContent.Children.Add(t);
     }
 
+    [DynamicWindowsRuntimeCast(typeof(Microsoft.UI.Xaml.Media.Brush))]
     private void AddStatusCell(Grid g, int c, int r, string l, string v) { var s = new StackPanel(); s.Children.Add(new TextBlock { Text = l, FontSize = 12, Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"] }); s.Children.Add(new TextBlock { Text = v, FontSize = 15, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold }); Grid.SetColumn(s, c); Grid.SetRow(s, r); g.Children.Add(s); }
 
     private async void OnPreviewRename(object s, RoutedEventArgs e)
@@ -267,6 +275,7 @@ public sealed partial class ResourceManagerPage : Page
         PendingBar.Visibility = Visibility.Collapsed;
         SetStatus("已取消");
     }
+    [DynamicWindowsRuntimeCast(typeof(Button))]
     private void OnResolveConflict(object s, RoutedEventArgs e) { if (s is Button b && b.Tag is string st) { _pendingOps = _ops.ApplyConflictStrategy(_pendingOps, st); ShowPending(); } }
     private async void OnUndo(object s, RoutedEventArgs e)
     {
