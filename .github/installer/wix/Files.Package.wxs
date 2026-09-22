@@ -52,8 +52,19 @@
          deterministic MSI components. Support files are authored separately
          because the identity registration custom actions need stable File ids. -->
     <ComponentGroup Id="ApplicationFiles" Directory="INSTALLFOLDER">
-      <Files Include="$(var.PayloadDir)\**" />
+      <Files Include="$(var.PayloadDir)\**">
+        <!-- e_sqlite3.dll is language-neutral but carries a file version. Give
+             its MSI File row LANGID 0 explicitly to satisfy ICE60. -->
+        <Exclude Files="$(var.PayloadDir)\e_sqlite3.dll" />
+      </Files>
+      <ComponentRef Id="SqliteNativeLibrary" />
     </ComponentGroup>
+
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="SqliteNativeLibrary" Guid="C9DF7897-A4C6-4E69-9BCB-4CFD59A0D530">
+        <File Id="SqliteNativeLibraryFile" Source="$(var.PayloadDir)\e_sqlite3.dll" DefaultLanguage="0" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
 
     <DirectoryRef Id="INSTALLSUPPORT">
       <Component Id="InstallerSupportFiles" Guid="E2600A42-10A0-4A04-B2AB-3DD40F14734B">

@@ -112,6 +112,12 @@ jobs:
           # quoted MSI custom-action argument is fragile because its trailing
           # backslash interacts with Windows command-line quote parsing.
           $packageWix = Get-Content -Raw -LiteralPath (Join-Path $workspace '.github\installer\wix\Files.Package.wxs')
+          if (-not $packageWix.Contains('<Exclude Files="$(var.PayloadDir)\e_sqlite3.dll" />')) {
+            throw 'Files.Package.wxs must exclude e_sqlite3.dll from harvesting so its language-neutral File metadata is authored explicitly.'
+          }
+          if (-not $packageWix.Contains('Source="$(var.PayloadDir)\e_sqlite3.dll" DefaultLanguage="0" KeyPath="yes"')) {
+            throw 'Files.Package.wxs must assign LANGID 0 to the language-neutral e_sqlite3.dll payload.'
+          }
           if ($packageWix.Contains('-InstallDirectory &quot;[INSTALLFOLDER]')) {
             throw 'Files.Package.wxs must not pass INSTALLFOLDER as a quoted PowerShell custom-action argument.'
           }
@@ -179,7 +185,36 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Restore publish output cache
+        id: restore-publish
+        uses: actions/cache@v5
+        with:
+          path: |
+            artifacts/publish
+            artifacts/server-publish
+          key: ${{ runner.os }}-files-max-publish-${{ inputs.fast_build }}-${{ hashFiles('src/**/*', 'Directory.*', 'global.json', 'NuGet.config', 'Files.slnx') }}
+
+      - name: Use installer-only NuGet package directory
+        if: ${{ inputs.fast_build == true && steps.restore-publish.outputs.cache-hit == 'true' }}
+        shell: pwsh
+        run: |
+          $packageDir = Join-Path $env:GITHUB_WORKSPACE '.nuget\installer-packages'
+          New-Item -ItemType Directory -Path $packageDir -Force | Out-Null
+          "NUGET_PACKAGES=$packageDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Cache installer NuGet packages
+        if: ${{ inputs.fast_build == true && steps.restore-publish.outputs.cache-hit == 'true' }}
+        uses: actions/cache@v5
+        with:
+          path: .nuget/installer-packages
+          key: ${{ runner.os }}-files-max-installer-nuget-${{ hashFiles('Directory.Packages.props', 'Directory.Build.props', 'Directory.Build.targets', 'nuget.config', 'global.json', '.github/installer/**/*.csproj', '.github/installer/**/*.wixproj', 'src/Files.App.Launcher/Files.App.Launcher.vcxproj', 'src/Files.App.Launcher/packages.config') }}
+
       - name: Cache NuGet packages
+        # A fast build with a publish-cache hit only needs installer packages.
+        # Restoring the complete app's 2+ GB NuGet cache costs more than the
+        # targeted installer restores, so keep that cache for full builds and
+        # fast cache misses only.
+        if: ${{ inputs.fast_build != true || steps.restore-publish.outputs.cache-hit != 'true' }}
         uses: actions/cache@v5
         with:
           path: ~\.nuget\packages
@@ -195,8 +230,14 @@ jobs:
 
       - name: Restore
         shell: pwsh
+        env:
+          FILES_MAX_PUBLISH_CACHE_HIT: ${{ steps.restore-publish.outputs.cache-hit }}
         run: |
           $ErrorActionPreference = 'Stop'
+          if ($env:FILES_MAX_FAST_BUILD -eq 'true' -and $env:FILES_MAX_PUBLISH_CACHE_HIT -eq 'true') {
+            Write-Host 'Fast build with a publish cache hit; skipping full solution restore.'
+            return
+          }
           msbuild "${{ github.workspace }}\Files.slnx" -m -t:Restore -p:Configuration=Release -p:Platform=x64
           if ($LASTEXITCODE -ne 0) {
             throw 'Solution restore failed.'
@@ -340,15 +381,6 @@ jobs:
           "FILES_MAX_WIX_TOOL=$wixTool" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host 'External installer tools preflight passed.'
 
-      - name: Restore publish output cache
-        id: restore-publish
-        uses: actions/cache@v5
-        with:
-          path: |
-            artifacts/publish
-            artifacts/server-publish
-          key: ${{ runner.os }}-files-max-publish-${{ inputs.fast_build }}-${{ hashFiles('src/**/*', 'Directory.*', 'global.json', 'NuGet.config', 'Files.slnx') }}
-
       - name: Build launcher
         shell: pwsh
         run: |
@@ -409,6 +441,9 @@ jobs:
           }
           if (-not (Test-Path -LiteralPath (Join-Path $publishDir 'resources.pri'))) {
             throw 'resources.pri was not copied to the publish output.'
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $publishDir 'e_sqlite3.dll'))) {
+            throw 'e_sqlite3.dll was not copied to the publish output required by the explicit MSI component.'
           }
           if (-not (Test-Path -LiteralPath (Join-Path $publishDir 'Assets'))) {
             throw 'Application assets were not copied to the publish output.'
