@@ -358,7 +358,7 @@ public sealed class ResourceOperationsService : IResourceOperationsService
 
             try
             {
-                return JsonSerializer.Deserialize<List<ResourceOperationBatch>>(File.ReadAllText(path)) ?? [];
+                return JsonSerializer.Deserialize(File.ReadAllText(path), ResourceManagerJsonSerializerContext.Default.ListResourceOperationBatch) ?? [];
             }
             catch (Exception ex)
             {
@@ -549,7 +549,7 @@ public sealed class ResourceOperationsService : IResourceOperationsService
 
         try
         {
-            return JsonSerializer.Deserialize<List<ResourceOperationBatch>>(File.ReadAllText(path)) ?? [];
+            return JsonSerializer.Deserialize(File.ReadAllText(path), ResourceManagerJsonSerializerContext.Default.ListResourceOperationBatch) ?? [];
         }
         catch (Exception ex)
         {
@@ -564,7 +564,7 @@ public sealed class ResourceOperationsService : IResourceOperationsService
         var temporaryPath = $"{path}.{Guid.NewGuid():N}.tmp";
         try
         {
-            File.WriteAllText(temporaryPath, JsonSerializer.Serialize(history, new JsonSerializerOptions { WriteIndented = true }));
+            File.WriteAllText(temporaryPath, JsonSerializer.Serialize(history, ResourceManagerJsonSerializerContext.Default.ListResourceOperationBatch));
             File.Move(temporaryPath, path, true);
         }
         catch (Exception ex)

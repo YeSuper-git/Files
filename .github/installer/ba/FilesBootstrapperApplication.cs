@@ -19,7 +19,6 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
     private const string EulaVariable = "EulaAcceptCheckbox";
     private const string InstallerScriptLogFileName = "Files max Installer-script.log";
     private const string InstallerErrorLogFileName = "Files max Installer-error.log";
-    private const int MaxDiagnosticLogScanBytes = 512 * 1024;
     private const int MaxFailureClipboardCharacters = 24000;
 
     private InstallerWindow? window;
@@ -506,7 +505,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
             details.Add($"Burn 错误：{lastError}");
 
         var scriptErrorPath = FindRecentNonEmptyInstallerLog(InstallerErrorLogFileName);
-        var scriptError = scriptErrorPath is null ? null : ReadInstallerLog(scriptErrorPath);
+        var scriptError = scriptErrorPath is null ? null : ReadInstallerErrorDetails(scriptErrorPath, 4500);
         if (!string.IsNullOrWhiteSpace(scriptError))
         {
             details.Add(string.Empty);
@@ -542,7 +541,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         0x80073CF3 => "应用包校验、版本或依赖关系不满足要求。请确认安装包完整，并卸载旧版本后重试。",
         0x80073CF6 => "应用身份注册失败。请查看上方的安装脚本详细错误和日志路径。",
         0x800B0109 => "签名证书不受信任。请确认安装包来自同一版本，并重新运行安装程序。",
-        0x80070643 => "MSI 自定义安装步骤失败。上方的安装脚本详细错误会给出具体失败步骤。",
+        0x80070643 => "MSI 主程序包失败。该代码本身不是根因，请查看 MSI 首个失败动作、启动器错误和脚本异常上下文。",
         _ => null,
     };
 
@@ -643,6 +642,11 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
 
     private string? FindRecentBundleLog()
     {
+        return FindRecentBundleLogs().FirstOrDefault()?.FullName;
+    }
+
+    private List<FileInfo> FindRecentBundleLogs()
+    {
         var minimumWriteTime = operationStartedAt == default
             ? DateTime.Now.AddMinutes(-1)
             : operationStartedAt;
@@ -668,7 +672,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         return bundleLogs
             .OrderByDescending(file => file.Name.EndsWith("_FilesInstallerMsi.log", StringComparison.OrdinalIgnoreCase))
             .ThenByDescending(file => file.LastWriteTime)
-            .FirstOrDefault()?.FullName;
+            .ToList();
     }
 
     private void OpenInstallerErrorLog()
@@ -679,11 +683,11 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
 
         try
         {
-            if (!string.IsNullOrWhiteSpace(logPath))
+            if (!string.IsNullOrWhiteSpace(logPath) && File.Exists(logPath))
             {
-                var notepad = new ProcessStartInfo("notepad.exe") { UseShellExecute = false };
-                notepad.ArgumentList.Add(logPath);
-                Process.Start(notepad);
+                var fileExplorer = new ProcessStartInfo("explorer.exe") { UseShellExecute = true };
+                fileExplorer.ArgumentList.Add($"/select,{logPath}");
+                Process.Start(fileExplorer);
                 return;
             }
 
@@ -725,11 +729,16 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         if (!string.IsNullOrWhiteSpace(lastError))
             details.Add($"Burn 错误：{lastError}");
 
-        var bundleLogPath = FindRecentBundleLog();
-        AddFailureLogExcerpt(details, "MSI/启动器日志关键片段", bundleLogPath, FindMsiFailureContext);
+        var bundleLogs = FindRecentBundleLogs();
+        var msiLogPath = bundleLogs.FirstOrDefault(file =>
+            file.Name.EndsWith("_FilesInstallerMsi.log", StringComparison.OrdinalIgnoreCase))?.FullName;
+        var burnLogPath = bundleLogs.FirstOrDefault(file =>
+            !file.Name.EndsWith("_FilesInstallerMsi.log", StringComparison.OrdinalIgnoreCase))?.FullName;
+        AddFailureLogExcerpt(details, "MSI 首个失败动作及上下文", msiLogPath, FindMsiFailureContext);
+        AddFailureLogExcerpt(details, "启动器/Burn 错误上下文", burnLogPath, path => ReadDiagnosticLogTail(path, 5000));
 
         var scriptErrorPath = FindRecentNonEmptyInstallerLog(InstallerErrorLogFileName);
-        AddFailureLogExcerpt(details, "安装脚本错误日志", scriptErrorPath, path => ReadDiagnosticLogTail(path, 4500));
+        AddFailureLogExcerpt(details, "安装脚本异常（含异常类型、HRESULT、位置和堆栈）", scriptErrorPath, path => ReadInstallerErrorDetails(path, 4500));
 
         var scriptLogPath = FindRecentNonEmptyInstallerLog(InstallerScriptLogFileName);
         AddFailureLogExcerpt(details, "安装脚本过程日志（末尾）", scriptLogPath, path => ReadDiagnosticLogTail(path, 3500));
@@ -779,44 +788,123 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         try
         {
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            var startOffset = Math.Max(0, stream.Length - MaxDiagnosticLogScanBytes);
-            using var reader = CreateLogTailReader(stream, startOffset, out var skipPartialLine);
-            if (skipPartialLine)
-                reader.ReadLine();
-
-            var lines = new List<string>();
+            using var reader = CreateLogTailReader(stream, 0, out _);
+            var previousLines = new Queue<string>();
+            var tailLines = new Queue<string>();
+            var contexts = new List<(int LineNumber, int Priority, string Marker, List<string> Lines)>();
+            var seenPriorities = new HashSet<int>();
+            List<string>? activeContext = null;
+            var remainingContextLines = 0;
+            var lineNumber = 0;
             string? line;
             while ((line = reader.ReadLine()) is not null)
-                lines.Add(line);
-
-            var failureIndex = lines.FindLastIndex(value => value.Contains("Return value 3", StringComparison.OrdinalIgnoreCase));
-            if (failureIndex < 0)
             {
-                failureIndex = lines.FindLastIndex(value =>
-                    value.Contains("returned actual error code", StringComparison.OrdinalIgnoreCase) ||
-                    value.Contains("Error 1603", StringComparison.OrdinalIgnoreCase) ||
-                    value.Contains("Error 1722", StringComparison.OrdinalIgnoreCase) ||
-                    value.Contains("Error 1721", StringComparison.OrdinalIgnoreCase));
-            }
-            if (failureIndex < 0)
-            {
-                failureIndex = lines.FindLastIndex(value =>
-                    value.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
-                    value.Contains("exception", StringComparison.OrdinalIgnoreCase));
+                lineNumber++;
+                tailLines.Enqueue(line);
+                if (tailLines.Count > 32)
+                    tailLines.Dequeue();
+
+                if (activeContext is not null)
+                {
+                    activeContext.Add(line);
+                    remainingContextLines--;
+                    if (remainingContextLines == 0)
+                        activeContext = null;
+                }
+                else if (TryGetMsiFailureMarker(line, out var marker, out var priority) && seenPriorities.Add(priority))
+                {
+                    activeContext = previousLines.ToList();
+                    activeContext.Add(line);
+                    contexts.Add((lineNumber, priority, marker, activeContext));
+                    remainingContextLines = 8;
+                }
+
+                previousLines.Enqueue(line);
+                if (previousLines.Count > 18)
+                    previousLines.Dequeue();
             }
 
-            var firstLine = failureIndex < 0 ? Math.Max(0, lines.Count - 32) : Math.Max(0, failureIndex - 14);
-            var lastLine = failureIndex < 0 ? lines.Count : Math.Min(lines.Count, failureIndex + 13);
-            var excerpt = string.Join(Environment.NewLine, lines.Skip(firstLine).Take(lastLine - firstLine));
-            if (excerpt.Length > 8500)
-                excerpt = excerpt[^8500..];
-            return excerpt;
+            if (contexts.Count > 0)
+            {
+                var excerpts = contexts.OrderBy(context => context.Priority).ThenBy(context => context.LineNumber).Take(3)
+                    .Select((context, index) =>
+                    $"MSI 失败上下文 {index + 1}（第 {context.LineNumber} 行，匹配：{context.Marker}）{Environment.NewLine}" +
+                    string.Join(Environment.NewLine, context.Lines.Select(TrimDiagnosticLine)));
+                var excerpt = string.Join(Environment.NewLine + "--------------------" + Environment.NewLine, excerpts);
+                return excerpt.Length <= 8500 ? excerpt : excerpt[..8500] + Environment.NewLine + "……（片段已截断）";
+            }
+
+            return "未在完整 MSI 日志中匹配到具体失败标记；以下为日志末尾：" + Environment.NewLine +
+                string.Join(Environment.NewLine, tailLines.Select(TrimDiagnosticLine));
         }
         catch (Exception exception)
         {
             return $"读取日志片段失败：{exception.GetType().Name}: {exception.Message}";
         }
     }
+
+    private static bool TryGetMsiFailureMarker(string line, out string marker, out int priority)
+    {
+        if (line.Contains("Return value 3", StringComparison.OrdinalIgnoreCase))
+        {
+            marker = "Return value 3";
+            priority = 0;
+        }
+        else if (line.Contains("returned actual error code", StringComparison.OrdinalIgnoreCase))
+        {
+            marker = "returned actual error code";
+            priority = 1;
+        }
+        else if (line.Contains("Error 1721", StringComparison.OrdinalIgnoreCase) ||
+                 line.Contains("Error 1722", StringComparison.OrdinalIgnoreCase) ||
+                 line.Contains("Error 1723", StringComparison.OrdinalIgnoreCase))
+        {
+            marker = "MSI custom action error";
+            priority = 2;
+        }
+        else if (line.Contains("CustomAction", StringComparison.OrdinalIgnoreCase) &&
+                 (line.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
+                  line.Contains("returned", StringComparison.OrdinalIgnoreCase) ||
+                  line.Contains("error", StringComparison.OrdinalIgnoreCase)))
+        {
+            marker = "CustomAction failure";
+            priority = 3;
+        }
+        else if (line.Contains("access is denied", StringComparison.OrdinalIgnoreCase))
+        {
+            marker = "access denied";
+            priority = 4;
+        }
+        else if (line.Contains("exception", StringComparison.OrdinalIgnoreCase))
+        {
+            marker = "exception";
+            priority = 5;
+        }
+        else if (line.Contains("RegisterFilesIdentity", StringComparison.OrdinalIgnoreCase) ||
+                 line.Contains("UnregisterFilesIdentity", StringComparison.OrdinalIgnoreCase) ||
+                 line.Contains("WixQuietExec", StringComparison.OrdinalIgnoreCase))
+        {
+            marker = "MSI 自定义脚本动作";
+            priority = 6;
+        }
+        else if (line.Contains("Error 1603", StringComparison.OrdinalIgnoreCase) ||
+                 line.Contains("1603", StringComparison.OrdinalIgnoreCase) && line.Contains("error", StringComparison.OrdinalIgnoreCase))
+        {
+            marker = "MSI 返回 1603（通用失败码）";
+            priority = 7;
+        }
+        else
+        {
+            marker = string.Empty;
+            priority = int.MaxValue;
+            return false;
+        }
+
+        return true;
+    }
+
+    private static string TrimDiagnosticLine(string line) =>
+        line.Length <= 1200 ? line : line[..1200] + "……（本行已截断）";
 
     private static string? ReadDiagnosticLogTail(string path, int maxCharacters)
     {
@@ -830,6 +918,24 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
 
             var contents = reader.ReadToEnd().Trim();
             return contents.Length <= maxCharacters ? contents : contents[^maxCharacters..];
+        }
+        catch (Exception exception)
+        {
+            return $"读取日志片段失败：{exception.GetType().Name}: {exception.Message}";
+        }
+    }
+
+    private static string? ReadInstallerErrorDetails(string path, int maxCharacters)
+    {
+        try
+        {
+            var contents = File.ReadAllText(path).Trim();
+            if (contents.Length <= maxCharacters)
+                return contents;
+
+            var headLength = maxCharacters * 2 / 3;
+            var tailLength = maxCharacters - headLength;
+            return contents[..headLength] + Environment.NewLine + "……（中间错误记录已省略）……" + Environment.NewLine + contents[^tailLength..];
         }
         catch (Exception exception)
         {

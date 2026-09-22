@@ -107,7 +107,7 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
         {
             if (File.Exists(_statePath))
             {
-                var state = JsonSerializer.Deserialize<ResourceWorkspaceState>(File.ReadAllText(_statePath));
+                var state = JsonSerializer.Deserialize(File.ReadAllText(_statePath), ResourceManagerJsonSerializerContext.Default.ResourceWorkspaceState);
                 if (state is not null)
                 {
                     state.LibraryPath ??= string.Empty;
@@ -186,7 +186,7 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
 
             File.WriteAllText(
                 temporaryPath,
-                JsonSerializer.Serialize(_state, new JsonSerializerOptions { WriteIndented = true }));
+                JsonSerializer.Serialize(_state, ResourceManagerJsonSerializerContext.Default.ResourceWorkspaceState));
             File.Move(temporaryPath, _statePath, true);
         }
         catch (Exception ex)
