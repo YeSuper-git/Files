@@ -536,6 +536,12 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
                     continue;
 
                 var contents = File.ReadAllText(path).Trim();
+                if (string.IsNullOrWhiteSpace(contents))
+                {
+                    LogDiagnostic($"Installer log '{path}' is empty; checking the next log location.");
+                    continue;
+                }
+
                 if (contents.Length <= 3200)
                     return contents;
 
