@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
@@ -18,6 +19,8 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
     private const string EulaVariable = "EulaAcceptCheckbox";
     private const string InstallerScriptLogFileName = "Files max Installer-script.log";
     private const string InstallerErrorLogFileName = "Files max Installer-error.log";
+    private const int MaxDiagnosticLogScanBytes = 512 * 1024;
+    private const int MaxFailureClipboardCharacters = 24000;
 
     private InstallerWindow? window;
     private Dispatcher? dispatcher;
@@ -705,11 +708,212 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         }
     }
 
+    private string BuildFailureClipboardDetails(string message, string? header)
+    {
+        var details = new List<string>
+        {
+            "Files max 安装器诊断包",
+            $"版本：{GetBundleVersion()}",
+            $"操作：{(string.IsNullOrWhiteSpace(header) ? GetActionFailureHeader() : header)}",
+            $"失败阶段：{currentStage}",
+            $"本次操作编号：{currentAttemptId ?? "未生成（失败发生在安装计划前）"}",
+            $"安装位置：{ReadInstallFolder()}",
+        };
+
+        if (!string.IsNullOrWhiteSpace(currentPackageId))
+            details.Add($"失败组件：{GetPackageDisplayName(currentPackageId)} ({currentPackageId})");
+        if (!string.IsNullOrWhiteSpace(lastError))
+            details.Add($"Burn 错误：{lastError}");
+
+        var bundleLogPath = FindRecentBundleLog();
+        AddFailureLogExcerpt(details, "MSI/启动器日志关键片段", bundleLogPath, FindMsiFailureContext);
+
+        var scriptErrorPath = FindRecentNonEmptyInstallerLog(InstallerErrorLogFileName);
+        AddFailureLogExcerpt(details, "安装脚本错误日志", scriptErrorPath, path => ReadDiagnosticLogTail(path, 4500));
+
+        var scriptLogPath = FindRecentNonEmptyInstallerLog(InstallerScriptLogFileName);
+        AddFailureLogExcerpt(details, "安装脚本过程日志（末尾）", scriptLogPath, path => ReadDiagnosticLogTail(path, 3500));
+
+        details.Add("失败页面详情：");
+        details.Add(message);
+        details.Add(string.Empty);
+        details.Add($"临时目录：{string.Join("；", GetInstallerLogRoots())}");
+
+        var report = string.Join(Environment.NewLine, details);
+        if (report.Length > MaxFailureClipboardCharacters)
+        {
+            report = report[..MaxFailureClipboardCharacters] + Environment.NewLine + "……（诊断内容已截断）";
+        }
+
+        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrWhiteSpace(userProfile))
+            report = report.Replace(
+                userProfile + Path.DirectorySeparatorChar,
+                "%USERPROFILE%" + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase);
+
+        return report;
+    }
+
+    private static void AddFailureLogExcerpt(
+        List<string> details,
+        string title,
+        string? path,
+        Func<string, string?> readExcerpt)
+    {
+        details.Add(string.Empty);
+        details.Add($"{title}：");
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            details.Add("未找到本次操作对应的日志文件。");
+            return;
+        }
+
+        details.Add($"日志文件：{path}");
+        var excerpt = readExcerpt(path);
+        details.Add(string.IsNullOrWhiteSpace(excerpt) ? "日志中没有可提取的文本内容。" : excerpt);
+    }
+
+    private static string? FindMsiFailureContext(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            var startOffset = Math.Max(0, stream.Length - MaxDiagnosticLogScanBytes);
+            using var reader = CreateLogTailReader(stream, startOffset, out var skipPartialLine);
+            if (skipPartialLine)
+                reader.ReadLine();
+
+            var lines = new List<string>();
+            string? line;
+            while ((line = reader.ReadLine()) is not null)
+                lines.Add(line);
+
+            var failureIndex = lines.FindLastIndex(value => value.Contains("Return value 3", StringComparison.OrdinalIgnoreCase));
+            if (failureIndex < 0)
+            {
+                failureIndex = lines.FindLastIndex(value =>
+                    value.Contains("returned actual error code", StringComparison.OrdinalIgnoreCase) ||
+                    value.Contains("Error 1603", StringComparison.OrdinalIgnoreCase) ||
+                    value.Contains("Error 1722", StringComparison.OrdinalIgnoreCase) ||
+                    value.Contains("Error 1721", StringComparison.OrdinalIgnoreCase));
+            }
+            if (failureIndex < 0)
+            {
+                failureIndex = lines.FindLastIndex(value =>
+                    value.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
+                    value.Contains("exception", StringComparison.OrdinalIgnoreCase));
+            }
+
+            var firstLine = failureIndex < 0 ? Math.Max(0, lines.Count - 32) : Math.Max(0, failureIndex - 14);
+            var lastLine = failureIndex < 0 ? lines.Count : Math.Min(lines.Count, failureIndex + 13);
+            var excerpt = string.Join(Environment.NewLine, lines.Skip(firstLine).Take(lastLine - firstLine));
+            if (excerpt.Length > 8500)
+                excerpt = excerpt[^8500..];
+            return excerpt;
+        }
+        catch (Exception exception)
+        {
+            return $"读取日志片段失败：{exception.GetType().Name}: {exception.Message}";
+        }
+    }
+
+    private static string? ReadDiagnosticLogTail(string path, int maxCharacters)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            var startOffset = Math.Max(0, stream.Length - (maxCharacters * 4L));
+            using var reader = CreateLogTailReader(stream, startOffset, out var skipPartialLine);
+            if (skipPartialLine)
+                reader.ReadLine();
+
+            var contents = reader.ReadToEnd().Trim();
+            return contents.Length <= maxCharacters ? contents : contents[^maxCharacters..];
+        }
+        catch (Exception exception)
+        {
+            return $"读取日志片段失败：{exception.GetType().Name}: {exception.Message}";
+        }
+    }
+
+    private static StreamReader CreateLogTailReader(FileStream stream, long requestedOffset, out bool skipPartialLine)
+    {
+        var prefix = new byte[256];
+        stream.Seek(0, SeekOrigin.Begin);
+        var prefixLength = stream.Read(prefix, 0, prefix.Length);
+        var encoding = Encoding.UTF8;
+        var preambleLength = 0;
+        var isUtf16 = false;
+
+        if (prefixLength >= 2 && prefix[0] == 0xFF && prefix[1] == 0xFE)
+        {
+            encoding = Encoding.Unicode;
+            preambleLength = 2;
+            isUtf16 = true;
+        }
+        else if (prefixLength >= 2 && prefix[0] == 0xFE && prefix[1] == 0xFF)
+        {
+            encoding = Encoding.BigEndianUnicode;
+            preambleLength = 2;
+            isUtf16 = true;
+        }
+        else if (prefixLength >= 3 && prefix[0] == 0xEF && prefix[1] == 0xBB && prefix[2] == 0xBF)
+        {
+            preambleLength = 3;
+        }
+        else
+        {
+            var evenNulls = 0;
+            var oddNulls = 0;
+            for (var index = 0; index < prefixLength; index++)
+            {
+                if (prefix[index] != 0)
+                    continue;
+
+                if (index % 2 == 0)
+                    evenNulls++;
+                else
+                    oddNulls++;
+            }
+
+            if (oddNulls > 8 && oddNulls > evenNulls * 4)
+            {
+                encoding = Encoding.Unicode;
+                isUtf16 = true;
+            }
+            else if (evenNulls > 8 && evenNulls > oddNulls * 4)
+            {
+                encoding = Encoding.BigEndianUnicode;
+                isUtf16 = true;
+            }
+        }
+
+        var startOffset = requestedOffset <= preambleLength ? 0 : requestedOffset;
+        if (isUtf16 && startOffset > preambleLength && (startOffset - preambleLength) % 2 != 0)
+            startOffset++;
+
+        skipPartialLine = startOffset > preambleLength;
+        stream.Seek(startOffset, SeekOrigin.Begin);
+        return new StreamReader(stream, encoding, detectEncodingFromByteOrderMarks: startOffset == 0, bufferSize: 1024, leaveOpen: true);
+    }
+
     private void ShowFailure(string message, string? header = null)
     {
         if (window is not null)
         {
-            window.ShowFailure(message, header);
+            string clipboardDetails;
+            try
+            {
+                clipboardDetails = BuildFailureClipboardDetails(message, header);
+            }
+            catch (Exception exception)
+            {
+                LogDiagnostic($"Could not assemble failure diagnostics: {exception.Message}");
+                clipboardDetails = string.Join(Environment.NewLine, header ?? GetActionFailureHeader(), message);
+            }
+
+            window.ShowFailure(message, header, clipboardDetails);
             window.SetBusy(false);
         }
         else

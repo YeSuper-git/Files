@@ -27,6 +27,7 @@ public partial class InstallerWindow : Window
 
     private bool allowClose;
     private bool suppressFolderChanged;
+    private string? failureClipboardDetails;
 
     public InstallerWindow()
     {
@@ -135,12 +136,13 @@ public partial class InstallerWindow : Window
         CompleteCloseButton.Style = (Style)FindResource(canLaunch ? "SecondaryButtonStyle" : "PrimaryButtonStyle");
     }
 
-    public void ShowFailure(string message, string? header = null)
+    public void ShowFailure(string message, string? header = null, string? clipboardDetails = null)
     {
         SetPage(FailurePage, FailureActions, "操作未完成");
         FailureHeaderText.Text = string.IsNullOrWhiteSpace(header) ? "安装失败" : header;
-        CopyFailureDetailsButton.Content = "复制错误";
-        CopyFailureDetailsButton.ToolTip = "复制完整错误详情及日志位置";
+        CopyFailureDetailsButton.Content = "复制诊断信息";
+        CopyFailureDetailsButton.ToolTip = "复制本次错误、操作编号及相关日志片段，便于直接发送排查";
+        failureClipboardDetails = clipboardDetails;
         FailureMessageText.Text = string.IsNullOrWhiteSpace(message)
             ? "安装程序遇到问题，请查看日志后重试。"
             : message;
@@ -150,10 +152,12 @@ public partial class InstallerWindow : Window
     {
         try
         {
-            var details = string.Join(Environment.NewLine, FailureHeaderText.Text, FailureMessageText.Text);
+            var details = string.IsNullOrWhiteSpace(failureClipboardDetails)
+                ? string.Join(Environment.NewLine, FailureHeaderText.Text, FailureMessageText.Text)
+                : failureClipboardDetails;
             System.Windows.Clipboard.SetText(details);
-            CopyFailureDetailsButton.Content = "已复制";
-            CopyFailureDetailsButton.ToolTip = "错误标题和完整详情已复制到剪贴板";
+            CopyFailureDetailsButton.Content = "已复制诊断信息";
+            CopyFailureDetailsButton.ToolTip = "诊断信息已复制，可直接粘贴发送排查";
         }
         catch (Exception)
         {

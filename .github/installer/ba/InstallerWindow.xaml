@@ -309,8 +309,8 @@
 						<Grid>
 							<Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
 							<TextBlock x:Name="FailureHeaderText" Style="{StaticResource HeadingStyle}" Foreground="#B4232D" Text="安装未完成" />
-							<Button x:Name="CopyFailureDetailsButton" Grid.Column="1" Content="复制错误" Click="CopyFailureDetailsButton_Click"
-								Style="{StaticResource SecondaryButtonStyle}" Margin="0" MinWidth="92" Height="32" FontSize="12" />
+							<Button x:Name="CopyFailureDetailsButton" Grid.Column="1" Content="复制诊断信息" Click="CopyFailureDetailsButton_Click"
+								Style="{StaticResource SecondaryButtonStyle}" Margin="0" MinWidth="124" Height="32" FontSize="12" />
 						</Grid>
 						<TextBlock Grid.Row="1" Margin="0,8,0,12" Style="{StaticResource BodyStyle}" Text="请根据下方原因处理后重试。也可以复制详细信息，方便排查问题。" />
 						<Border Grid.Row="2" Background="#F7F9FC" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="6" Padding="12">

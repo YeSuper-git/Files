@@ -68,19 +68,20 @@ internal static class Program
 			window.ShowComplete("修复完成", "Files max 已修复完成，可以重新启动应用。", true);
 			Require(Equals(Control<Button>(window, "CompleteCloseButton").Content, "仅关闭"), "Repair must restore the secondary close label.");
 			Capture(window, output, "09-repaired");
-			window.ShowFailure("失败阶段：注册应用身份\n错误代码：0x80070005\n原因：访问被拒绝。\n\n请检查目标文件夹的访问权限后重试。\n\n" + new string('详', 1800), "安装未完成");
+			window.ShowFailure("失败阶段：注册应用身份\n错误代码：0x80070005\n原因：访问被拒绝。\n\n请检查目标文件夹的访问权限后重试。\n\n" + new string('详', 1800), "安装未完成", "Files max 安装器诊断包\n诊断测试关键片段");
 			var details = Control<TextBox>(window, "FailureMessageText");
 			Require(details.IsReadOnly && details.VerticalScrollBarVisibility == ScrollBarVisibility.Auto, "Failure details must be selectable and scrollable.");
 			Require(details.Text.StartsWith("失败阶段：", StringComparison.Ordinal), "Failure details must lead with the actionable stage, without repeating the headline.");
 			Capture(window, output, "10-failure");
 			var copyFailureDetailsButton = Control<Button>(window, "CopyFailureDetailsButton");
+			Require(Equals(copyFailureDetailsButton.Content, "复制诊断信息"), "Failure page must clearly label the one-click diagnostics action.");
 			copyFailureDetailsButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-			Require(Equals(copyFailureDetailsButton.Content, "已复制") || Equals(copyFailureDetailsButton.Content, "无法复制"), "Copy feedback must be visible even when clipboard access is unavailable.");
-			if (Equals(copyFailureDetailsButton.Content, "已复制"))
+			Require(Equals(copyFailureDetailsButton.Content, "已复制诊断信息") || Equals(copyFailureDetailsButton.Content, "无法复制"), "Copy feedback must be visible even when clipboard access is unavailable.");
+			if (Equals(copyFailureDetailsButton.Content, "已复制诊断信息"))
 			{
 				var clipboardText = System.Windows.Clipboard.GetText();
-				Require(clipboardText.StartsWith("安装未完成" + Environment.NewLine, StringComparison.Ordinal), "Copied diagnostics must include the failure headline.");
-				Require(clipboardText.Contains("失败阶段：注册应用身份", StringComparison.Ordinal), "Copied diagnostics must include the actionable failure details.");
+				Require(clipboardText.StartsWith("Files max 安装器诊断包", StringComparison.Ordinal), "Copied diagnostics must start with a shareable diagnostics package.");
+				Require(clipboardText.Contains("诊断测试关键片段", StringComparison.Ordinal), "Copied diagnostics must include the collected log context.");
 			}
 			Console.WriteLine("Passed: frame policy, consent, navigation, path gating, progress, completion actions, failure clipboard content, fixed layout and visible control bounds. Captured 10 WPF pages.");
 			return 0;
