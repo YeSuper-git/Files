@@ -22,6 +22,13 @@ internal static class Program
 		{
 			window = new InstallerWindow();
 			window.Show();
+			window.UpdateLayout();
+			var outerFrame = Control<Border>(window, "OuterFrame");
+			var nativeFrameApplied = outerFrame.BorderThickness.Equals(new Thickness(0));
+			Require(nativeFrameApplied || outerFrame.Clip is RectangleGeometry, "The window must initialize either the native DWM frame or the rounded fallback.");
+			Console.WriteLine(nativeFrameApplied
+				? "Window frame policy: native DWM border and rounded-corner attributes accepted."
+				: "Window frame policy: clipped rounded-corner fallback active.");
 			window.SetVersion("预览版本");
 			window.SetInstallFolder(@"C:\Program Files\Files max");
 			window.ShowWelcome();
@@ -64,8 +71,18 @@ internal static class Program
 			window.ShowFailure("失败阶段：注册应用身份\n错误代码：0x80070005\n原因：访问被拒绝。\n\n请检查目标文件夹的访问权限后重试。\n\n" + new string('详', 1800), "安装未完成");
 			var details = Control<TextBox>(window, "FailureMessageText");
 			Require(details.IsReadOnly && details.VerticalScrollBarVisibility == ScrollBarVisibility.Auto, "Failure details must be selectable and scrollable.");
+			Require(details.Text.StartsWith("失败阶段：", StringComparison.Ordinal), "Failure details must lead with the actionable stage, without repeating the headline.");
 			Capture(window, output, "10-failure");
-			Console.WriteLine("Passed: consent, navigation, path gating, progress, completion actions, fixed layout and visible control bounds. Captured 10 WPF pages.");
+			var copyFailureDetailsButton = Control<Button>(window, "CopyFailureDetailsButton");
+			copyFailureDetailsButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+			Require(Equals(copyFailureDetailsButton.Content, "已复制") || Equals(copyFailureDetailsButton.Content, "无法复制"), "Copy feedback must be visible even when clipboard access is unavailable.");
+			if (Equals(copyFailureDetailsButton.Content, "已复制"))
+			{
+				var clipboardText = System.Windows.Clipboard.GetText();
+				Require(clipboardText.StartsWith("安装未完成" + Environment.NewLine, StringComparison.Ordinal), "Copied diagnostics must include the failure headline.");
+				Require(clipboardText.Contains("失败阶段：注册应用身份", StringComparison.Ordinal), "Copied diagnostics must include the actionable failure details.");
+			}
+			Console.WriteLine("Passed: frame policy, consent, navigation, path gating, progress, completion actions, failure clipboard content, fixed layout and visible control bounds. Captured 10 WPF pages.");
 			return 0;
 		}
 		catch (Exception exception)

@@ -148,12 +148,14 @@ public partial class InstallerWindow : Window
     {
         try
         {
-            System.Windows.Clipboard.SetText(FailureMessageText.Text);
+            var details = string.Join(Environment.NewLine, FailureHeaderText.Text, FailureMessageText.Text);
+            System.Windows.Clipboard.SetText(details);
             CopyFailureDetailsButton.Content = "已复制";
-            CopyFailureDetailsButton.ToolTip = "错误详情已复制到剪贴板";
+            CopyFailureDetailsButton.ToolTip = "错误标题和完整详情已复制到剪贴板";
         }
         catch (Exception)
         {
+            CopyFailureDetailsButton.Content = "无法复制";
             CopyFailureDetailsButton.ToolTip = "复制失败，请选择下方文字手动复制";
         }
     }

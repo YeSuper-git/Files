@@ -469,8 +469,6 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
     {
         var details = new List<string>
         {
-            $"{GetActionFailureHeader()}：操作未完成。",
-            string.Empty,
             $"失败阶段：{stage ?? currentStage}",
             $"错误代码：0x{unchecked((uint)status):X8}（{status}）",
         };
