@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Files max · 安装器界面预览</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #edf1f6; color: #202938; font: 14px/1.6 "Microsoft YaHei UI", "PingFang SC", sans-serif; }
+  main { width: min(100% - 48px, 880px); margin: 36px auto; }
+  header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 20px; }
+  h1 { font-size: 19px; font-weight: 600; margin: 0; }
+  header span, footer { color: #657083; font-size: 12px; }
+  nav { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 28px; }
+  button { border: 1px solid transparent; border-radius: 6px; padding: 7px 12px; background: transparent; color: #657083; font: inherit; font-size: 13px; cursor: pointer; }
+  button:hover { background: #e1e8f2; }
+  button[aria-pressed="true"] { background: #fff; border-color: #d4dce8; color: #245bc8; }
+  button:focus-visible { outline: 2px solid #2864dc; outline-offset: 2px; }
+  figure { margin: 0 auto; width: fit-content; max-width: 100%; }
+  img { display: block; width: 720px; max-width: 100%; height: auto; border: 1px solid #d1d9e6; box-shadow: 0 16px 44px #34425a16; }
+  figcaption { color: #657083; font-size: 12px; text-align: center; padding-top: 16px; }
+  footer { text-align: center; margin-top: 28px; }
+</style>
+<main>
+  <header><h1>Files max 安装器</h1><span>Windows 实际界面渲染</span></header>
+  <nav aria-label="预览页面"></nav>
+  <figure><img src="01-welcome.png" alt="欢迎页，许可条款未勾选，下一步不可用"><figcaption></figcaption></figure>
+  <footer>此预览只展示界面，不执行安装。系统绘制的外框、圆角与阴影需在 Windows 11 实机确认。</footer>
+</main>
+<script>
+  const pages = [
+    ['01-welcome', '欢迎', '许可条款默认未勾选，下一步不可用'],
+    ['02-consent', '同意许可', '勾选许可后，蓝色的下一步按钮可用'],
+    ['03-options', '安装选项', '安装路径与浏览按钮统一高度'],
+    ['04-long-path', '长路径', '长路径保持单行，可在输入框内滚动查看'],
+    ['05-maintenance', '维护', '修复和卸载的作用分别说明'],
+    ['06-progress', '进度', '显示安装引擎的真实百分比'],
+    ['07-installed', '安装完成', '启动并关闭 / 仅关闭'],
+    ['08-uninstalled', '卸载完成', '卸载后只有关闭按钮'],
+    ['09-repaired', '修复完成', '修复完成后可以启动应用'],
+    ['10-failure', '失败详情', '详细原因可滚动、选择并复制']
+  ];
+  const nav = document.querySelector('nav');
+  function select(index) {
+    const [file, title, description] = pages[index];
+    document.querySelector('img').src = file + '.png';
+    document.querySelector('img').alt = title + '：' + description;
+    document.querySelector('figcaption').textContent = title + ' · ' + description;
+    [...nav.children].forEach((button, i) => button.setAttribute('aria-pressed', String(index === i)));
+  }
+  pages.forEach((page, index) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = page[1];
+    button.addEventListener('click', () => select(index));
+    nav.appendChild(button);
+  });
+  select(0);
+</script>
+</html>

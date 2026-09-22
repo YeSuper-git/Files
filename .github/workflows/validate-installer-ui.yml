@@ -30,10 +30,11 @@ jobs:
         run: |
           dotnet run --project .github/installer/verification/FilesMax.Installer.Verification.csproj --configuration Release -- artifacts/installer-ui-review
           if ($LASTEXITCODE -ne 0) { throw 'Installer UI verification failed.' }
+          Copy-Item .github/installer/verification/preview.html artifacts/installer-ui-review/index.html
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: Installer UI review
-          path: artifacts/installer-ui-review/*.png
+          path: artifacts/installer-ui-review/
           if-no-files-found: warn
           retention-days: 14

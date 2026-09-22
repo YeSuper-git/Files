@@ -137,9 +137,25 @@ public partial class InstallerWindow : Window
     {
         SetPage(FailurePage, FailureActions, "操作未完成");
         FailureHeaderText.Text = string.IsNullOrWhiteSpace(header) ? "安装失败" : header;
+        CopyFailureDetailsButton.Content = "复制错误";
+        CopyFailureDetailsButton.ToolTip = "复制完整错误详情及日志位置";
         FailureMessageText.Text = string.IsNullOrWhiteSpace(message)
             ? "安装程序遇到问题，请查看日志后重试。"
             : message;
+    }
+
+    private void CopyFailureDetailsButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Clipboard.SetText(FailureMessageText.Text);
+            CopyFailureDetailsButton.Content = "已复制";
+            CopyFailureDetailsButton.ToolTip = "错误详情已复制到剪贴板";
+        }
+        catch (Exception)
+        {
+            CopyFailureDetailsButton.ToolTip = "复制失败，请选择下方文字手动复制";
+        }
     }
 
     public void SetBusy(bool busy)

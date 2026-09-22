@@ -15,6 +15,7 @@ starting Burn or installing/uninstalling any software. It checks consent and
 path gating, navigation callbacks, progress labels, completion actions, fixed
 window dimensions, and visible button text bounds. It also renders ten actual
 WPF client-area images for visual review, including long paths and long errors.
+Open `index.html` in the review artifact to switch between the captured pages.
 
 `Validate installer UI` runs these focused checks for bootstrapper UI changes.
 It does not compile the Files app, package an installer, or publish a release.
