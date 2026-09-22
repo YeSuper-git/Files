@@ -560,6 +560,21 @@ jobs:
           # valid and language-neutral for this non-localized application.
           $msiDatabase = New-Object -ComObject WindowsInstaller.Installer
           $msiTransaction = $msiDatabase.OpenDatabase($msiPath, 1)
+
+          # ICE60 reports only the generated File identifier, which is not
+          # actionable on its own. Log the corresponding names for versioned
+          # files whose language metadata is absent so the next warning can
+          # be traced to its publish input without suppressing ICE validation.
+          $msiView = $msiTransaction.OpenView("SELECT ``File``, ``FileName``, ``Version`` FROM ``File`` WHERE ``Version`` IS NOT NULL AND ``Language`` IS NULL")
+          $msiView.Execute()
+          while ($msiRecord = $msiView.Fetch()) {
+            Write-Host ("MSI ICE60 diagnostic candidate: FileId='{0}', FileName='{1}', Version='{2}'" -f `
+              $msiRecord.StringData(1), $msiRecord.StringData(2), $msiRecord.StringData(3))
+            [void][Runtime.InteropServices.Marshal]::ReleaseComObject($msiRecord)
+          }
+          $msiView.Close()
+          [void][Runtime.InteropServices.Marshal]::ReleaseComObject($msiView)
+
           $msiView = $msiTransaction.OpenView("UPDATE ``File`` SET ``Language`` = '0' WHERE ``Language`` IS NOT NULL")
           $msiView.Execute()
           $msiView.Close()
