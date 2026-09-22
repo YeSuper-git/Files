@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
@@ -494,9 +495,12 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
 
         var scriptLogPath = Path.Combine(Path.GetTempPath(), InstallerScriptLogFileName);
         var errorLogPath = Path.Combine(Path.GetTempPath(), InstallerErrorLogFileName);
+        var bundleLogPath = FindRecentBundleLog();
         details.Add(string.Empty);
         details.Add($"详细日志：{scriptLogPath}");
         details.Add($"错误日志：{errorLogPath}");
+        if (!string.IsNullOrWhiteSpace(bundleLogPath))
+            details.Add($"MSI/启动器详细日志：{bundleLogPath}");
         details.Add("如果日志不在当前用户临时目录，请同时查看 C:\\Windows\\Temp 中的同名文件。");
         return string.Join(Environment.NewLine, details);
     }
@@ -590,10 +594,41 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         return null;
     }
 
+    private string? FindRecentBundleLog()
+    {
+        var tempRoots = new List<string> { Path.GetTempPath() };
+        var systemRoot = Environment.GetEnvironmentVariable("SystemRoot");
+        if (!string.IsNullOrWhiteSpace(systemRoot))
+            tempRoots.Add(Path.Combine(systemRoot, "Temp"));
+
+        foreach (var root in tempRoots)
+        {
+            try
+            {
+                var recentLogs = Directory.EnumerateFiles(root, "Files_max_*.log")
+                    .Select(path => new FileInfo(path))
+                    .Where(file => file.Length > 0 &&
+                        (operationStartedAt == default || file.LastWriteTime >= operationStartedAt.AddMinutes(-2)))
+                    .OrderByDescending(file => file.Name.EndsWith("_FilesInstallerMsi.log", StringComparison.OrdinalIgnoreCase))
+                    .ThenByDescending(file => file.LastWriteTime);
+                var latestLog = recentLogs.FirstOrDefault();
+                if (latestLog is not null)
+                    return latestLog.FullName;
+            }
+            catch (Exception exception)
+            {
+                LogDiagnostic($"Could not search installer logs in '{root}': {exception.Message}");
+            }
+        }
+
+        return null;
+    }
+
     private void OpenInstallerErrorLog()
     {
         var logPath = FindRecentNonEmptyInstallerLog(InstallerErrorLogFileName)
-            ?? FindRecentNonEmptyInstallerLog(InstallerScriptLogFileName);
+            ?? FindRecentNonEmptyInstallerLog(InstallerScriptLogFileName)
+            ?? FindRecentBundleLog();
 
         try
         {
