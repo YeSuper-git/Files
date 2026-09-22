@@ -51,6 +51,8 @@ public partial class InstallerWindow : Window
 
     public event EventHandler? LicenseChanged;
 
+    public event EventHandler? OpenErrorLogRequested;
+
     public event EventHandler? FinalCloseRequested;
 
     public string InstallFolder => InstallFolderTextBox.Text.Trim();
@@ -158,6 +160,11 @@ public partial class InstallerWindow : Window
             CopyFailureDetailsButton.Content = "无法复制";
             CopyFailureDetailsButton.ToolTip = "复制失败，请选择下方文字手动复制";
         }
+    }
+
+    private void OpenErrorLogButton_Click(object sender, RoutedEventArgs e)
+    {
+        OpenErrorLogRequested?.Invoke(this, EventArgs.Empty);
     }
 
     public void SetBusy(bool busy)

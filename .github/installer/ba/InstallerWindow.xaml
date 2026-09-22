@@ -345,6 +345,7 @@
 					<Button x:Name="CompleteCloseButton" Content="仅关闭" Click="CompleteCloseButton_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0" />
 				</StackPanel>
 				<StackPanel x:Name="FailureActions" HorizontalAlignment="Right" Orientation="Horizontal" Visibility="Collapsed">
+					<Button x:Name="OpenErrorLogButton" Content="打开错误日志" Click="OpenErrorLogButton_Click" Style="{StaticResource SecondaryButtonStyle}" MinWidth="120" />
 					<Button x:Name="FailureCloseButton" Content="关闭" Click="CompleteCloseButton_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0" />
 				</StackPanel>
 			</Grid>

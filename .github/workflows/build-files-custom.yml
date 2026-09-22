@@ -21,12 +21,46 @@ env:
 
 jobs:
   build:
+    outputs:
+      installer_version: ${{ steps.installer_version.outputs.current }}
+      next_installer_version: ${{ steps.installer_version.outputs.next }}
     runs-on: windows-2025
     timeout-minutes: 30
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Determine installer archive version
+        id: installer_version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $currentVersion = $env:GITHUB_REF_NAME -replace '^v', ''
+            if ($currentVersion -notmatch '^\d+\.\d+\.\d+$') {
+              throw "Installer tags must use vMAJOR.MINOR.PATCH, got '$env:GITHUB_REF_NAME'."
+            }
+            $nextVersion = ''
+          } else {
+            $versionFile = Join-Path $env:GITHUB_WORKSPACE '.github\installer\build-version.txt'
+            $currentVersion = (Get-Content -Raw -LiteralPath $versionFile).Trim()
+            $parsedVersion = [regex]::Match($currentVersion, '^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)$')
+            if (-not $parsedVersion.Success) {
+              throw "Invalid installer archive version in '$versionFile': $currentVersion"
+            }
+            $major = [int]$parsedVersion.Groups['major'].Value
+            $minor = [int]$parsedVersion.Groups['minor'].Value
+            $patch = [int]$parsedVersion.Groups['patch'].Value
+            if ($patch -eq [int]::MaxValue) {
+              throw "Installer patch version overflow: $currentVersion"
+            }
+            $nextVersion = '{0}.{1}.{2}' -f $major, $minor, ($patch + 1)
+          }
+
+          "current=$currentVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "next=$nextVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Host "This installer artifact will be named Files max Setup $currentVersion."
 
       - name: Preflight installer inputs
         shell: pwsh
@@ -691,6 +725,11 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      - name: Checkout version state
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+
       - name: Restore candidate installer from internal cache
         uses: actions/cache/restore@v5
         with:
@@ -850,11 +889,49 @@ jobs:
             throw 'External-location identity remained registered after uninstall.'
           }
 
+      - name: Advance installer archive version
+        if: github.ref_type == 'branch'
+        shell: pwsh
+        env:
+          BUILT_VERSION: ${{ needs.build.outputs.installer_version }}
+          NEXT_VERSION: ${{ needs.build.outputs.next_installer_version }}
+          BUILD_BRANCH: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $versionFile = Join-Path $env:GITHUB_WORKSPACE '.github\installer\build-version.txt'
+          $recordedVersion = (Get-Content -Raw -LiteralPath $versionFile).Trim()
+          if ($recordedVersion -ne $env:BUILT_VERSION) {
+            throw "Installer version changed during the build: expected $env:BUILT_VERSION, found $recordedVersion. No version was advanced."
+          }
+          if ($env:NEXT_VERSION -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Invalid next installer version: $env:NEXT_VERSION"
+          }
+
+          Set-Content -LiteralPath $versionFile -Value $env:NEXT_VERSION -NoNewline -Encoding ascii
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- .github/installer/build-version.txt
+          git commit -m "Advance installer archive version to $env:NEXT_VERSION"
+          git push origin "HEAD:refs/heads/$env:BUILD_BRANCH"
+
+      - name: Stage versioned installer artifact
+        shell: pwsh
+        env:
+          INSTALLER_VERSION: ${{ needs.build.outputs.installer_version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sourcePath = Join-Path $env:GITHUB_WORKSPACE 'Files max Setup.exe'
+          $artifactPath = Join-Path $env:GITHUB_WORKSPACE "Files max Setup $env:INSTALLER_VERSION.exe"
+          Copy-Item -LiteralPath $sourcePath -Destination $artifactPath -Force
+          if ((Get-Item -LiteralPath $artifactPath).Length -ne (Get-Item -LiteralPath $sourcePath).Length) {
+            throw 'Versioned installer artifact does not match the verified installer size.'
+          }
+
       - name: Upload verified installer
         uses: actions/upload-artifact@v7
         with:
-          name: Files max
-          path: Files max Setup.exe
+          name: Files max Setup ${{ needs.build.outputs.installer_version }}
+          path: Files max Setup ${{ needs.build.outputs.installer_version }}.exe
           if-no-files-found: error
 
       - name: Release

@@ -96,6 +96,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
             window.LaunchRequested += (_, _) => LaunchAndClose();
             window.CancelRequested += (_, _) => Cancel();
             window.LicenseChanged += (_, _) => SetEulaAccepted(window.LicenseAccepted);
+            window.OpenErrorLogRequested += (_, _) => OpenInstallerErrorLog();
             window.FinalCloseRequested += (_, _) => CloseAndQuit(result);
             window.SetVersion(GetBundleVersion());
             window.ShowWelcome();
@@ -554,6 +555,90 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         }
 
         return null;
+    }
+
+    private string? FindRecentNonEmptyInstallerLog(string fileName)
+    {
+        var tempRoots = new List<string> { Path.GetTempPath() };
+        var systemRoot = Environment.GetEnvironmentVariable("SystemRoot");
+        if (!string.IsNullOrWhiteSpace(systemRoot))
+            tempRoots.Add(Path.Combine(systemRoot, "Temp"));
+
+        foreach (var root in tempRoots)
+        {
+            var path = Path.Combine(root, fileName);
+            try
+            {
+                if (!File.Exists(path))
+                    continue;
+
+                var lastWrite = File.GetLastWriteTime(path);
+                if (operationStartedAt != default && lastWrite < operationStartedAt.AddMinutes(-2))
+                    continue;
+
+                if (string.IsNullOrWhiteSpace(File.ReadAllText(path)))
+                    continue;
+
+                return path;
+            }
+            catch (Exception exception)
+            {
+                LogDiagnostic($"Could not inspect installer log '{path}': {exception.Message}");
+            }
+        }
+
+        return null;
+    }
+
+    private void OpenInstallerErrorLog()
+    {
+        var logPath = FindRecentNonEmptyInstallerLog(InstallerErrorLogFileName)
+            ?? FindRecentNonEmptyInstallerLog(InstallerScriptLogFileName);
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(logPath))
+            {
+                var notepad = new ProcessStartInfo("notepad.exe") { UseShellExecute = false };
+                notepad.ArgumentList.Add(logPath);
+                Process.Start(notepad);
+                return;
+            }
+
+            var tempRoots = new List<string> { Path.GetTempPath() };
+            var systemRoot = Environment.GetEnvironmentVariable("SystemRoot");
+            if (!string.IsNullOrWhiteSpace(systemRoot))
+                tempRoots.Add(Path.Combine(systemRoot, "Temp"));
+
+            var logDirectory = tempRoots[0];
+            foreach (var root in tempRoots)
+            {
+                if (!File.Exists(Path.Combine(root, InstallerErrorLogFileName)) &&
+                    !File.Exists(Path.Combine(root, InstallerScriptLogFileName)))
+                {
+                    continue;
+                }
+
+                logDirectory = root;
+                break;
+            }
+            var explorer = new ProcessStartInfo("explorer.exe") { UseShellExecute = true };
+            explorer.ArgumentList.Add(logDirectory);
+            Process.Start(explorer);
+            MessageBox.Show(window!,
+                "暂未找到本次安装生成的非空日志，已打开日志所在目录。也可以检查 C:\\Windows\\Temp。",
+                "未找到错误日志",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(window!,
+                $"无法打开错误日志。\n{exception.Message}",
+                "打开日志失败",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
     }
 
     private void ShowFailure(string message, string? header = null)
