@@ -82,6 +82,10 @@ jobs:
             $details = $parseErrors | ForEach-Object { $_.Message }
             throw "Install-App.ps1 has PowerShell syntax errors: $($details -join '; ')"
           }
+          $installScriptText = Get-Content -Raw -LiteralPath $scriptPath
+          if (-not $installScriptText.Contains("(Split-Path -Leaf `$scriptDirectory) -ieq 'Installer'")) {
+            throw 'Install-App.ps1 must resolve its install root from the parent of the Installer support directory.'
+          }
 
           $xmlFiles = @(
             'src\Files.App\Package.appxmanifest',
@@ -103,13 +107,39 @@ jobs:
             }
           }
 
-          # INSTALLFOLDER is an MSI Directory property and ends with a
-          # backslash. Add a second separator before the closing quote so the
-          # Windows command-line parser passes one trailing backslash while
-          # correctly terminating the argument. Guard this exact safe form.
+          # The installed script lives under INSTALLFOLDER\Installer and
+          # derives the root from its own location. Passing INSTALLFOLDER in a
+          # quoted MSI custom-action argument is fragile because its trailing
+          # backslash interacts with Windows command-line quote parsing.
           $packageWix = Get-Content -Raw -LiteralPath (Join-Path $workspace '.github\installer\wix\Files.Package.wxs')
-          if (-not $packageWix.Contains('-InstallDirectory &quot;[INSTALLFOLDER]\&quot;')) {
-            throw 'Files.Package.wxs must escape the trailing INSTALLFOLDER separator in the PowerShell custom action.'
+          if ($packageWix.Contains('-InstallDirectory &quot;[INSTALLFOLDER]')) {
+            throw 'Files.Package.wxs must not pass INSTALLFOLDER as a quoted PowerShell custom-action argument.'
+          }
+          if (-not $packageWix.Contains('-File &quot;[#InstallAppScript]&quot; -Mode Install -AttemptId &quot;[INSTALLERATTEMPTID]&quot;')) {
+            throw 'Files.Package.wxs must invoke Install-App.ps1 without a fragile trailing-separator argument.'
+          }
+          if (-not $packageWix.Contains('-File &quot;[#InstallAppScript]&quot; -Mode Uninstall -AttemptId &quot;[INSTALLERATTEMPTID]&quot;')) {
+            throw 'The uninstall custom action must receive the per-operation installer attempt id.'
+          }
+          $bundleWix = Get-Content -Raw -LiteralPath (Join-Path $workspace '.github\installer\wix\Files.Bundle.wxs')
+          if (-not $bundleWix.Contains('Name="InstallerAttemptId"')) {
+            throw 'Files.Bundle.wxs must declare the installer attempt id variable.'
+          }
+          if (-not $bundleWix.Contains('<MsiProperty Name="INSTALLERATTEMPTID" Value="[InstallerAttemptId]" />')) {
+            throw 'Files.Bundle.wxs must pass the custom BA attempt id through to the MSI.'
+          }
+          $bootstrapperSource = Get-Content -Raw -LiteralPath (Join-Path $workspace '.github\installer\ba\FilesBootstrapperApplication.cs')
+          if (-not $bootstrapperSource.Contains('SetVariableString("InstallerAttemptId"')) {
+            throw 'The custom bootstrapper must generate and set a unique attempt id before planning the MSI.'
+          }
+          if (-not $installScriptText.Contains('[string]$AttemptId =')) {
+            throw 'Install-App.ps1 must accept the attempt id to create correlated unique log files.'
+          }
+          if (-not $installScriptText.Contains('Set-InstallStage')) {
+            throw 'Install-App.ps1 must log named installation stages for failure diagnosis.'
+          }
+          if (-not $installScriptText.Contains("'{0}-{1}.log' -f `$logBaseName, `$AttemptId")) {
+            throw 'Install-App.ps1 must preserve a separate uniquely named script log for each attempt.'
           }
 
           $requiredFiles = @(

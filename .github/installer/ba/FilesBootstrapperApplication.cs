@@ -29,6 +29,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
     private int result;
     private string? lastError;
     private string? currentPackageId;
+    private string? currentAttemptId;
     private string currentStage = "准备安装";
     private DateTime operationStartedAt;
 
@@ -84,6 +85,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
     {
         dispatcher = Dispatcher.CurrentDispatcher;
         result = 0;
+        operationStartedAt = DateTime.Now;
         LogDiagnostic("Run entered");
 
         if (command is not null && command.Display is Display.Full or Display.Passive)
@@ -307,6 +309,18 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         currentPackageId = null;
         currentStage = GetActionStage();
         operationStartedAt = DateTime.Now;
+        var attemptSuffix = Guid.NewGuid().ToString("N")[..8];
+        var attemptId = $"{operationStartedAt:yyyyMMdd-HHmmss}-{attemptSuffix}";
+        currentAttemptId = attemptId;
+        try
+        {
+            engine.SetVariableString("InstallerAttemptId", attemptId, formatted: false);
+        }
+        catch (Exception exception)
+        {
+            LogDiagnostic($"Could not pass attempt id to MSI: {exception.Message}");
+        }
+
         LogDiagnostic($"Starting plan action={plannedAction}");
         ShowProgress();
         engine.Plan(plannedAction, BundleScope.Default);
@@ -475,6 +489,9 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
             $"错误代码：0x{unchecked((uint)status):X8}（{status}）",
         };
 
+        if (!string.IsNullOrWhiteSpace(currentAttemptId))
+            details.Add($"本次操作编号：{currentAttemptId}");
+
         var statusHint = GetStatusHint(status);
         if (!string.IsNullOrWhiteSpace(statusHint))
             details.Add($"系统提示：{statusHint}");
@@ -485,7 +502,8 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         if (!string.IsNullOrWhiteSpace(lastError))
             details.Add($"Burn 错误：{lastError}");
 
-        var scriptError = ReadRecentInstallerLog(InstallerErrorLogFileName);
+        var scriptErrorPath = FindRecentNonEmptyInstallerLog(InstallerErrorLogFileName);
+        var scriptError = scriptErrorPath is null ? null : ReadInstallerLog(scriptErrorPath);
         if (!string.IsNullOrWhiteSpace(scriptError))
         {
             details.Add(string.Empty);
@@ -493,15 +511,24 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
             details.Add(scriptError);
         }
 
-        var scriptLogPath = Path.Combine(Path.GetTempPath(), InstallerScriptLogFileName);
-        var errorLogPath = Path.Combine(Path.GetTempPath(), InstallerErrorLogFileName);
+        var scriptLogPath = FindRecentNonEmptyInstallerLog(InstallerScriptLogFileName);
+        var scriptLog = scriptLogPath is null ? null : ReadInstallerLog(scriptLogPath);
+        if (string.IsNullOrWhiteSpace(scriptError) && !string.IsNullOrWhiteSpace(scriptLog))
+        {
+            details.Add(string.Empty);
+            details.Add("安装脚本过程日志（末尾）：");
+            details.Add(scriptLog);
+        }
+
         var bundleLogPath = FindRecentBundleLog();
         details.Add(string.Empty);
-        details.Add($"详细日志：{scriptLogPath}");
-        details.Add($"错误日志：{errorLogPath}");
+        details.Add($"脚本过程日志：{scriptLogPath ?? "未生成（失败可能发生在脚本启动前）"}");
+        details.Add($"脚本错误日志：{scriptErrorPath ?? "未生成（失败可能发生在脚本启动前）"}");
         if (!string.IsNullOrWhiteSpace(bundleLogPath))
-            details.Add($"MSI/启动器详细日志：{bundleLogPath}");
-        details.Add("如果日志不在当前用户临时目录，请同时查看 C:\\Windows\\Temp 中的同名文件。");
+            details.Add($"MSI/启动器日志：{bundleLogPath}");
+        else
+            details.Add("MSI/启动器日志：未在临时目录中找到本次日志");
+        details.Add($"搜索位置：{string.Join("；", GetInstallerLogRoots())}");
         return string.Join(Environment.NewLine, details);
     }
 
@@ -521,99 +548,62 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
             ? "Files max 主程序"
             : "Microsoft Visual C++ 运行库";
 
-    private string? ReadRecentInstallerLog(string fileName)
+    private List<string> GetInstallerLogRoots()
     {
         var tempRoots = new List<string> { Path.GetTempPath() };
         var systemRoot = Environment.GetEnvironmentVariable("SystemRoot");
         if (!string.IsNullOrWhiteSpace(systemRoot))
             tempRoots.Add(Path.Combine(systemRoot, "Temp"));
 
-        foreach (var root in tempRoots)
+        return tempRoots.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private List<FileInfo> FindRecentInstallerLogFiles(string fileName)
+    {
+        var baseName = Path.GetFileNameWithoutExtension(fileName);
+        var extension = Path.GetExtension(fileName);
+        var exactAttemptName = string.IsNullOrWhiteSpace(currentAttemptId)
+            ? null
+            : $"{baseName}-{currentAttemptId}{extension}";
+        var minimumWriteTime = operationStartedAt == default
+            ? DateTime.Now.AddMinutes(-1)
+            : operationStartedAt;
+        var matches = new List<FileInfo>();
+
+        foreach (var root in GetInstallerLogRoots())
         {
-            var path = Path.Combine(root, fileName);
             try
             {
-                if (!File.Exists(path))
+                if (!Directory.Exists(root))
                     continue;
 
-                var lastWrite = File.GetLastWriteTime(path);
-                if (operationStartedAt != default && lastWrite < operationStartedAt.AddMinutes(-2))
-                    continue;
-
-                var contents = File.ReadAllText(path).Trim();
-                if (string.IsNullOrWhiteSpace(contents))
+                var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (exactAttemptName is not null)
                 {
-                    LogDiagnostic($"Installer log '{path}' is empty; checking the next log location.");
-                    continue;
+                    var exactPath = Path.Combine(root, exactAttemptName);
+                    if (File.Exists(exactPath))
+                        paths.Add(exactPath);
                 }
 
-                if (contents.Length <= 3200)
-                    return contents;
+                foreach (var path in Directory.EnumerateFiles(root, $"{baseName}-*{extension}"))
+                    paths.Add(path);
+                var legacyPath = Path.Combine(root, fileName);
+                if (File.Exists(legacyPath))
+                    paths.Add(legacyPath);
 
-                return "……" + contents[^3200..];
-            }
-            catch (Exception exception)
-            {
-                LogDiagnostic($"Could not read installer log '{path}': {exception.Message}");
-            }
-        }
+                foreach (var path in paths)
+                {
+                    var file = new FileInfo(path);
+                    if (file.Length == 0)
+                        continue;
 
-        return null;
-    }
+                    var isCurrentAttempt = exactAttemptName is not null &&
+                        string.Equals(file.Name, exactAttemptName, StringComparison.OrdinalIgnoreCase);
+                    if (!isCurrentAttempt && file.LastWriteTime < minimumWriteTime)
+                        continue;
 
-    private string? FindRecentNonEmptyInstallerLog(string fileName)
-    {
-        var tempRoots = new List<string> { Path.GetTempPath() };
-        var systemRoot = Environment.GetEnvironmentVariable("SystemRoot");
-        if (!string.IsNullOrWhiteSpace(systemRoot))
-            tempRoots.Add(Path.Combine(systemRoot, "Temp"));
-
-        foreach (var root in tempRoots)
-        {
-            var path = Path.Combine(root, fileName);
-            try
-            {
-                if (!File.Exists(path))
-                    continue;
-
-                var lastWrite = File.GetLastWriteTime(path);
-                if (operationStartedAt != default && lastWrite < operationStartedAt.AddMinutes(-2))
-                    continue;
-
-                if (string.IsNullOrWhiteSpace(File.ReadAllText(path)))
-                    continue;
-
-                return path;
-            }
-            catch (Exception exception)
-            {
-                LogDiagnostic($"Could not inspect installer log '{path}': {exception.Message}");
-            }
-        }
-
-        return null;
-    }
-
-    private string? FindRecentBundleLog()
-    {
-        var tempRoots = new List<string> { Path.GetTempPath() };
-        var systemRoot = Environment.GetEnvironmentVariable("SystemRoot");
-        if (!string.IsNullOrWhiteSpace(systemRoot))
-            tempRoots.Add(Path.Combine(systemRoot, "Temp"));
-
-        foreach (var root in tempRoots)
-        {
-            try
-            {
-                var recentLogs = Directory.EnumerateFiles(root, "Files_max_*.log")
-                    .Select(path => new FileInfo(path))
-                    .Where(file => file.Length > 0 &&
-                        (operationStartedAt == default || file.LastWriteTime >= operationStartedAt.AddMinutes(-2)))
-                    .OrderByDescending(file => file.Name.EndsWith("_FilesInstallerMsi.log", StringComparison.OrdinalIgnoreCase))
-                    .ThenByDescending(file => file.LastWriteTime);
-                var latestLog = recentLogs.FirstOrDefault();
-                if (latestLog is not null)
-                    return latestLog.FullName;
+                    matches.Add(file);
+                }
             }
             catch (Exception exception)
             {
@@ -621,7 +611,61 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
             }
         }
 
-        return null;
+        return matches
+            .OrderByDescending(file => exactAttemptName is not null &&
+                string.Equals(file.Name, exactAttemptName, StringComparison.OrdinalIgnoreCase))
+            .ThenByDescending(file => file.LastWriteTime)
+            .ToList();
+    }
+
+    private string? FindRecentNonEmptyInstallerLog(string fileName) =>
+        FindRecentInstallerLogFiles(fileName).FirstOrDefault()?.FullName;
+
+    private string? ReadInstallerLog(string path)
+    {
+        try
+        {
+            var contents = File.ReadAllText(path).Trim();
+            if (contents.Length <= 3200)
+                return contents;
+
+            return "……" + contents[^3200..];
+        }
+        catch (Exception exception)
+        {
+            LogDiagnostic($"Could not read installer log '{path}': {exception.Message}");
+            return null;
+        }
+    }
+
+    private string? FindRecentBundleLog()
+    {
+        var minimumWriteTime = operationStartedAt == default
+            ? DateTime.Now.AddMinutes(-1)
+            : operationStartedAt;
+        var bundleLogs = new List<FileInfo>();
+
+        foreach (var root in GetInstallerLogRoots())
+        {
+            try
+            {
+                if (!Directory.Exists(root))
+                    continue;
+
+                bundleLogs.AddRange(Directory.EnumerateFiles(root, "Files_max_*.log")
+                    .Select(path => new FileInfo(path))
+                    .Where(file => file.Length > 0 && file.LastWriteTime >= minimumWriteTime));
+            }
+            catch (Exception exception)
+            {
+                LogDiagnostic($"Could not search bundle logs in '{root}': {exception.Message}");
+            }
+        }
+
+        return bundleLogs
+            .OrderByDescending(file => file.Name.EndsWith("_FilesInstallerMsi.log", StringComparison.OrdinalIgnoreCase))
+            .ThenByDescending(file => file.LastWriteTime)
+            .FirstOrDefault()?.FullName;
     }
 
     private void OpenInstallerErrorLog()
@@ -640,28 +684,13 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
                 return;
             }
 
-            var tempRoots = new List<string> { Path.GetTempPath() };
-            var systemRoot = Environment.GetEnvironmentVariable("SystemRoot");
-            if (!string.IsNullOrWhiteSpace(systemRoot))
-                tempRoots.Add(Path.Combine(systemRoot, "Temp"));
-
+            var tempRoots = GetInstallerLogRoots();
             var logDirectory = tempRoots[0];
-            foreach (var root in tempRoots)
-            {
-                if (!File.Exists(Path.Combine(root, InstallerErrorLogFileName)) &&
-                    !File.Exists(Path.Combine(root, InstallerScriptLogFileName)))
-                {
-                    continue;
-                }
-
-                logDirectory = root;
-                break;
-            }
             var explorer = new ProcessStartInfo("explorer.exe") { UseShellExecute = true };
             explorer.ArgumentList.Add(logDirectory);
             Process.Start(explorer);
             MessageBox.Show(window!,
-                "暂未找到本次安装生成的非空日志，已打开日志所在目录。也可以检查 C:\\Windows\\Temp。",
+                $"暂未找到可打开的日志，已打开：{logDirectory}\n本次操作编号：{currentAttemptId ?? "尚未开始"}\n也请检查：{string.Join("；", tempRoots)}",
                 "未找到错误日志",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -701,7 +730,8 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
     {
         try
         {
-            engine.Log(LogLevel.Verbose, $"[Files max BA] {message}");
+            var attempt = string.IsNullOrWhiteSpace(currentAttemptId) ? "no-attempt" : currentAttemptId;
+            engine.Log(LogLevel.Verbose, $"[Files max BA][{attempt}] {message}");
         }
         catch
         {

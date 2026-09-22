@@ -28,6 +28,16 @@
         Value="0"
         Persisted="no" />
 
+    <!-- Created by the custom BA for each install, repair, or uninstall plan.
+         The same id is forwarded to MSI and the PowerShell custom action so
+         the separate log files can be correlated without overwriting older
+         attempts. -->
+    <Variable
+        Name="InstallerAttemptId"
+        Type="string"
+        Value=""
+        Persisted="no" />
+
     <Variable
         Name="InstallFolder"
         Type="formatted"
@@ -133,6 +143,7 @@
           SourceFile="$(var.MsiPath)"
           Vital="yes">
         <MsiProperty Name="INSTALLFOLDER" Value="[InstallFolder]" />
+        <MsiProperty Name="INSTALLERATTEMPTID" Value="[InstallerAttemptId]" />
       </MsiPackage>
     </Chain>
   </Bundle>

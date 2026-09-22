@@ -10,52 +10,93 @@ param(
     [string]$Publisher = 'CN=Files',
     [string]$ProductName = 'Files max',
     [string]$CertificateFileName = 'Files.cer',
-    [string]$LogFileName = 'Files max Installer-install.log',
+    [string]$AttemptId = '',
+    [string]$LogFileName = 'Files max Installer-script.log',
     [string]$ErrorFileName = 'Files max Installer-error.log',
     [string]$LegacyUninstallKeyName = 'Files'
 )
 
 $ErrorActionPreference = 'Stop'
-$root = if ([string]::IsNullOrWhiteSpace($InstallDirectory)) {
-    Split-Path -Parent $MyInvocation.MyCommand.Definition
-} else {
-    [IO.Path]::GetFullPath($InstallDirectory)
+$script:root = ''
+$script:stage = '初始化安装程序'
+$script:logPath = $null
+$script:errorPath = $null
+$script:loggingFailures = @()
+
+if ([string]::IsNullOrWhiteSpace($AttemptId)) {
+    $AttemptId = '{0}-{1}-{2}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'), $PID, ([guid]::NewGuid().ToString('N').Substring(0, 8))
 }
-$tempDirectory = [IO.Path]::GetTempPath()
-$logPath = Join-Path $tempDirectory $LogFileName
-$errorPath = Join-Path $tempDirectory $ErrorFileName
-$stage = '初始化安装程序'
+$AttemptId = [regex]::Replace($AttemptId, '[^A-Za-z0-9_-]', '_')
+$script:attemptId = $AttemptId
+$logBaseName = [IO.Path]::GetFileNameWithoutExtension([IO.Path]::GetFileName($LogFileName))
+$errorBaseName = [IO.Path]::GetFileNameWithoutExtension([IO.Path]::GetFileName($ErrorFileName))
+$script:logFileName = '{0}-{1}.log' -f $logBaseName, $AttemptId
+$script:errorFileName = '{0}-{1}.log' -f $errorBaseName, $AttemptId
 
 function Initialize-InstallLogs {
-    try {
-        $logDirectory = Split-Path -Parent $logPath
-        if (-not (Test-Path -LiteralPath $logDirectory)) {
-            New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
-        }
-
-        Set-Content -LiteralPath $logPath -Value "[$(Get-Date -Format s)] Files max installer started. Mode=$Mode InstallDirectory=$root" -Encoding UTF8
-        Set-Content -LiteralPath $errorPath -Value '' -Encoding UTF8
-    } catch {
-        # Logging must never prevent the actual install from starting.
+    $tempRoots = @([IO.Path]::GetTempPath(), $env:TEMP)
+    if (-not [string]::IsNullOrWhiteSpace($env:SystemRoot)) {
+        $tempRoots += Join-Path $env:SystemRoot 'Temp'
     }
+
+    $uniqueRoots = @($tempRoots |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Select-Object -Unique)
+    foreach ($logDirectory in $uniqueRoots) {
+        try {
+            if (-not (Test-Path -LiteralPath $logDirectory -PathType Container)) {
+                New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+            }
+
+            $candidateLogPath = Join-Path $logDirectory $script:logFileName
+            $candidateErrorPath = Join-Path $logDirectory $script:errorFileName
+            Set-Content -LiteralPath $candidateLogPath -Value "[$(Get-Date -Format s)] Files max installer started. AttemptId=$script:attemptId Mode=$Mode PID=$PID" -Encoding UTF8
+            Set-Content -LiteralPath $candidateErrorPath -Value '' -Encoding UTF8
+            $script:logPath = $candidateLogPath
+            $script:errorPath = $candidateErrorPath
+
+            if ($script:loggingFailures.Count -gt 0) {
+                Write-InstallLog "Log directory fallback used. Earlier locations failed: $($script:loggingFailures -join ' | ')"
+            }
+            return
+        } catch {
+            $script:loggingFailures += "${logDirectory}: $($_.Exception.Message)"
+        }
+    }
+
+    Write-Host "WARNING: Could not initialize installer log files. AttemptId=$script:attemptId. Tried: $($uniqueRoots -join '; ')"
 }
 
 function Write-InstallLog {
     param([string]$Message)
+    if ([string]::IsNullOrWhiteSpace($script:logPath)) { return }
+
     try {
-        Add-Content -LiteralPath $logPath -Value "[$(Get-Date -Format s)] $Message" -Encoding UTF8
+        Add-Content -LiteralPath $script:logPath -Value "[$(Get-Date -Format s)] [AttemptId=$script:attemptId] $Message" -Encoding UTF8
     } catch {
-        # Logging must never replace the real installation error.
+        $script:loggingFailures += "Writing script log failed: $($_.Exception.Message)"
+        $script:logPath = $null
+        Write-Host "WARNING: Installer script log became unavailable: $($_.Exception.Message)"
     }
 }
 
 function Write-InstallErrorLog {
     param([string]$Message)
+    if ([string]::IsNullOrWhiteSpace($script:errorPath)) { return }
+
     try {
-        Set-Content -LiteralPath $errorPath -Value $Message -Encoding UTF8
+        Set-Content -LiteralPath $script:errorPath -Value $Message -Encoding UTF8
     } catch {
-        # The bootstrapper will still show the Burn error and error code.
+        $script:loggingFailures += "Writing script error log failed: $($_.Exception.Message)"
+        $script:errorPath = $null
+        Write-Host "WARNING: Installer error log became unavailable: $($_.Exception.Message)"
     }
+}
+
+function Set-InstallStage {
+    param([Parameter(Mandatory)][string]$Name)
+    $script:stage = $Name
+    Write-InstallLog "Stage started: $Name"
 }
 
 function Stop-FilesProcesses {
@@ -162,14 +203,29 @@ function Invoke-ProcessChecked {
     $startInfo.WorkingDirectory = $root
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    Write-InstallLog "Launching process: $FileName $Arguments (timeout=${TimeoutMilliseconds}ms)"
     $process = [System.Diagnostics.Process]::Start($startInfo)
+    $standardOutputTask = $process.StandardOutput.ReadToEndAsync()
+    $standardErrorTask = $process.StandardError.ReadToEndAsync()
     if (-not $process.WaitForExit($TimeoutMilliseconds)) {
         try { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue } catch { }
+        $process.WaitForExit()
+        Write-InstallLog "Process timed out: $FileName (pid=$($process.Id))"
         throw "$FileName timed out after $([math]::Round($TimeoutMilliseconds / 60000)) minutes."
     }
 
+    $standardOutput = $standardOutputTask.GetAwaiter().GetResult().Trim()
+    $standardError = $standardErrorTask.GetAwaiter().GetResult().Trim()
     $process.Refresh()
     Write-InstallLog "$FileName exited with code $($process.ExitCode)"
+    if (-not [string]::IsNullOrWhiteSpace($standardOutput)) {
+        Write-InstallLog "Process stdout ($FileName): $standardOutput"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($standardError)) {
+        Write-InstallLog "Process stderr ($FileName): $standardError"
+    }
     return $process.ExitCode
 }
 
@@ -194,10 +250,24 @@ function Get-IdentityPackageVersion {
 
 try {
     Initialize-InstallLogs
+    Set-InstallStage '解析安装路径'
+    $scriptDirectory = [IO.Path]::GetFullPath($PSScriptRoot)
+    $defaultInstallDirectory = if ((Split-Path -Leaf $scriptDirectory) -ieq 'Installer') {
+        Split-Path -Parent $scriptDirectory
+    } else {
+        $scriptDirectory
+    }
+    $root = if ([string]::IsNullOrWhiteSpace($InstallDirectory)) {
+        [IO.Path]::GetFullPath($defaultInstallDirectory)
+    } else {
+        [IO.Path]::GetFullPath($InstallDirectory)
+    }
+    $script:root = $root
     Write-InstallLog "Resolved install root: $root"
+    Write-InstallLog "PowerShell=$($PSVersionTable.PSVersion), identity package input='$IdentityPackagePath'"
 
     if ([string]::IsNullOrWhiteSpace($IdentityPackagePath)) {
-        $stage = '定位应用身份包'
+        Set-InstallStage '定位应用身份包'
         $IdentityPackagePath = Join-Path $root 'Files.Identity.msix'
         if (-not (Test-Path -LiteralPath $IdentityPackagePath)) {
             $IdentityPackagePath = Join-Path $root 'Installer\Files.Identity.msix'
@@ -205,11 +275,11 @@ try {
     }
 
     if ($Mode -eq 'Uninstall') {
-        $stage = '停止 Files max 进程'
+        Set-InstallStage '停止 Files max 进程'
         Stop-FilesProcesses
         # Remove every identity package with this package name. This also
         # cleans up installations made by an earlier publisher identity.
-        $stage = '移除应用身份包'
+        Set-InstallStage '移除应用身份包'
         $installedPackages = @(Get-AppxPackage -Name $PackageName -ErrorAction SilentlyContinue)
         foreach ($package in $installedPackages) {
             Write-InstallLog "Removing identity package: $($package.PackageFullName)"
@@ -222,7 +292,7 @@ try {
         exit 0
     }
 
-    $stage = '验证安装文件'
+    Set-InstallStage '验证安装文件'
     if (-not (Test-Path -LiteralPath (Join-Path $root 'Files.exe'))) {
         throw "Files.exe was not found in '$root'."
     }
@@ -230,10 +300,10 @@ try {
         throw "Identity package was not found: $IdentityPackagePath"
     }
 
-    $stage = '读取应用身份包'
+    Set-InstallStage '读取应用身份包'
     $identityVersion = Get-IdentityPackageVersion $IdentityPackagePath
 
-    $stage = '验证应用签名证书'
+    Set-InstallStage '验证应用签名证书'
     $certificate = Join-Path $root $CertificateFileName
     $installerCertificate = Join-Path $root "Installer\$CertificateFileName"
     if (-not (Test-Path -LiteralPath $certificate)) {
@@ -258,7 +328,7 @@ try {
         throw "Identity certificate import failed with exit code $certificateExitCode"
     }
 
-    $stage = '安装 Visual C++ 运行库'
+    Set-InstallStage '安装 Visual C++ 运行库'
     $vcRedist = Join-Path $root 'VC_redist.x64.exe'
     if (Test-Path -LiteralPath $vcRedist) {
         Write-InstallLog 'Installing Microsoft Visual C++ Redistributable'
@@ -271,9 +341,9 @@ try {
     # Remove an older identity package before registering the current one.
     # The package name is stable, while the signing identity may change when
     # moving from a development build to the standard Files identity.
-    $stage = '停止 Files max 进程'
+    Set-InstallStage '停止 Files max 进程'
     Stop-FilesProcesses
-    $stage = '移除旧应用身份包'
+    Set-InstallStage '移除旧应用身份包'
     $legacyIdentities = @(Get-AppxPackage -Name $PackageName -ErrorAction SilentlyContinue |
         Where-Object { $_.Publisher -ne $Publisher })
     foreach ($legacyIdentity in $legacyIdentities) {
@@ -282,7 +352,7 @@ try {
     }
     Wait-IdentityPackagesAbsent -Name $PackageName -ExcludedPublisher $Publisher
 
-    $stage = '注册 Files max 应用身份'
+    Set-InstallStage '注册 Files max 应用身份'
     $existingIdentity = Get-AppxPackage -Name $PackageName -ErrorAction SilentlyContinue |
         Where-Object { $_.Publisher -eq $Publisher } |
         Select-Object -First 1
@@ -293,7 +363,7 @@ try {
     }
     Register-ExternalLocationIdentity -PackagePath $IdentityPackagePath -ExternalLocation $root
 
-    $stage = '验证应用身份注册结果'
+    Set-InstallStage '验证应用身份注册结果'
     $installedApp = Get-AppxPackage -Name $PackageName -ErrorAction SilentlyContinue |
         Where-Object { $_.Publisher -eq $Publisher -and $_.Status -eq 'Ok' } |
         Select-Object -First 1
@@ -307,7 +377,7 @@ try {
         throw 'Files identity package was not registered after installation.'
     }
 
-    $stage = '清理旧版卸载注册'
+    Set-InstallStage '清理旧版卸载注册'
     if (-not [string]::IsNullOrWhiteSpace($LegacyUninstallKeyName)) {
         Remove-LegacyUninstallRegistration -KeyName $LegacyUninstallKeyName
     }
@@ -317,20 +387,45 @@ try {
     exit 0
 }
 catch {
-    $details = ($_ | Out-String).Trim()
+    $errorRecord = $_
+    $exception = $errorRecord.Exception
+    $hresult = '未知'
+    if ($null -ne $exception) {
+        try {
+            $hresultValue = [BitConverter]::ToUInt32([BitConverter]::GetBytes([int]$exception.HResult), 0)
+            $hresult = '0x{0:X8}' -f $hresultValue
+        } catch { }
+    }
+    $positionMessage = if ($errorRecord.InvocationInfo) { $errorRecord.InvocationInfo.PositionMessage } else { '不可用' }
+    $stackTrace = if ($errorRecord.ScriptStackTrace) { $errorRecord.ScriptStackTrace } else { '不可用' }
+    $recordDetails = ($errorRecord | Format-List * -Force | Out-String -Width 4096).Trim()
     $diagnostic = @(
         'Files max installer failed.',
+        "Timestamp: $(Get-Date -Format o)",
+        "AttemptId: $script:attemptId",
         "Mode: $Mode",
-        "Stage: $stage",
+        "Stage: $script:stage",
         "InstallDirectory: $root",
         "IdentityPackagePath: $IdentityPackagePath",
-        "Message: $($_.Exception.Message)",
-        'Details:',
-        $details
+        "ExceptionType: $(if ($exception) { $exception.GetType().FullName } else { 'unknown' })",
+        "HResult: $hresult",
+        "ExceptionDetails: $(if ($exception) { $exception.ToString() } else { 'unavailable' })",
+        "FullyQualifiedErrorId: $($errorRecord.FullyQualifiedErrorId)",
+        "CategoryInfo: $($errorRecord.CategoryInfo)",
+        "Message: $($errorRecord.Exception.Message)",
+        "Position: $positionMessage",
+        "ScriptStackTrace: $stackTrace",
+        'ErrorRecord:',
+        $recordDetails,
+        "LogWriteWarnings: $($script:loggingFailures -join ' | ')"
     ) -join [Environment]::NewLine
     Write-InstallLog $diagnostic
     Write-InstallErrorLog $diagnostic
     $ErrorActionPreference = 'Continue'
-    Write-Error "$ProductName $Mode failed during '$stage': $($_.Exception.Message). Details saved to $errorPath"
+    $errorLogLocation = if ($script:errorPath) { $script:errorPath } else { '错误日志写入失败；请从 Windows Installer 日志中搜索本次操作编号' }
+    Write-Error "$ProductName $Mode failed during '$script:stage': $($errorRecord.Exception.Message). AttemptId=$script:attemptId. ErrorLog=$errorLogLocation"
+    if (-not $script:errorPath) {
+        Write-Error $diagnostic
+    }
     exit 1
 }
