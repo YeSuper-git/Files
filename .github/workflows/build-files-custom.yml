@@ -63,25 +63,42 @@ jobs:
           Write-Host "This installer artifact will be named Files max Setup $currentVersion."
 
       - name: Preflight installer inputs
-        shell: pwsh
+        # The MSI custom action runs the inbox Windows PowerShell 5.1 host.
+        # Parse installer scripts with that exact engine, not PowerShell 7.
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $workspace = $env:GITHUB_WORKSPACE
 
-          # Catch PowerShell parser errors before the expensive Windows App
-          # SDK publish. This specifically protects MSI custom actions, which
-          # otherwise fail only after the application has been packaged.
-          $scriptPath = Join-Path $workspace 'Install-App.ps1'
-          $tokens = $null
-          $parseErrors = $null
-          [void][System.Management.Automation.Language.Parser]::ParseFile(
-            $scriptPath,
-            [ref]$tokens,
-            [ref]$parseErrors)
-          if ($parseErrors.Count -gt 0) {
-            $details = $parseErrors | ForEach-Object { $_.Message }
-            throw "Install-App.ps1 has PowerShell syntax errors: $($details -join '; ')"
+          # Catch parser errors before the expensive Windows App SDK publish.
+          # This uses the same Windows PowerShell 5.1 parser as the MSI action.
+          $scriptPaths = @(
+            (Join-Path $workspace 'Install-App.ps1'),
+            (Join-Path $workspace 'Invoke-Install-App.ps1')
+          )
+          foreach ($scriptPath in $scriptPaths) {
+            $scriptBytes = [IO.File]::ReadAllBytes($scriptPath)
+            if ($scriptBytes.Length -lt 3 -or
+                $scriptBytes[0] -ne 0xEF -or
+                $scriptBytes[1] -ne 0xBB -or
+                $scriptBytes[2] -ne 0xBF) {
+              throw "$(Split-Path -Leaf $scriptPath) must be UTF-8 with BOM for Windows PowerShell 5.1."
+            }
+
+            $tokens = $null
+            $parseErrors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $scriptPath,
+              [ref]$tokens,
+              [ref]$parseErrors)
+            if ($parseErrors.Count -gt 0) {
+              $details = $parseErrors | ForEach-Object {
+                "line $($_.Extent.StartLineNumber), column $($_.Extent.StartColumnNumber): $($_.Message)"
+              }
+              throw "$(Split-Path -Leaf $scriptPath) has Windows PowerShell 5.1 syntax errors: $($details -join '; ')"
+            }
           }
+          $scriptPath = $scriptPaths[0]
           $installScriptText = Get-Content -Raw -LiteralPath $scriptPath
           if (-not $installScriptText.Contains("(Split-Path -Leaf `$scriptDirectory) -ieq 'Installer'")) {
             throw 'Install-App.ps1 must resolve its install root from the parent of the Installer support directory.'
@@ -121,11 +138,11 @@ jobs:
           if ($packageWix.Contains('-InstallDirectory &quot;[INSTALLFOLDER]')) {
             throw 'Files.Package.wxs must not pass INSTALLFOLDER as a quoted PowerShell custom-action argument.'
           }
-          if (-not $packageWix.Contains('-File &quot;[#InstallAppScript]&quot; -Mode Install -AttemptId &quot;[INSTALLERATTEMPTID]&quot;')) {
-            throw 'Files.Package.wxs must invoke Install-App.ps1 without a fragile trailing-separator argument.'
+          if (-not $packageWix.Contains('-File &quot;[#InstallAppLauncherScript]&quot; -Mode Install -AttemptId &quot;[INSTALLERATTEMPTID]&quot;')) {
+            throw 'Files.Package.wxs must invoke the diagnostic launcher for install custom actions.'
           }
-          if (-not $packageWix.Contains('-File &quot;[#InstallAppScript]&quot; -Mode Uninstall -AttemptId &quot;[INSTALLERATTEMPTID]&quot;')) {
-            throw 'The uninstall custom action must receive the per-operation installer attempt id.'
+          if (-not $packageWix.Contains('-File &quot;[#InstallAppLauncherScript]&quot; -Mode Uninstall -AttemptId &quot;[INSTALLERATTEMPTID]&quot;')) {
+            throw 'Files.Package.wxs must invoke the diagnostic launcher for uninstall custom actions.'
           }
           $bundleWix = Get-Content -Raw -LiteralPath (Join-Path $workspace '.github\installer\wix\Files.Bundle.wxs')
           if (-not $bundleWix.Contains('Name="InstallerAttemptId"')) {
@@ -172,6 +189,7 @@ jobs:
             '.github\installer\ba\InstallerWindow.xaml.cs',
             '.github\installer\ba\ProgressWidthConverter.cs',
             '.github\installer\ba\FilesMax.Installer.Bootstrapper.csproj',
+            'Invoke-Install-App.ps1',
             'Install-App.ps1'
           ) | ForEach-Object { Join-Path $workspace $_ }
           $missingFiles = @($requiredFiles | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) })

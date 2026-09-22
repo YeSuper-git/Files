@@ -1,4 +1,4 @@
-# Copyright (c) Files Community
+﻿# Copyright (c) Files Community
 # Licensed under the MIT License.
 
 param(
@@ -252,15 +252,13 @@ try {
     Initialize-InstallLogs
     Set-InstallStage '解析安装路径'
     $scriptDirectory = [IO.Path]::GetFullPath($PSScriptRoot)
-    $defaultInstallDirectory = if ((Split-Path -Leaf $scriptDirectory) -ieq 'Installer') {
-        Split-Path -Parent $scriptDirectory
-    } else {
-        $scriptDirectory
+    $defaultInstallDirectory = $scriptDirectory
+    if ((Split-Path -Leaf $scriptDirectory) -ieq 'Installer') {
+        $defaultInstallDirectory = Split-Path -Parent $scriptDirectory
     }
-    $root = if ([string]::IsNullOrWhiteSpace($InstallDirectory)) {
-        [IO.Path]::GetFullPath($defaultInstallDirectory)
-    } else {
-        [IO.Path]::GetFullPath($InstallDirectory)
+    $root = [IO.Path]::GetFullPath($defaultInstallDirectory)
+    if (-not [string]::IsNullOrWhiteSpace($InstallDirectory)) {
+        $root = [IO.Path]::GetFullPath($InstallDirectory)
     }
     $script:root = $root
     Write-InstallLog "Resolved install root: $root"
@@ -289,7 +287,7 @@ try {
         Wait-IdentityPackagesAbsent -Name $PackageName
 
         Write-Host 'Files max identity removed successfully.'
-        exit 0
+        return
     }
 
     Set-InstallStage '验证安装文件'
@@ -333,7 +331,7 @@ try {
     if (Test-Path -LiteralPath $vcRedist) {
         Write-InstallLog 'Installing Microsoft Visual C++ Redistributable'
         $exitCode = Invoke-ProcessChecked -FileName $vcRedist -Arguments '/install /quiet /norestart'
-        if ($exitCode -notin @(0, 1638, 3010)) {
+        if (@(0, 1638, 3010) -notcontains $exitCode) {
             throw "Microsoft Visual C++ Redistributable installation failed with exit code $exitCode"
         }
     }
@@ -384,7 +382,7 @@ try {
 
     Write-InstallLog "Files external-location installation completed: $($installedApp.PackageFullName)"
     Write-Host "$ProductName installed successfully."
-    exit 0
+    return
 }
 catch {
     $errorRecord = $_
@@ -396,8 +394,20 @@ catch {
             $hresult = '0x{0:X8}' -f $hresultValue
         } catch { }
     }
-    $positionMessage = if ($errorRecord.InvocationInfo) { $errorRecord.InvocationInfo.PositionMessage } else { '不可用' }
-    $stackTrace = if ($errorRecord.ScriptStackTrace) { $errorRecord.ScriptStackTrace } else { '不可用' }
+    $positionMessage = '不可用'
+    if ($errorRecord.InvocationInfo) {
+        $positionMessage = $errorRecord.InvocationInfo.PositionMessage
+    }
+    $stackTrace = '不可用'
+    if ($errorRecord.ScriptStackTrace) {
+        $stackTrace = $errorRecord.ScriptStackTrace
+    }
+    $exceptionType = 'unknown'
+    $exceptionDetails = 'unavailable'
+    if ($exception) {
+        $exceptionType = $exception.GetType().FullName
+        $exceptionDetails = $exception.ToString()
+    }
     $recordDetails = ($errorRecord | Format-List * -Force | Out-String -Width 4096).Trim()
     $diagnostic = @(
         'Files max installer failed.',
@@ -407,9 +417,9 @@ catch {
         "Stage: $script:stage",
         "InstallDirectory: $root",
         "IdentityPackagePath: $IdentityPackagePath",
-        "ExceptionType: $(if ($exception) { $exception.GetType().FullName } else { 'unknown' })",
+        "ExceptionType: $exceptionType",
         "HResult: $hresult",
-        "ExceptionDetails: $(if ($exception) { $exception.ToString() } else { 'unavailable' })",
+        "ExceptionDetails: $exceptionDetails",
         "FullyQualifiedErrorId: $($errorRecord.FullyQualifiedErrorId)",
         "CategoryInfo: $($errorRecord.CategoryInfo)",
         "Message: $($errorRecord.Exception.Message)",
@@ -422,10 +432,13 @@ catch {
     Write-InstallLog $diagnostic
     Write-InstallErrorLog $diagnostic
     $ErrorActionPreference = 'Continue'
-    $errorLogLocation = if ($script:errorPath) { $script:errorPath } else { '错误日志写入失败；请从 Windows Installer 日志中搜索本次操作编号' }
+    $errorLogLocation = '错误日志写入失败；请从 Windows Installer 日志中搜索本次操作编号'
+    if ($script:errorPath) {
+        $errorLogLocation = $script:errorPath
+    }
     Write-Error "$ProductName $Mode failed during '$script:stage': $($errorRecord.Exception.Message). AttemptId=$script:attemptId. ErrorLog=$errorLogLocation"
     if (-not $script:errorPath) {
         Write-Error $diagnostic
     }
-    exit 1
+    throw
 }

@@ -69,6 +69,7 @@
     <DirectoryRef Id="INSTALLSUPPORT">
       <Component Id="InstallerSupportFiles" Guid="E2600A42-10A0-4A04-B2AB-3DD40F14734B">
         <File Id="InstallAppScript" Source="$(var.InstallScript)" KeyPath="yes" />
+        <File Id="InstallAppLauncherScript" Source="$(var.InstallLauncherScript)" />
         <File Id="IdentityPackageFile" Source="$(var.IdentityPackage)" />
         <File Id="IdentityCertificateFile" Source="$(var.Certificate)" />
       </Component>
@@ -139,11 +140,12 @@
          deliberately impersonates the installing user: Add-AppxPackage
          registers the external-location identity per user, so running it as
          LocalSystem would register the package for the wrong account. The
-         script derives INSTALLFOLDER from its own INSTALLSUPPORT location;
-         do not pass a quoted directory argument ending in a backslash here. -->
+         launcher captures syntax errors before Install-App.ps1 can initialize
+         its own diagnostics. The script derives INSTALLFOLDER from its own
+         INSTALLSUPPORT location; do not pass a quoted path ending in a slash. -->
     <SetProperty
         Id="RegisterFilesIdentity"
-        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppScript]&quot; -Mode Install -AttemptId &quot;[INSTALLERATTEMPTID]&quot; -LogFileName &quot;Files max Installer-script.log&quot; -ErrorFileName &quot;Files max Installer-error.log&quot;"
+        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppLauncherScript]&quot; -Mode Install -AttemptId &quot;[INSTALLERATTEMPTID]&quot; -LogFileName &quot;Files max Installer-script.log&quot; -ErrorFileName &quot;Files max Installer-error.log&quot;"
         Before="RegisterFilesIdentity"
         Sequence="execute"
         Condition="NOT Installed OR REINSTALL~=&quot;ALL&quot;" />
@@ -157,7 +159,7 @@
 
     <SetProperty
         Id="UnregisterFilesIdentity"
-        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppScript]&quot; -Mode Uninstall -AttemptId &quot;[INSTALLERATTEMPTID]&quot; -LogFileName &quot;Files max Installer-script.log&quot; -ErrorFileName &quot;Files max Installer-error.log&quot;"
+        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppLauncherScript]&quot; -Mode Uninstall -AttemptId &quot;[INSTALLERATTEMPTID]&quot; -LogFileName &quot;Files max Installer-script.log&quot; -ErrorFileName &quot;Files max Installer-error.log&quot;"
         Before="UnregisterFilesIdentity"
         Sequence="execute"
         Condition="REMOVE=&quot;ALL&quot;" />

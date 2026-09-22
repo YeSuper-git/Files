@@ -524,8 +524,8 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
 
         var bundleLogPath = FindRecentBundleLog();
         details.Add(string.Empty);
-        details.Add($"脚本过程日志：{scriptLogPath ?? "未生成（失败可能发生在脚本启动前）"}");
-        details.Add($"脚本错误日志：{scriptErrorPath ?? "未生成（失败可能发生在脚本启动前）"}");
+        details.Add($"脚本过程日志：{scriptLogPath ?? "未找到（脚本未能写出过程日志；可能在日志初始化前退出）"}");
+        details.Add($"脚本错误日志：{scriptErrorPath ?? "未找到（脚本未能写出错误日志；请结合 MSI 首个失败动作判断）"}");
         if (!string.IsNullOrWhiteSpace(bundleLogPath))
             details.Add($"MSI/启动器日志：{bundleLogPath}");
         else
