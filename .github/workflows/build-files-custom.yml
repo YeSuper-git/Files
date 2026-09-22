@@ -103,14 +103,13 @@ jobs:
             }
           }
 
-          # Do not append a trailing backslash to the quoted INSTALLFOLDER
-          # argument. A single backslash immediately before the closing quote
-          # escapes that quote in Windows command-line parsing and corrupts the
-          # following PowerShell arguments. Guard the safe form used by the MSI.
+          # INSTALLFOLDER is an MSI Directory property and ends with a
+          # backslash. Add a second separator before the closing quote so the
+          # Windows command-line parser passes one trailing backslash while
+          # correctly terminating the argument. Guard this exact safe form.
           $packageWix = Get-Content -Raw -LiteralPath (Join-Path $workspace '.github\installer\wix\Files.Package.wxs')
-          if (-not $packageWix.Contains('-InstallDirectory &quot;[INSTALLFOLDER]&quot;') -or
-              $packageWix.Contains('-InstallDirectory &quot;[INSTALLFOLDER]\&quot;')) {
-            throw 'Files.Package.wxs must quote INSTALLFOLDER without appending a trailing separator.'
+          if (-not $packageWix.Contains('-InstallDirectory &quot;[INSTALLFOLDER]\&quot;')) {
+            throw 'Files.Package.wxs must escape the trailing INSTALLFOLDER separator in the PowerShell custom action.'
           }
 
           $requiredFiles = @(
