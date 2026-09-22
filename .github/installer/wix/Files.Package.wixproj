@@ -12,6 +12,12 @@
          MSI is linked, while all other ICE validation remains enabled. -->
     <SuppressIces>ICE03</SuppressIces>
 
+    <!-- WIX1101 is emitted for the language-neutral e_sqlite3.dll because
+         its PE version resource has no language block. Keep LANGID 0 on its
+         MSI File row (and ICE validation enabled); silence only this known
+         metadata warning rather than assigning a misleading language. -->
+    <SuppressSpecificWarnings>$(SuppressSpecificWarnings);1101</SuppressSpecificWarnings>
+
     <!-- These paths are supplied by the Windows build workflow. Keeping them
          as explicit properties prevents WiX from accidentally harvesting a
          local bin/obj directory. -->
