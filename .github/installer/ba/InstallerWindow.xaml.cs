@@ -148,7 +148,7 @@ public partial class InstallerWindow : Window
     {
         try
         {
-            Clipboard.SetText(FailureMessageText.Text);
+            System.Windows.Clipboard.SetText(FailureMessageText.Text);
             CopyFailureDetailsButton.Content = "已复制";
             CopyFailureDetailsButton.ToolTip = "错误详情已复制到剪贴板";
         }
