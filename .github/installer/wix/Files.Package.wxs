@@ -10,10 +10,12 @@
       Compressed="yes">
 
     <SummaryInformation Description="Files max" Manufacturer="YeSuper" />
-    <!-- The public version line is now 1.0.x. Allow MSI to migrate installations
-         from the former 4.2.32.x line; the Burn BA blocks downgrades between
-         canonical 1.0.x versions before planning this MSI. -->
-    <MajorUpgrade Schedule="afterInstallInitialize" AllowDowngrades="yes" />
+    <!-- Install/update the new external-location identity before removing the
+         previous MSI. Removing the identity first is treated as an app
+         uninstall by Windows and can delete its per-user LocalState. The old
+         MSI's version-scoped cleanup then sees the new identity and preserves
+         it. Keep harvested component identities stable for this late schedule. -->
+    <MajorUpgrade Schedule="afterInstallExecute" AllowDowngrades="yes" />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <!-- Ask the user to close Files during repair, upgrade, or uninstall so

@@ -249,7 +249,6 @@
 						<StackPanel>
 							<TextBlock Style="{StaticResource HeadingStyle}" Text="欢迎使用 Files max" />
 							<TextBlock Margin="0,12,0,0" Style="{StaticResource BodyStyle}" Text="即将在这台电脑上安装 Files max。&#x0a;请先确认许可条款，再选择安装位置。" />
-							<TextBlock x:Name="WelcomeUpgradeNotice" Margin="0,12,0,0" Style="{StaticResource BodyStyle}" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" Visibility="Collapsed" />
 						</StackPanel>
 						<StackPanel Grid.Row="2">
 							<TextBlock x:Name="WelcomeVersionText" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Text="版本" />
@@ -262,7 +261,6 @@
 						<StackPanel>
 							<TextBlock Style="{StaticResource HeadingStyle}" Text="安装选项" />
 							<TextBlock Margin="0,12,0,0" Style="{StaticResource BodyStyle}" Text="选择 Files max 的安装位置。" />
-							<TextBlock x:Name="OptionsUpgradeNotice" Margin="0,8,0,0" Style="{StaticResource BodyStyle}" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" Visibility="Collapsed" />
 							<TextBlock Margin="0,24,0,8" FontWeight="SemiBold" Text="安装位置" />
 							<Grid>
 								<Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="8" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>

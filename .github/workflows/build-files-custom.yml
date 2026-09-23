@@ -150,8 +150,8 @@ jobs:
               -not $packageWix.Contains('Value="$(var.AppVersion)"')) {
             throw 'Files.Package.wxs must persist the canonical installer version for downgrade protection.'
           }
-          if (-not $packageWix.Contains('<MajorUpgrade Schedule="afterInstallInitialize" AllowDowngrades="yes"')) {
-            throw 'Files.Package.wxs must allow the one-time migration from the previous 4.2.32 product version line.'
+          if (-not $packageWix.Contains('<MajorUpgrade Schedule="afterInstallExecute" AllowDowngrades="yes"')) {
+            throw 'Files.Package.wxs must install the new identity before removing the old MSI, preserving the external-location package user data during upgrades.'
           }
           $bundleWix = Get-Content -Raw -LiteralPath (Join-Path $workspace '.github\installer\wix\Files.Bundle.wxs')
           if (-not $bundleWix.Contains('Name="InstallerAttemptId"')) {
@@ -169,6 +169,11 @@ jobs:
           }
           if (-not $bootstrapperSource.Contains('TryGetInstalledInstallerVersion')) {
             throw 'The custom bootstrapper must reject stale installers after the version migration.'
+          }
+          if (-not $bootstrapperSource.Contains('MSI entered RemoveExistingProducts after the new identity was registered') -or
+              -not $bootstrapperSource.Contains('正在安装新版；现有用户数据会保留') -or
+              -not $bootstrapperSource.Contains('正在卸载旧版本并清理旧版安装记录')) {
+            throw 'The custom bootstrapper must expose the data-preserving install-new then remove-old upgrade stages.'
           }
           if (-not $installScriptText.Contains('[string]$AttemptId =')) {
             throw 'Install-App.ps1 must accept the attempt id to create correlated unique log files.'

@@ -84,16 +84,6 @@ public partial class InstallerWindow : Window
         InstallButton.IsEnabled = LicenseAccepted && !string.IsNullOrWhiteSpace(path);
     }
 
-    public void SetUpgradeInfo(string version, string installFolder)
-    {
-        var versionText = string.IsNullOrWhiteSpace(version) ? "现有版本" : $"Files max {version}";
-        var message = $"检测到已安装的{versionText}。将沿用原安装目录：{installFolder}。安装时会先卸载旧版本，再安装新版。";
-        WelcomeUpgradeNotice.Text = message;
-        OptionsUpgradeNotice.Text = message;
-        WelcomeUpgradeNotice.Visibility = Visibility.Visible;
-        OptionsUpgradeNotice.Visibility = Visibility.Visible;
-    }
-
     public void ShowWelcome()
     {
         SetPage(WelcomePage, WelcomeActions, "第 1 步，共 3 步");

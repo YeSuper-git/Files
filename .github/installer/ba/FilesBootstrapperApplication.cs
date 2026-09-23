@@ -193,9 +193,8 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
 
                 engine.SetVariableString(InstallFolderVariable, existingInstallFolder, formatted: false);
                 existingInstallVersion ??= "旧版本";
-                window?.SetInstallFolder(existingInstallFolder, lockPath: true);
-                window?.SetUpgradeInfo(existingInstallVersion, existingInstallFolder);
-                LogDiagnostic($"Existing installation detected version={existingInstallVersion}, folder={existingInstallFolder}; upgrade path locked");
+                window?.SetInstallFolder(existingInstallFolder);
+                LogDiagnostic($"Existing installation detected version={existingInstallVersion}, folder={existingInstallFolder}; using it as the editable default install path");
             }
             else if (window is not null)
             {
@@ -410,14 +409,14 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         if (isRemovingPreviousProduct)
         {
             currentStage = "卸载旧版本";
-            LogDiagnostic("MSI entered RemoveExistingProducts; old version removal has started");
-            RunOnUi(() => window?.SetProgressMessage("正在卸载旧版本；原安装目录保持不变……"));
+            LogDiagnostic("MSI entered RemoveExistingProducts after the new identity was registered; old version removal has started");
+            RunOnUi(() => window?.SetProgressMessage("新版已就位，正在卸载旧版本并清理旧版安装记录；用户数据会保留……"));
         }
         else
         {
             currentStage = "安装新版本";
-            LogDiagnostic("MSI entered InstallFiles after RemoveExistingProducts; new version file installation has started");
-            RunOnUi(() => window?.SetProgressMessage("旧版本已移除，正在原安装目录安装新版……"));
+            LogDiagnostic("MSI entered InstallFiles; new version file installation has started before old-product cleanup");
+            RunOnUi(() => window?.SetProgressMessage("正在安装新版；现有用户数据会保留……"));
         }
     }
 
@@ -546,7 +545,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         }
         else if (existingInstallationDetected)
         {
-            window.ShowProgress("正在升级 Files max", $"检测到 {existingInstallVersion}，将保留安装目录 {existingInstallFolder}，先移除旧版本，再安装新版……");
+            window.ShowProgress("正在升级 Files max", "正在准备新版安装，并保留现有用户数据……");
         }
         else
         {
