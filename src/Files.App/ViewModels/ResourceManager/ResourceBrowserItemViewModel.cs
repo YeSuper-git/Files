@@ -3,6 +3,7 @@
 
 using CommunityToolkit.Mvvm.DependencyInjection;
 using Files.App.Data.Models.ResourceManager;
+using Files.App.Services.ResourceManager;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media.Imaging;
 
