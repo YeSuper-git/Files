@@ -981,6 +981,33 @@ jobs:
             throw 'External-location identity was not registered.'
           }
 
+          # An older cached MSI can invoke the current shared installer
+          # script after this version has registered its identity. Reproduce
+          # that legacy custom-action call (no IdentityVersion argument) and
+          # assert that it cannot unregister the current app.
+          $legacyUninstallLauncher = Join-Path $installDir 'Installer\Invoke-Install-App.ps1'
+          if (-not (Test-Path -LiteralPath $legacyUninstallLauncher -PathType Leaf)) {
+            throw "Installer diagnostic launcher was not installed at '$legacyUninstallLauncher'."
+          }
+          $legacyUninstallArguments = '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{0}" -Mode Uninstall -AttemptId "smoke-legacy-uninstall"' -f $legacyUninstallLauncher
+          $legacyUninstallProcess = Start-Process `
+            -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') `
+            -ArgumentList $legacyUninstallArguments `
+            -WindowStyle Hidden `
+            -Wait `
+            -PassThru
+          if ($legacyUninstallProcess.ExitCode -ne 0) {
+            throw "Legacy unversioned uninstall simulation failed with exit code $($legacyUninstallProcess.ExitCode)."
+          }
+          $identityAfterLegacyUninstall = Get-AppxPackage -Name 'FilesDev' -ErrorAction SilentlyContinue |
+            Where-Object { $_.Publisher -eq 'CN=Files' -and $_.Status -eq 'Ok' } |
+            Select-Object -First 1
+          if (-not $identityAfterLegacyUninstall -or
+              [version]$identityAfterLegacyUninstall.Version -ne [version]$identity.Version) {
+            throw 'A legacy unversioned uninstall action removed or replaced the active Files identity package.'
+          }
+          Write-Host "Legacy unversioned uninstall simulation preserved active identity $($identityAfterLegacyUninstall.PackageFullName)."
+
           $appProcess = Start-Process -FilePath $installedExe -WorkingDirectory $installDir -PassThru
           $windowFound = $false
           for ($attempt = 0; $attempt -lt 60; $attempt++) {
