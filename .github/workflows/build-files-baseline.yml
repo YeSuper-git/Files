@@ -191,6 +191,25 @@ jobs:
             throw "Identity package creation failed with exit code $LASTEXITCODE."
           }
 
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $identityArchive = [IO.Compression.ZipFile]::OpenRead($identityPackage)
+          try {
+            $missingPackagedTaskbarIcons = @(
+              foreach ($asset in $taskbarIconAssets) {
+                $entryName = "Assets/AppTiles/Dev/$($asset.Name)"
+                if (-not $identityArchive.GetEntry($entryName)) {
+                  $entryName
+                }
+              }
+            )
+            if ($missingPackagedTaskbarIcons.Count -gt 0) {
+              throw "Identity MSIX is missing taskbar icon variants: $($missingPackagedTaskbarIcons -join ', ')"
+            }
+            Write-Host "Verified $($taskbarIconAssets.Count) taskbar icon variants inside the identity MSIX."
+          } finally {
+            $identityArchive.Dispose()
+          }
+
           # Keep the baseline identity and installer signed with the same
           # temporary Files certificate used by the package manifest.
           $pfxPasswordText = [guid]::NewGuid().ToString()
