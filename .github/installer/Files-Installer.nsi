@@ -94,7 +94,7 @@ Section "Uninstall"
     StrCpy $IdentityPackage "$INSTDIR\Files.Identity.msix"
 
     DetailPrint "正在注销文件资源管理器..."
-    nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$InstallScript" -Mode Uninstall -InstallDirectory "$INSTDIR" -IdentityPackagePath "$IdentityPackage"'
+    nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$InstallScript" -Mode Uninstall -IdentityVersion "${APP_VERSION}" -InstallDirectory "$INSTDIR" -IdentityPackagePath "$IdentityPackage"'
     Pop $0
     ${If} $0 != 0
         MessageBox MB_ICONEXCLAMATION|MB_OK "文件资源管理器身份清理失败。请关闭文件资源管理器后重新运行卸载程序。未删除任何文件。"

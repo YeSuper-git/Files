@@ -9,6 +9,11 @@ param(
     [string]$PackageName = 'FilesDev',
     [string]$Publisher = 'CN=Files',
     [string]$ProductName = 'Files max',
+    # The MSI passes its own product version during a real uninstall. Older
+    # cached MSI custom actions do not know this parameter; treating a missing
+    # version as a no-op prevents their late major-upgrade cleanup from
+    # removing the identity package just installed by the newer MSI.
+    [string]$IdentityVersion = '',
     [string]$CertificateFileName = 'Files.cer',
     [string]$AttemptId = '',
     [string]$LogFileName = 'Files max Installer-script.log',
@@ -119,13 +124,32 @@ function Stop-FilesProcesses {
 function Wait-IdentityPackagesAbsent {
     param(
         [Parameter(Mandatory)][string]$Name,
-        [string]$ExcludedPublisher = ''
+        [string]$ExcludedPublisher = '',
+        [string]$ExpectedVersion = ''
     )
+
+    $expectedVersionValue = $null
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedVersion)) {
+        try {
+            $expectedVersionValue = [version]$ExpectedVersion
+        } catch {
+            throw "Invalid expected identity package version '$ExpectedVersion'."
+        }
+    }
 
     for ($attempt = 0; $attempt -lt 30; $attempt++) {
         $packages = @(Get-AppxPackage -Name $Name -ErrorAction SilentlyContinue)
         if (-not [string]::IsNullOrWhiteSpace($ExcludedPublisher)) {
             $packages = @($packages | Where-Object { $_.Publisher -ne $ExcludedPublisher })
+        }
+        if ($expectedVersionValue) {
+            $packages = @($packages | Where-Object {
+                try {
+                    ([version]$_.Version) -eq $expectedVersionValue
+                } catch {
+                    $false
+                }
+            })
         }
 
         if ($packages.Count -eq 0) {
@@ -273,18 +297,57 @@ try {
     }
 
     if ($Mode -eq 'Uninstall') {
+        if ([string]::IsNullOrWhiteSpace($IdentityVersion)) {
+            Set-InstallStage '保护新版身份包'
+            Write-InstallLog 'Skipping identity removal because this uninstall action did not specify its owning product version. This is expected for a cached pre-version-scoped MSI during major upgrade.'
+            Write-Host 'Skipped identity removal: the uninstall action did not specify an owning product version.'
+            return
+        }
+
+        try {
+            $identityVersionToRemove = [version]$IdentityVersion
+        } catch {
+            throw "Invalid uninstall identity version '$IdentityVersion'; refusing to remove any identity package."
+        }
+
+        # Remove only the package version owned by this MSI. During a major
+        # upgrade the previous MSI may run after the new MSI has registered
+        # its identity package, so an unscoped removal can break the upgrade.
+        Set-InstallStage '查找待移除身份包'
+        $installedPackages = @(Get-AppxPackage -Name $PackageName -ErrorAction SilentlyContinue)
+        $packagesToRemove = @()
+        foreach ($package in $installedPackages) {
+            $packageVersion = $null
+            try {
+                $packageVersion = [version]$package.Version
+            } catch {
+                Write-InstallLog "Skipping identity package with unreadable version '$($package.Version)': $($package.PackageFullName)"
+                continue
+            }
+
+            if ($packageVersion -ne $identityVersionToRemove) {
+                Write-InstallLog "Preserving identity package version $packageVersion; uninstall owns version $($identityVersionToRemove): $($package.PackageFullName)"
+                continue
+            }
+
+            $packagesToRemove += $package
+        }
+
+        if ($packagesToRemove.Count -eq 0) {
+            Write-InstallLog "No identity package owned by version $identityVersionToRemove was found; preserving all installed identity packages."
+            Write-Host "Skipped identity removal: version $identityVersionToRemove is not installed."
+            return
+        }
+
         Set-InstallStage '停止 Files max 进程'
         Stop-FilesProcesses
-        # Remove every identity package with this package name. This also
-        # cleans up installations made by an earlier publisher identity.
         Set-InstallStage '移除应用身份包'
-        $installedPackages = @(Get-AppxPackage -Name $PackageName -ErrorAction SilentlyContinue)
-        foreach ($package in $installedPackages) {
+        foreach ($package in $packagesToRemove) {
             Write-InstallLog "Removing identity package: $($package.PackageFullName)"
             Remove-AppxPackage -Package $package.PackageFullName -ErrorAction Stop
         }
 
-        Wait-IdentityPackagesAbsent -Name $PackageName
+        Wait-IdentityPackagesAbsent -Name $PackageName -ExpectedVersion $identityVersionToRemove.ToString()
 
         Write-Host 'Files max identity removed successfully.'
         return

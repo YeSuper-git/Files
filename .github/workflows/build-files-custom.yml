@@ -141,7 +141,7 @@ jobs:
           if (-not $packageWix.Contains('-File &quot;[#InstallAppLauncherScript]&quot; -Mode Install -AttemptId &quot;[INSTALLERATTEMPTID]&quot;')) {
             throw 'Files.Package.wxs must invoke the diagnostic launcher for install custom actions.'
           }
-          if (-not $packageWix.Contains('-File &quot;[#InstallAppLauncherScript]&quot; -Mode Uninstall -AttemptId &quot;[INSTALLERATTEMPTID]&quot;')) {
+          if (-not $packageWix.Contains('-File &quot;[#InstallAppLauncherScript]&quot; -Mode Uninstall -IdentityVersion &quot;[ProductVersion]&quot; -AttemptId &quot;[INSTALLERATTEMPTID]&quot;')) {
             throw 'Files.Package.wxs must invoke the diagnostic launcher for uninstall custom actions.'
           }
           $bundleWix = Get-Content -Raw -LiteralPath (Join-Path $workspace '.github\installer\wix\Files.Bundle.wxs')
@@ -157,6 +157,31 @@ jobs:
           }
           if (-not $installScriptText.Contains('[string]$AttemptId =')) {
             throw 'Install-App.ps1 must accept the attempt id to create correlated unique log files.'
+          }
+          if (-not $installScriptText.Contains("[string]`$IdentityVersion = ''")) {
+            throw 'Install-App.ps1 must accept an owning identity version for version-scoped uninstall.'
+          }
+          if (-not $installScriptText.Contains('Skipping identity removal because this uninstall action did not specify its owning product version')) {
+            throw 'Unversioned legacy uninstall actions must safely skip identity removal during major upgrade.'
+          }
+          if (-not $installScriptText.Contains('Preserving identity package version')) {
+            throw 'Uninstall must preserve identity packages whose version is not owned by the MSI being removed.'
+          }
+          $launcherScriptText = Get-Content -Raw -LiteralPath (Join-Path $workspace 'Invoke-Install-App.ps1')
+          if (-not $launcherScriptText.Contains('[string]$IdentityVersion =')) {
+            throw 'The diagnostic launcher must accept and forward the MSI-owned identity version.'
+          }
+          if (-not $launcherScriptText.Contains('-IdentityVersion $IdentityVersion')) {
+            throw 'The diagnostic launcher must forward the MSI-owned identity version to Install-App.ps1.'
+          }
+          foreach ($nsisPath in @(
+            (Join-Path $workspace '.github\installer\Files-Installer.nsi'),
+            (Join-Path $workspace '.github\installer\Files-Baseline.nsi')
+          )) {
+            $nsisText = Get-Content -Raw -LiteralPath $nsisPath
+            if (-not $nsisText.Contains('-Mode Uninstall -IdentityVersion "${APP_VERSION}"')) {
+              throw "$(Split-Path -Leaf $nsisPath) must pass its own version to the shared identity-uninstall script."
+            }
           }
           if (-not $installScriptText.Contains('Set-InstallStage')) {
             throw 'Install-App.ps1 must log named installation stages for failure diagnosis.'

@@ -1,6 +1,7 @@
 ﻿param(
     [ValidateSet('Install', 'Uninstall')]
     [string]$Mode = 'Install',
+    [string]$IdentityVersion = '',
     [string]$AttemptId = '',
     [string]$LogFileName = 'Files max Installer-script.log',
     [string]$ErrorFileName = 'Files max Installer-error.log'
@@ -73,7 +74,7 @@ try {
     if ($scriptLogPath) {
         Add-Content -LiteralPath $scriptLogPath -Value "[$(Get-Date -Format o)] Windows PowerShell $($PSVersionTable.PSVersion); validated $installScriptPath" -Encoding UTF8
     }
-    & $installScriptPath -Mode $Mode -AttemptId $safeAttemptId -LogFileName $LogFileName -ErrorFileName $ErrorFileName
+    & $installScriptPath -Mode $Mode -IdentityVersion $IdentityVersion -AttemptId $safeAttemptId -LogFileName $LogFileName -ErrorFileName $ErrorFileName
     exit 0
 } catch {
     $errorRecord = $_

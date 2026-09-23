@@ -159,7 +159,7 @@
 
     <SetProperty
         Id="UnregisterFilesIdentity"
-        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppLauncherScript]&quot; -Mode Uninstall -AttemptId &quot;[INSTALLERATTEMPTID]&quot; -LogFileName &quot;Files max Installer-script.log&quot; -ErrorFileName &quot;Files max Installer-error.log&quot;"
+        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppLauncherScript]&quot; -Mode Uninstall -IdentityVersion &quot;[ProductVersion]&quot; -AttemptId &quot;[INSTALLERATTEMPTID]&quot; -LogFileName &quot;Files max Installer-script.log&quot; -ErrorFileName &quot;Files max Installer-error.log&quot;"
         Before="UnregisterFilesIdentity"
         Sequence="execute"
         Condition="REMOVE=&quot;ALL&quot;" />
