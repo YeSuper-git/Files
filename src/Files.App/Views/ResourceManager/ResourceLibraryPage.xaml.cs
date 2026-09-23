@@ -216,7 +216,6 @@ public sealed partial class ResourceLibraryPage : Page
         if (sender is FrameworkElement element &&
             element.DataContext is ResourceBrowserItemViewModel { Kind: ResourceBrowserItemKind.ActorFolder } actor)
         {
-            e.Handled = true;
             await EditActorDetailsAsync(actor);
         }
     }
