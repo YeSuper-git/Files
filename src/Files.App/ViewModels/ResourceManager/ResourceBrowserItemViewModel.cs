@@ -9,7 +9,7 @@ using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace Files.App.ViewModels.ResourceManager;
 
-public sealed class ResourceBrowserItemViewModel : ObservableObject
+public sealed partial class ResourceBrowserItemViewModel : ObservableObject
 {
     private readonly IResourceWorkspaceService _workspace = Ioc.Default.GetRequiredService<IResourceWorkspaceService>();
 

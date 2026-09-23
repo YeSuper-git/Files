@@ -54,6 +54,7 @@ namespace Files.App.UserControls.Menus
 			Opening += Item_Opening;
 		}
 
+		[DynamicWindowsRuntimeCast(typeof(Geometry))]
 		private IEnumerable<IMenuFlyoutItemViewModel> CreateMenuItems()
 		{
 			var tags = FileTagsSettingsService.FileTagList;

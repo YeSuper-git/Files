@@ -202,6 +202,7 @@ public sealed partial class ResourceManagerPage : Page
         DetailContent.Children.Add(t);
     }
 
+    [DynamicWindowsRuntimeCast(typeof(Microsoft.UI.Xaml.Media.SolidColorBrush))]
     private static Microsoft.UI.Xaml.Media.SolidColorBrush GetSystemAccentBrush()
     {
         var accentResource = Application.Current.Resources["SystemAccentColor"];

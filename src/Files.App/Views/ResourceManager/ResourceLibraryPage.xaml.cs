@@ -211,6 +211,7 @@ public sealed partial class ResourceLibraryPage : Page
         SetNativeSelection(selectedItems.Count == 0 ? null : selectedItems);
     }
 
+    [DynamicWindowsRuntimeCast(typeof(FrameworkElement))]
     private async void OnEditActorInfo(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement element &&
@@ -282,6 +283,7 @@ public sealed partial class ResourceLibraryPage : Page
         return listedItem;
     }
 
+    [DynamicWindowsRuntimeCast(typeof(FrameworkElement))]
     private void OnBrowserItemDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
         if (sender is not FrameworkElement element || element.DataContext is not ResourceBrowserItemViewModel item)
@@ -336,7 +338,7 @@ public sealed partial class ResourceLibraryPage : Page
 
         if (PathEquals(fullPath, _libraryPath))
         {
-            NavigateToLocation([new ResourceBrowserLocation(_libraryPath, ResourceBrowserLocationKind.LibraryRoot, _libraryPath)]);
+            NavigateToLocation(new[] { new ResourceBrowserLocation(_libraryPath, ResourceBrowserLocationKind.LibraryRoot, _libraryPath) });
             return true;
         }
 
@@ -576,6 +578,7 @@ public sealed partial class ResourceLibraryPage : Page
         StatusText.Text = $"已保存“{item.Name}”的资源管理标签。";
     }
 
+    [DynamicWindowsRuntimeCast(typeof(Microsoft.UI.Xaml.Media.Brush))]
     private async Task EditActorDetailsAsync(ResourceBrowserItemViewModel item)
     {
         var details = _workspace.GetActorDetails(item.Path);
@@ -877,6 +880,7 @@ public sealed partial class ResourceLibraryPage : Page
         return (panel, selectedTagIds);
     }
 
+    [DynamicWindowsRuntimeCast(typeof(Microsoft.UI.Xaml.Media.Brush))]
     private async Task ManageResourceTagsAsync()
     {
         var content = new StackPanel { Spacing = 10 };
