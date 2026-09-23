@@ -161,6 +161,19 @@ jobs:
           Copy-Item "$workspace\src\Files.App\Assets\AppTiles\Dev\StoreLogo.scale-100.png" $identityAssetDir -Force
           Copy-Item "$workspace\src\Files.App\Assets\AppTiles\Dev\Square150x150Logo.scale-100.png" $identityAssetDir -Force
           Copy-Item "$workspace\src\Files.App\Assets\AppTiles\Dev\Square44x44Logo.scale-100.png" $identityAssetDir -Force
+          $taskbarIconSourceDir = Join-Path $workspace 'src\Files.App\Assets\AppTiles\Dev'
+          $taskbarIconSizes = @('16', '20', '24', '30', '32', '36', '40', '48', '60', '64', '72', '80', '96', '256')
+          foreach ($size in $taskbarIconSizes) {
+            foreach ($variant in @("${size}_altform-unplated.png", "${size}_altform-lightunplated_theme-light.png")) {
+              $assetName = "Square44x44Logo.targetsize-$variant"
+              $assetPath = Join-Path $taskbarIconSourceDir $assetName
+              if (-not (Test-Path -LiteralPath $assetPath -PathType Leaf)) {
+                throw "Required Windows taskbar icon variant is missing: $assetPath"
+              }
+            }
+          }
+          $taskbarIconAssets = @(Get-ChildItem -LiteralPath $taskbarIconSourceDir -Filter 'Square44x44Logo.targetsize-*_altform-*.png' -File)
+          Copy-Item -LiteralPath $taskbarIconAssets.FullName -Destination $identityAssetDir -Force
           $archiveAssetDir = Join-Path $identityDir 'Assets\archives'
           New-Item -ItemType Directory -Path $archiveAssetDir -Force | Out-Null
           Copy-Item "$workspace\src\Files.App\Assets\archives\ExtensionIcon.png" $archiveAssetDir -Force
