@@ -6,6 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:vm="using:Files.App.ViewModels.ResourceManager"
+    xmlns:assistant="using:Files.App.UserControls.Assistant"
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
@@ -101,5 +102,35 @@
         </Border>
 
         <TextBlock x:Name="StatusText" Grid.Row="2" Margin="0,10,0,0" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+        <Border
+            x:Name="AssistantFloatingPanel"
+            Grid.RowSpan="3"
+            Width="420"
+            Height="600"
+            Margin="0,0,0,56"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="14"
+            Visibility="Collapsed">
+            <assistant:VideoAssistantChatView x:Name="AssistantChatView" />
+        </Border>
+        <Button
+            Grid.RowSpan="3"
+            Margin="0,0,0,0"
+            Padding="14,10"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            Background="{ThemeResource AccentFillColorDefaultBrush}"
+            Click="OnOpenVideoAssistant"
+            Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <FontIcon Glyph="&#xE8D4;" />
+                <TextBlock Text="视频助手" />
+            </StackPanel>
+        </Button>
     </Grid>
 </Page>

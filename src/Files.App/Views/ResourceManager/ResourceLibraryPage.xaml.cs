@@ -10,6 +10,8 @@ using Files.App.Helpers;
 using Files.App.Services.ResourceManager;
 using Files.App.Utils;
 using Files.App.Utils.FileTags;
+using Files.App.UserControls.Assistant;
+using Files.App.ViewModels.Assistant;
 using Files.App.ViewModels.ResourceManager;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -39,7 +41,33 @@ public sealed partial class ResourceLibraryPage : Page
     public ResourceLibraryPage()
     {
         InitializeComponent();
+        AssistantChatView.CloseRequested += (_, _) => AssistantFloatingPanel.Visibility = Visibility.Collapsed;
         Unloaded += OnPageUnloaded;
+    }
+
+    private async void OnOpenVideoAssistant(object sender, RoutedEventArgs e)
+    {
+        if (AssistantFloatingPanel.Visibility == Visibility.Visible)
+            return;
+
+        var actorPath = _locations.FirstOrDefault(location => location.Kind == ResourceBrowserLocationKind.ActorFolder)?.Path;
+        await AssistantChatView.ConfigureAsync(new VideoAssistantContext
+        {
+            LibraryPath = _libraryPath,
+            CurrentActorPath = actorPath,
+            OpenResourceManagerAsync = () =>
+            {
+                AssistantFloatingPanel.Visibility = Visibility.Collapsed;
+                _contentPageContext.ShellPage?.NavigateToResourceManager();
+                return Task.CompletedTask;
+            },
+            OpenLocationAsync = async candidate =>
+            {
+                AssistantFloatingPanel.Visibility = Visibility.Collapsed;
+                await TryNavigateToResourcePathAsync(candidate.FolderPath);
+            },
+        });
+        AssistantFloatingPanel.Visibility = Visibility.Visible;
     }
 
     protected override async void OnNavigatedTo(NavigationEventArgs e)

@@ -20,6 +20,8 @@ public interface IResourceWorkspaceService
     void SetPosterOverride(string itemPath, string posterPath);
     ResourceActorDetails GetActorDetails(string actorFolderPath);
     void SetActorDetails(string actorFolderPath, ResourceActorDetails details);
+    ResourceVideoWatchStatus GetVideoWatchStatus(string videoPath);
+    void SetVideoWatchStatus(string videoPath, ResourceVideoWatchStatus status);
     IReadOnlyList<string> GetResourceTagIds(string itemPath);
     IReadOnlyList<ResourceTagDefinition> GetResourceTagsByIds(IEnumerable<string>? tagIds);
     ResourceTagDefinition? GetResourceTagById(string uid);

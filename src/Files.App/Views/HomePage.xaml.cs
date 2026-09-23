@@ -5,6 +5,10 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Navigation;
+using Files.App.Data.Models;
+using Files.App.Services.ResourceManager;
+using Files.App.UserControls.Assistant;
+using Files.App.ViewModels.Assistant;
 using WinRT;
 
 namespace Files.App.Views
@@ -33,6 +37,47 @@ namespace Files.App.Views
 		{
 			if (ViewModel.ReloadWidgetsCommand.CanExecute(e))
 				ViewModel.ReloadWidgetsCommand.Execute(e);
+		}
+
+		private async void OpenVideoAssistant_Click(object sender, RoutedEventArgs e)
+		{
+			var workspace = Ioc.Default.GetRequiredService<IResourceWorkspaceService>();
+			var assistantView = new VideoAssistantChatView();
+			ContentDialog? dialog = null;
+			dialog = new ContentDialog
+			{
+				Content = assistantView,
+				CloseButtonText = "关闭",
+				DefaultButton = ContentDialogButton.Close,
+				MaxWidth = 860,
+				XamlRoot = XamlRoot,
+			};
+			assistantView.CloseRequested += (_, _) => dialog.Hide();
+			await assistantView.ConfigureAsync(new VideoAssistantContext
+			{
+				LibraryPath = workspace.LibraryPath,
+				OpenResourceManagerAsync = () =>
+				{
+					dialog.Hide();
+					AppInstance.NavigateToResourceManager();
+					return Task.CompletedTask;
+				},
+				OpenLocationAsync = candidate =>
+				{
+					dialog.Hide();
+					AppInstance.NavigateToResourceLibraryLocation(new NavigationArguments
+					{
+						NavPathParam = "ResourceManager",
+						IsResourceLibraryPage = true,
+						ResourceLibraryPath = workspace.LibraryPath,
+						ResourceLocationPaths = candidate.LocationPaths.ToArray(),
+						ResourceLocationKinds = candidate.LocationKinds.ToArray(),
+						ResourceLocationTitles = candidate.LocationTitles.ToArray(),
+					});
+					return Task.CompletedTask;
+				},
+			});
+			await dialog.ShowAsync();
 		}
 
 		// Methods

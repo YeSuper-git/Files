@@ -45,6 +45,41 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
 
     public IReadOnlyList<ResourceTagDefinition> ResourceTags => _state.ResourceTags;
 
+    public ResourceVideoWatchStatus GetVideoWatchStatus(string videoPath)
+    {
+        try
+        {
+            var normalizedPath = NormalizePath(videoPath);
+            return _state.VideoWatchStatuses.TryGetValue(normalizedPath, out var status)
+                ? status
+                : ResourceVideoWatchStatus.Unknown;
+        }
+        catch
+        {
+            return ResourceVideoWatchStatus.Unknown;
+        }
+    }
+
+    public void SetVideoWatchStatus(string videoPath, ResourceVideoWatchStatus status)
+    {
+        if (string.IsNullOrWhiteSpace(videoPath))
+            return;
+
+        try
+        {
+            var normalizedPath = NormalizePath(videoPath);
+            if (status == ResourceVideoWatchStatus.Unknown)
+                _state.VideoWatchStatuses.Remove(normalizedPath);
+            else
+                _state.VideoWatchStatuses[normalizedPath] = status;
+            PersistState();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Unable to save video watch status for {VideoPath}", videoPath);
+        }
+    }
+
     public IReadOnlyList<string> GetResourceTagIds(string itemPath)
     {
         try
@@ -341,6 +376,7 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
                     state.ActorDetails = NormalizeActorDetails(state.ActorDetails);
                     state.ResourceTags = NormalizeResourceTags(state.ResourceTags);
                     state.ResourceTagAssignments = NormalizeResourceTagAssignments(state.ResourceTagAssignments, state.ResourceTags);
+                    state.VideoWatchStatuses = NormalizeVideoWatchStatuses(state.VideoWatchStatuses);
                     return state;
                 }
             }
@@ -446,6 +482,28 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
             catch
             {
                 // Ignore one malformed assignment and preserve valid resource tags.
+            }
+        }
+
+        return normalized;
+    }
+
+    private static Dictionary<string, ResourceVideoWatchStatus> NormalizeVideoWatchStatuses(
+        IReadOnlyDictionary<string, ResourceVideoWatchStatus>? statuses)
+    {
+        var normalized = new Dictionary<string, ResourceVideoWatchStatus>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in statuses ?? new Dictionary<string, ResourceVideoWatchStatus>())
+        {
+            if (string.IsNullOrWhiteSpace(pair.Key) || pair.Value is not (ResourceVideoWatchStatus.Watched or ResourceVideoWatchStatus.WantToWatch))
+                continue;
+
+            try
+            {
+                normalized[NormalizePath(pair.Key)] = pair.Value;
+            }
+            catch
+            {
+                // Ignore one malformed video path and preserve the rest of the local state.
             }
         }
 
