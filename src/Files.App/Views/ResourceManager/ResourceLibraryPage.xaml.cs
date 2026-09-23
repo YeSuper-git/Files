@@ -242,19 +242,40 @@ public sealed partial class ResourceLibraryPage : Page
 
         ResourceActorListedItem? actorListedItem = null;
         ListedItem listedItem = item.Kind == ResourceBrowserItemKind.ActorFolder
-            ? actorListedItem = new ResourceActorListedItem
-            {
-                ActorDetails = _workspace.GetActorDetails(item.Path),
-                CountActorVideosAsync = () => CountActorVideosAsync(item.Path),
-            }
+            ? actorListedItem = new ResourceActorListedItem()
             : new ListedItem();
 
         if (actorListedItem is not null)
         {
-            actorListedItem.EditActorDetailsAsync = async () =>
+            var actor = actorListedItem;
+            actor.ActorDetails = _workspace.GetActorDetails(item.Path);
+            actor.ActorPosterPaths = GetActorPosterPaths(item, actor.ActorDetails);
+            actor.MainPosterPath = _workspace.GetPosterOverride(item.Path) ?? item.Model.PosterPath;
+            actor.CountActorVideosAsync = () => CountActorVideosAsync(item.Path);
+            actor.EditActorDetailsAsync = async () =>
             {
                 await EditActorDetailsAsync(item);
-                actorListedItem.ActorDetails = _workspace.GetActorDetails(item.Path);
+                actor.ActorDetails = _workspace.GetActorDetails(item.Path);
+            };
+            actor.AddActorPosterAsync = async () =>
+            {
+                var posterPath = await PickPosterPathAsync();
+                if (posterPath is null)
+                    return null;
+
+                var updatedDetails = _workspace.GetActorDetails(item.Path);
+                if (!updatedDetails.PosterPaths.Contains(posterPath, StringComparer.OrdinalIgnoreCase))
+                    updatedDetails.PosterPaths.Add(posterPath);
+                _workspace.SetActorDetails(item.Path, updatedDetails);
+                actor.ActorDetails = _workspace.GetActorDetails(item.Path);
+                actor.ActorPosterPaths = GetActorPosterPaths(item, actor.ActorDetails);
+                return posterPath;
+            };
+            actor.SetActorMainPosterAsync = async posterPath =>
+            {
+                _workspace.SetPosterOverride(item.Path, posterPath);
+                actor.MainPosterPath = posterPath;
+                item.Poster = await LoadPosterAsync(posterPath, CancellationToken.None);
             };
         }
 
@@ -526,11 +547,14 @@ public sealed partial class ResourceLibraryPage : Page
             flyout.Items.Add(editDetails);
         }
 
-        var editResourceTags = new MenuFlyoutItem { Text = "编辑资源管理标签" };
-        editResourceTags.Click += async (_, _) => await EditResourceTagsAsync(item);
-        flyout.Items.Add(editResourceTags);
+        if (item.Kind != ResourceBrowserItemKind.ActorFolder)
+        {
+            var editResourceTags = new MenuFlyoutItem { Text = "编辑资源管理标签" };
+            editResourceTags.Click += async (_, _) => await EditResourceTagsAsync(item);
+            flyout.Items.Add(editResourceTags);
+        }
 
-        if (item.CanSetPoster)
+        if (item.CanSetPoster && item.Kind != ResourceBrowserItemKind.ActorFolder)
         {
             var setPoster = new MenuFlyoutItem { Text = "设置海报" };
             setPoster.Click += async (_, _) => await ChoosePosterAsync(item);
@@ -588,36 +612,7 @@ public sealed partial class ResourceLibraryPage : Page
     private async Task EditActorDetailsAsync(ResourceBrowserItemViewModel item)
     {
         var details = _workspace.GetActorDetails(item.Path);
-        var selectedTagIds = ReadTagIds(item.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var content = new StackPanel { Spacing = 12 };
-
-        var posterImage = new Image
-        {
-            Width = 112,
-            Height = 150,
-            Stretch = Microsoft.UI.Xaml.Media.Stretch.UniformToFill,
-            Source = await LoadPosterAsync(_workspace.GetPosterOverride(item.Path) ?? item.Model.PosterPath, CancellationToken.None),
-        };
-        var posterBorder = new Border
-        {
-            Width = 112,
-            Height = 150,
-            CornerRadius = new CornerRadius(8),
-            Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SubtleFillColorSecondaryBrush"],
-            Child = posterImage,
-        };
-        var choosePoster = new Button { Content = "更换海报", HorizontalAlignment = HorizontalAlignment.Left };
-        string? selectedPosterPath = null;
-        choosePoster.Click += async (_, _) =>
-        {
-            selectedPosterPath = await PickPosterPathAsync();
-            if (selectedPosterPath is not null)
-                posterImage.Source = await LoadPosterAsync(selectedPosterPath, CancellationToken.None);
-        };
-        var posterArea = new StackPanel { Spacing = 8 };
-        posterArea.Children.Add(new TextBlock { Text = "海报", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-        posterArea.Children.Add(posterBorder);
-        posterArea.Children.Add(choosePoster);
 
         var nameBox = new TextBox { Header = "姓名", Text = string.IsNullOrWhiteSpace(details.Name) ? item.Model.Name : details.Name };
         var aliasesBox = new TextBox { Header = "别名", Text = details.Aliases, PlaceholderText = "可填写多个别名" };
@@ -625,11 +620,12 @@ public sealed partial class ResourceLibraryPage : Page
         var weightBox = new TextBox { Text = details.WeightKg, PlaceholderText = "体重" };
         heightBox.BeforeTextChanging += (_, args) => args.Cancel = !IsValidNumberInput(args.NewText, allowDecimal: false);
         weightBox.BeforeTextChanging += (_, args) => args.Cancel = !IsValidNumberInput(args.NewText, allowDecimal: true);
-        var bustBox = CreateMeasurementBox("B", details.Bust);
-        var waistBox = CreateMeasurementBox("W", details.Waist);
-        var hipBox = CreateMeasurementBox("H", details.Hip);
+        var (bustField, bustBox) = CreateMeasurementField("B", details.Bust);
+        var (waistField, waistBox) = CreateMeasurementField("W", details.Waist);
+        var (hipField, hipBox) = CreateMeasurementField("H", details.Hip);
         var cupBox = new AutoSuggestBox
         {
+            Width = 76,
             PlaceholderText = "A–Z",
             Text = details.CupSize,
             MaxSuggestionListHeight = 240,
@@ -678,9 +674,6 @@ public sealed partial class ResourceLibraryPage : Page
         nameGrid.Children.Add(nameBox);
         nameGrid.Children.Add(aliasesBox);
 
-        var bodyGrid = new Grid { ColumnSpacing = 12 };
-        bodyGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(112) });
-        bodyGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         var fields = new StackPanel { Spacing = 10 };
         var physicalGrid = new Grid { ColumnSpacing = 12 };
         for (var index = 0; index < 2; index++)
@@ -691,73 +684,68 @@ public sealed partial class ResourceLibraryPage : Page
         physicalGrid.Children.Add(heightField);
         physicalGrid.Children.Add(weightField);
 
-        var measurementGrid = new Grid { ColumnSpacing = 8 };
-        for (var index = 0; index < 4; index++)
-            measurementGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        Grid.SetColumn(waistBox, 1);
-        Grid.SetColumn(hipBox, 2);
-        Grid.SetColumn(cupBox, 3);
-        measurementGrid.Children.Add(bustBox);
-        measurementGrid.Children.Add(waistBox);
-        measurementGrid.Children.Add(hipBox);
-        measurementGrid.Children.Add(cupBox);
+        var measurementRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        measurementRow.Children.Add(bustField);
+        measurementRow.Children.Add(waistField);
+        measurementRow.Children.Add(hipField);
+        measurementRow.Children.Add(cupBox);
 
+        var birthDateBox = new TextBox
+        {
+            Header = "出生日期",
+            Text = details.BirthDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty,
+            PlaceholderText = "yyyy-MM-dd",
+        };
+
+        var careerStatusBox = new ComboBox { Header = "生涯", PlaceholderText = "选择现役或退役" };
+        careerStatusBox.Items.Add("现役");
+        careerStatusBox.Items.Add("退役");
+        careerStatusBox.SelectedIndex = details.CareerRetirementDate is not null || details.IsCurrentlyActive == false
+            ? 1
+            : details.IsCurrentlyActive == true ? 0 : -1;
         var retirementBox = new TextBox
         {
             Text = details.CareerRetirementDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty,
-            PlaceholderText = "退役日期（留空表示在役）",
+            PlaceholderText = "退役日期（yyyy-MM-dd）",
+            Visibility = careerStatusBox.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed,
         };
-        var careerStatus = new TextBlock
+        careerStatusBox.SelectionChanged += (_, _) =>
         {
-            Text = details.CareerRetirementDate is { } retiredDate ? $"退役：{retiredDate:yyyy-MM-dd}" : "在役",
-            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+            retirementBox.Visibility = careerStatusBox.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
+            if (careerStatusBox.SelectedIndex == 0)
+                retirementBox.Text = string.Empty;
         };
         retirementBox.TextChanged += (_, _) =>
         {
-            careerStatus.Text = string.IsNullOrWhiteSpace(retirementBox.Text)
-                ? "在役"
-                : TryParseRetirementDate(retirementBox.Text, out var date)
-                    ? $"退役：{date:yyyy-MM-dd}"
-                    : "请输入有效日期；留空表示在役。";
+            if (!string.IsNullOrWhiteSpace(retirementBox.Text) && careerStatusBox.SelectedIndex != 1)
+                careerStatusBox.SelectedIndex = 1;
         };
 
-        var videoCountText = new TextBlock
-        {
-            Text = "作品数量：正在统计…",
-            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
-        };
+        var careerGrid = new Grid { ColumnSpacing = 12 };
+        careerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        careerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(retirementBox, 1);
+        careerGrid.Children.Add(careerStatusBox);
+        careerGrid.Children.Add(retirementBox);
+
         var validationText = new TextBlock
         {
             Visibility = Visibility.Collapsed,
             TextWrapping = TextWrapping.Wrap,
             Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"],
         };
-        _ = UpdateActorVideoCountAsync(videoCountText, item.Path);
 
         fields.Children.Add(physicalGrid);
         fields.Children.Add(new TextBlock { Text = "数值", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Margin = new Thickness(0, 2, 0, -4) });
-        fields.Children.Add(measurementGrid);
-        fields.Children.Add(new TextBlock { Text = "生涯", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Margin = new Thickness(0, 2, 0, -4) });
-        fields.Children.Add(retirementBox);
-        fields.Children.Add(careerStatus);
-        fields.Children.Add(videoCountText);
+        fields.Children.Add(measurementRow);
+        fields.Children.Add(birthDateBox);
+        fields.Children.Add(careerGrid);
         fields.Children.Add(validationText);
-        Grid.SetColumn(fields, 1);
-        bodyGrid.Children.Add(posterArea);
-        bodyGrid.Children.Add(fields);
 
         content.Children.Add(nameGrid);
-        content.Children.Add(bodyGrid);
-        content.Children.Add(new TextBlock { Text = "资源管理标签", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Margin = new Thickness(0, 4, 0, -6) });
-        ContentDialog? actorDialog = null;
-        var tagEditor = CreateTagEditor(selectedTagIds, () =>
-        {
-            actorDialog?.Hide();
-            _ = ManageResourceTagsAsync();
-        }).Panel;
-        content.Children.Add(tagEditor);
+        content.Children.Add(fields);
 
-        actorDialog = new ContentDialog
+        var actorDialog = new ContentDialog
         {
             Title = "编辑演员信息",
             Content = new ScrollViewer { Content = content, MaxHeight = 620, MaxWidth = 680 },
@@ -768,12 +756,21 @@ public sealed partial class ResourceLibraryPage : Page
         };
         actorDialog.PrimaryButtonClick += (_, args) =>
         {
-            if (!string.IsNullOrWhiteSpace(retirementBox.Text) &&
-                !TryParseRetirementDate(retirementBox.Text, out var ignoredRetirementDate))
+            if (!string.IsNullOrWhiteSpace(birthDateBox.Text) &&
+                !TryParseRetirementDate(birthDateBox.Text, out _))
+            {
+                args.Cancel = true;
+                birthDateBox.Focus(FocusState.Programmatic);
+                validationText.Text = "出生日期请输入有效日期，例如 1990-01-01。";
+                validationText.Visibility = Visibility.Visible;
+            }
+            else if (careerStatusBox.SelectedIndex == 1 &&
+                !TryParseRetirementDate(retirementBox.Text, out _))
             {
                 args.Cancel = true;
                 retirementBox.Focus(FocusState.Programmatic);
-                careerStatus.Text = "请输入有效日期；留空表示在役。";
+                validationText.Text = "选择退役后，请输入有效的退役日期。";
+                validationText.Visibility = Visibility.Visible;
             }
             else if (string.IsNullOrWhiteSpace(nameBox.Text))
             {
@@ -796,6 +793,12 @@ public sealed partial class ResourceLibraryPage : Page
                 validationText.Visibility = Visibility.Visible;
                 weightBox.Focus(FocusState.Programmatic);
             }
+            else if (!IsValidMeasurement(bustBox.Text) || !IsValidMeasurement(waistBox.Text) || !IsValidMeasurement(hipBox.Text))
+            {
+                args.Cancel = true;
+                validationText.Text = "B、W、H 请输入符合位数规则的数字。";
+                validationText.Visibility = Visibility.Visible;
+            }
             else if (!string.IsNullOrEmpty(cupBox.Text) &&
                 (cupBox.Text.Length != 1 || cupBox.Text[0] is < 'A' or > 'Z'))
             {
@@ -809,8 +812,13 @@ public sealed partial class ResourceLibraryPage : Page
         if (await actorDialog.ShowAsync() != ContentDialogResult.Primary)
             return;
 
+        DateTime? birthDate = null;
+        if (!string.IsNullOrWhiteSpace(birthDateBox.Text) &&
+            TryParseRetirementDate(birthDateBox.Text, out var parsedBirthDate))
+            birthDate = parsedBirthDate.Date;
+
         DateTime? retirementDate = null;
-        if (!string.IsNullOrWhiteSpace(retirementBox.Text) &&
+        if (careerStatusBox.SelectedIndex == 1 &&
             TryParseRetirementDate(retirementBox.Text, out var parsedDate))
             retirementDate = parsedDate.Date;
 
@@ -824,13 +832,17 @@ public sealed partial class ResourceLibraryPage : Page
             Waist = waistBox.Text,
             Hip = hipBox.Text,
             CupSize = cupBox.Text,
+            BirthDate = birthDate,
+            IsCurrentlyActive = careerStatusBox.SelectedIndex switch
+            {
+                0 => true,
+                1 => false,
+                _ => null,
+            },
             CareerRetirementDate = retirementDate,
+            PosterPaths = details.PosterPaths,
         });
 
-        if (selectedPosterPath is not null)
-            _workspace.SetPosterOverride(item.Path, selectedPosterPath);
-
-        await SaveTagsAsync(item.Path, selectedTagIds);
         await RefreshAsync();
         var refreshedActor = BrowserItems.FirstOrDefault(candidate => string.Equals(candidate.Path, item.Path, StringComparison.OrdinalIgnoreCase));
         if (refreshedActor is not null)
@@ -991,11 +1003,28 @@ public sealed partial class ResourceLibraryPage : Page
         await RefreshAsync();
     }
 
-    private static TextBox CreateMeasurementBox(string label, string value)
+    private static (FrameworkElement Field, TextBox Input) CreateMeasurementField(string label, string value)
     {
-        var textBox = new TextBox { Header = label, Text = value, MaxLength = 3 };
+        var field = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5, VerticalAlignment = VerticalAlignment.Center };
+        field.Children.Add(new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center });
+        var textBox = new TextBox { Text = value, MaxLength = 3, Width = 62 };
         textBox.BeforeTextChanging += (_, args) => args.Cancel = !IsValidMeasurement(args.NewText);
-        return textBox;
+        field.Children.Add(textBox);
+        return (field, textBox);
+    }
+
+    private static IReadOnlyList<string> GetActorPosterPaths(ResourceBrowserItemViewModel item, ResourceActorDetails details)
+    {
+        var paths = new List<string>();
+        var mainPosterPath = item.Model.PosterPath;
+        if (!string.IsNullOrWhiteSpace(mainPosterPath) && File.Exists(mainPosterPath))
+            paths.Add(mainPosterPath);
+
+        paths.AddRange(details.PosterPaths ?? []);
+        return paths
+            .Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private static bool IsValidMeasurement(string value)
@@ -1054,12 +1083,6 @@ public sealed partial class ResourceLibraryPage : Page
                 return 0;
             }
         });
-    }
-
-    private async Task UpdateActorVideoCountAsync(TextBlock target, string actorFolderPath)
-    {
-        var videoCount = await CountActorVideosAsync(actorFolderPath);
-        target.Text = $"作品数量：{videoCount}";
     }
 
     private static bool TryParseRetirementDate(string value, out DateTime date)

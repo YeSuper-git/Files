@@ -238,6 +238,16 @@
 					TextAlignment="Center"
 					TextWrapping="Wrap"
 					Visibility="Collapsed" />
+				<TextBlock
+					x:Name="DetailsActorAliasesTextBlock"
+					Margin="12,0,12,12"
+					HorizontalAlignment="Center"
+					Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+					Style="{ThemeResource BodyTextBlockStyle}"
+					Text="{x:Bind ViewModel.SelectedActorAliases, Mode=OneWay}"
+					TextAlignment="Center"
+					TextWrapping="Wrap"
+					Visibility="{x:Bind ViewModel.SelectedActorAliasesVisibility, Mode=OneWay}" />
 
 				<!--  Drive Details  -->
 				<TextBlock

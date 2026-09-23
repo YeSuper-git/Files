@@ -17,7 +17,10 @@ public sealed class ResourceActorDetails
     public string Waist { get; set; } = string.Empty;
     public string Hip { get; set; } = string.Empty;
     public string CupSize { get; set; } = string.Empty;
+    public DateTime? BirthDate { get; set; }
+    public bool? IsCurrentlyActive { get; set; }
     public DateTime? CareerRetirementDate { get; set; }
+    public List<string> PosterPaths { get; set; } = [];
 
     public ResourceActorDetails Clone() => new()
     {
@@ -29,6 +32,9 @@ public sealed class ResourceActorDetails
         Waist = Waist,
         Hip = Hip,
         CupSize = CupSize,
+        BirthDate = BirthDate,
+        IsCurrentlyActive = IsCurrentlyActive,
         CareerRetirementDate = CareerRetirementDate,
+        PosterPaths = [.. (PosterPaths ?? [])],
     };
 }

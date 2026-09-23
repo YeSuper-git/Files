@@ -66,7 +66,7 @@
                                 <StackPanel>
                                     <Border Height="{x:Bind PosterHeight}" CornerRadius="10,10,0,0" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
                                         <Grid>
-                                            <Image Source="{x:Bind Poster, Mode=OneTime}" Stretch="UniformToFill" Visibility="{x:Bind PosterVisibility}" />
+                                            <Image Source="{x:Bind Poster, Mode=OneWay}" Stretch="UniformToFill" Visibility="{x:Bind PosterVisibility}" />
                                             <FontIcon Glyph="{x:Bind FallbackGlyph}" FontSize="42" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorTertiaryBrush}" Visibility="{x:Bind FallbackVisibility}" />
                                             <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Padding="7,3" Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}" CornerRadius="5">
                                                 <TextBlock Text="{x:Bind KindLabel}" FontSize="12" />

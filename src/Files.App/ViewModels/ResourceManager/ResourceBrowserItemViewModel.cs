@@ -16,7 +16,8 @@ public sealed partial class ResourceBrowserItemViewModel : ObservableObject
     public ResourceBrowserItemViewModel(ResourceBrowserItem model)
     {
         Model = model;
-        UpdateTags(_workspace.GetResourceTagIds(model.Path));
+        if (model.Kind != ResourceBrowserItemKind.ActorFolder)
+            UpdateTags(_workspace.GetResourceTagIds(model.Path));
     }
 
     public ResourceBrowserItem Model { get; }
@@ -35,7 +36,19 @@ public sealed partial class ResourceBrowserItemViewModel : ObservableObject
     public ResourceBrowserItemKind Kind => Model.Kind;
     public ObservableCollection<string> Tags { get; } = [];
     public Visibility TagListVisibility => Tags.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
-    public BitmapImage? Poster { get; set; }
+    private BitmapImage? _poster;
+    public BitmapImage? Poster
+    {
+        get => _poster;
+        set
+        {
+            if (SetProperty(ref _poster, value))
+            {
+                OnPropertyChanged(nameof(PosterVisibility));
+                OnPropertyChanged(nameof(FallbackVisibility));
+            }
+        }
+    }
     public bool CanSetPoster => Kind is not ResourceBrowserItemKind.CategoryFolder;
     public Visibility PosterVisibility => Poster is null ? Visibility.Collapsed : Visibility.Visible;
     public Visibility FallbackVisibility => Poster is null ? Visibility.Visible : Visibility.Collapsed;

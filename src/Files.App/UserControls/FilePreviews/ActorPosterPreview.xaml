@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+	x:Class="Files.App.UserControls.FilePreviews.ActorPosterPreview"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	d:DesignHeight="300"
+	d:DesignWidth="240"
+	mc:Ignorable="d">
+	<Grid Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="*" />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
+		<Grid>
+			<Image x:Name="PosterImage" Stretch="Uniform" />
+			<TextBlock
+				x:Name="EmptyPosterText"
+				HorizontalAlignment="Center"
+				VerticalAlignment="Center"
+				Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+				Text="暂无海报"
+				Visibility="Collapsed" />
+			<Button
+				x:Name="PreviousButton"
+				Width="40"
+				Height="48"
+				HorizontalAlignment="Left"
+				VerticalAlignment="Center"
+				Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+				Click="PreviousButton_Click"
+				Content="‹"
+				FontSize="28"
+				ToolTipService.ToolTip="上一张海报" />
+			<Button
+				x:Name="NextButton"
+				Width="40"
+				Height="48"
+				HorizontalAlignment="Right"
+				VerticalAlignment="Center"
+				Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+				Click="NextButton_Click"
+				Content="›"
+				FontSize="28"
+				ToolTipService.ToolTip="下一张海报" />
+		</Grid>
+		<StackPanel
+			Grid.Row="1"
+			HorizontalAlignment="Center"
+			Orientation="Horizontal"
+			Padding="4"
+			Spacing="6">
+			<Button Content="添加海报" Click="AddPosterButton_Click" />
+			<Button x:Name="SetMainPosterButton" Content="设为主海报" Click="SetMainPosterButton_Click" />
+			<TextBlock x:Name="PosterCountText" VerticalAlignment="Center" Margin="2,0" />
+		</StackPanel>
+	</Grid>
+</UserControl>

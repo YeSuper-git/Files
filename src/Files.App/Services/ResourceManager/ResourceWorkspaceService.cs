@@ -200,6 +200,9 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
             normalizedDetails.Waist = normalizedDetails.Waist.Trim();
             normalizedDetails.Hip = normalizedDetails.Hip.Trim();
             normalizedDetails.CupSize = normalizedDetails.CupSize.Trim().ToUpperInvariant();
+            normalizedDetails.PosterPaths = NormalizeActorPosterPaths(normalizedDetails.PosterPaths);
+            if (normalizedDetails.CareerRetirementDate is not null)
+                normalizedDetails.IsCurrentlyActive = false;
             _state.ActorDetails[normalizedPath] = normalizedDetails;
             PersistState();
         }
@@ -485,11 +488,38 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
 
             try
             {
-                normalized[Path.GetFullPath(pair.Key.Trim())] = pair.Value.Clone();
+                var details = pair.Value.Clone();
+                details.PosterPaths = NormalizeActorPosterPaths(details.PosterPaths);
+                if (details.CareerRetirementDate is not null)
+                    details.IsCurrentlyActive = false;
+                normalized[Path.GetFullPath(pair.Key.Trim())] = details;
             }
             catch
             {
                 // Ignore one malformed path and preserve valid actor metadata.
+            }
+        }
+
+        return normalized;
+    }
+
+    private static List<string> NormalizeActorPosterPaths(IEnumerable<string>? paths)
+    {
+        var normalized = new List<string>();
+        foreach (var path in paths ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                continue;
+
+            try
+            {
+                var fullPath = Path.GetFullPath(path.Trim());
+                if (!normalized.Contains(fullPath, StringComparer.OrdinalIgnoreCase))
+                    normalized.Add(fullPath);
+            }
+            catch
+            {
+                // Ignore one invalid poster path without discarding actor metadata.
             }
         }
 

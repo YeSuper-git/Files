@@ -148,6 +148,16 @@ namespace Files.App.ViewModels.UserControls
 				? actor.ActorDetails.Name
 				: SelectedItem?.Name ?? string.Empty;
 
+		public string SelectedActorAliases
+			=> SelectedItem is ResourceActorListedItem actor && !string.IsNullOrWhiteSpace(actor.ActorDetails.Aliases)
+				? actor.ActorDetails.Aliases
+				: "暂无";
+
+		public Visibility SelectedActorAliasesVisibility
+			=> SelectedItem is ResourceActorListedItem
+				? Visibility.Visible
+				: Visibility.Collapsed;
+
 		public Visibility ResourceActorDetailsVisibility
 			=> SelectedItem is ResourceActorListedItem ? Visibility.Visible : Visibility.Collapsed;
 
@@ -168,13 +178,15 @@ namespace Files.App.ViewModels.UserControls
 		{
 			ResourceActorProperties.Clear();
 			OnPropertyChanged(nameof(SelectedItemDisplayName));
+			OnPropertyChanged(nameof(SelectedActorAliases));
+			OnPropertyChanged(nameof(SelectedActorAliasesVisibility));
 			OnPropertyChanged(nameof(ResourceActorDetailsVisibility));
 
 			if (SelectedItem is not ResourceActorListedItem actor)
 				return;
 
 			var details = actor.ActorDetails;
-			AddActorProperty("别名", details.Aliases);
+			AddActorProperty("出生日期", details.BirthDate?.ToString("yyyy-MM-dd") ?? string.Empty);
 			AddActorProperty("身高", string.IsNullOrWhiteSpace(details.HeightCm) ? string.Empty : $"{details.HeightCm} cm");
 			AddActorProperty("体重", string.IsNullOrWhiteSpace(details.WeightKg) ? string.Empty : $"{details.WeightKg} kg");
 
@@ -188,7 +200,15 @@ namespace Files.App.ViewModels.UserControls
 			if (!string.IsNullOrWhiteSpace(details.CupSize))
 				measurements.Add($"罩杯 {details.CupSize}");
 			AddActorProperty("数值", string.Join(" / ", measurements));
-			AddActorProperty("生涯", details.CareerRetirementDate is { } retiredDate ? $"退役（{retiredDate:yyyy-MM-dd}）" : "在役");
+			var career = details.CareerRetirementDate is { } retiredDate
+				? $"退役（{retiredDate:yyyy-MM-dd}）"
+				: details.IsCurrentlyActive switch
+				{
+					true => "现役",
+					false => "退役",
+					_ => string.Empty,
+				};
+			AddActorProperty("生涯", career);
 
 			var workCountProperty = new FileProperty { LocalizedName = "作品数量", Value = "正在统计…" };
 			ResourceActorProperties.Add(workCountProperty);
@@ -198,8 +218,11 @@ namespace Files.App.ViewModels.UserControls
 
 		private void AddActorProperty(string name, string value)
 		{
-			if (!string.IsNullOrWhiteSpace(value))
-				ResourceActorProperties.Add(new FileProperty { LocalizedName = name, Value = value });
+			ResourceActorProperties.Add(new FileProperty
+			{
+				LocalizedName = name,
+				Value = string.IsNullOrWhiteSpace(value) ? "暂无" : value,
+			});
 		}
 
 		private async Task UpdateActorVideoCountAsync(ResourceActorListedItem actor, FileProperty workCountProperty, Func<Task<int>> countActorVideosAsync)
@@ -333,6 +356,13 @@ namespace Files.App.ViewModels.UserControls
 		private async Task<UserControl?> GetBuiltInPreviewControlAsync(ListedItem item, bool downloadItem)
 		{
 			ShowCloudItemButton = false;
+
+			if (item is ResourceActorListedItem actorItem)
+			{
+				var actorPosterPreview = new ActorPosterPreview(actorItem);
+				await actorPosterPreview.LoadAsync();
+				return actorPosterPreview;
+			}
 
 			if (item.IsRecycleBinItem)
 			{

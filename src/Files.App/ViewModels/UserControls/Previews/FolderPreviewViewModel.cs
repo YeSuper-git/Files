@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Files.App.ViewModels.Properties;
+using Files.App.Data.Items.ResourceManager;
 using Microsoft.UI.Xaml.Media.Imaging;
 using System.IO;
 
@@ -45,6 +46,12 @@ namespace Files.App.ViewModels.Previews
 			// Drive properties will be obtained through the DrivesViewModel service.
 			if (Item.IsDriveRoot || infoPaneViewModel?.SelectedDriveItem is not null)
 				return;
+
+			if (Item is ResourceActorListedItem)
+			{
+				Item.FileDetails = [];
+				return;
+			}
 
 			var info = await folder.GetBasicPropertiesAsync();
 

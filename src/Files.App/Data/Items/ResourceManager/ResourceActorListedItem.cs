@@ -12,6 +12,10 @@ namespace Files.App.Data.Items.ResourceManager;
 public sealed partial class ResourceActorListedItem : ListedItem
 {
     public ResourceActorDetails ActorDetails { get; set; } = new();
+    public IReadOnlyList<string> ActorPosterPaths { get; set; } = [];
+    public string? MainPosterPath { get; set; }
     public Func<Task>? EditActorDetailsAsync { get; set; }
-    public Func<Task<int>>? CountActorVideosAsync { get; init; }
+    public Func<Task<int>>? CountActorVideosAsync { get; set; }
+    public Func<Task<string?>>? AddActorPosterAsync { get; set; }
+    public Func<string, Task>? SetActorMainPosterAsync { get; set; }
 }
