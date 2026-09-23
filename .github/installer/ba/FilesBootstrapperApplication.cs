@@ -21,12 +21,17 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
     private const string InstallerScriptLogFileName = "Files max Installer-script.log";
     private const string InstallerErrorLogFileName = "Files max Installer-error.log";
     private const int MaxFailureClipboardCharacters = 24000;
+    private sealed record ExistingInstallation(string Folder, string? Version);
 
     private InstallerWindow? window;
     private Dispatcher? dispatcher;
     private IBootstrapperCommand? command;
     private LaunchAction plannedAction;
     private bool mainPackageInstalled;
+    private bool detectStarted;
+    private bool existingInstallationDetected;
+    private string? existingInstallFolder;
+    private string? existingInstallVersion;
     private bool applying;
     private bool cancelRequested;
     private int result;
@@ -35,6 +40,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
     private string? currentAttemptId;
     private string currentStage = "准备安装";
     private DateTime operationStartedAt;
+    private readonly Stopwatch startupStopwatch = Stopwatch.StartNew();
 
     [DllImport("user32.dll", ExactSpelling = true)]
     private static extern IntPtr GetDesktopWindow();
@@ -49,6 +55,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         ApplyBegin += OnApplyBegin;
         Progress += OnProgress;
         ExecutePackageBegin += OnExecutePackageBegin;
+        ExecuteMsiMessage += OnExecuteMsiMessage;
         Error += OnError;
         ApplyComplete += OnApplyComplete;
     }
@@ -108,14 +115,31 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
             window.FinalCloseRequested += (_, _) => CloseAndQuit(result);
             window.SetVersion(GetBundleVersion());
             window.ShowWelcome();
+            window.ContentRendered += (_, _) =>
+            {
+                LogDiagnostic($"First installer frame rendered after {startupStopwatch.ElapsedMilliseconds} ms");
+                StartDetect();
+            };
             window.Show();
         }
 
-        LogDiagnostic("Starting detect");
-        engine.Detect();
+        // Do not let Burn's initial package/registry scan block the first WPF
+        // render. The user sees a responsive window before detection begins.
+        if (window is null)
+            StartDetect();
         Dispatcher.Run();
         LogDiagnostic($"Dispatcher stopped with result={result}");
         engine.Quit(result);
+    }
+
+    private void StartDetect()
+    {
+        if (detectStarted)
+            return;
+
+        detectStarted = true;
+        LogDiagnostic($"Starting detect after first frame; startup elapsed={startupStopwatch.ElapsedMilliseconds} ms");
+        engine.Detect();
     }
 
     private void OnDetectPackageComplete(object? sender, DetectPackageCompleteEventArgs args)
@@ -129,7 +153,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
 
     private void OnDetectComplete(object? sender, DetectCompleteEventArgs args)
     {
-        LogDiagnostic($"Detect complete status=0x{args.Status:X8}, display={command?.Display}, action={command?.Action}");
+        LogDiagnostic($"Detect complete status=0x{args.Status:X8}, startup elapsed={startupStopwatch.ElapsedMilliseconds} ms, display={command?.Display}, action={command?.Action}");
         RunOnUi(() =>
         {
             if (args.Status != 0)
@@ -139,14 +163,43 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
                 return;
             }
 
-            if (window is not null)
-                window.SetInstallFolder(ReadInstallFolder());
-
             var requestedAction = GetCommandAction();
             if (requestedAction is LaunchAction.Uninstall or LaunchAction.UnsafeUninstall or LaunchAction.Layout or LaunchAction.Cache)
             {
                 StartPlan(requestedAction);
                 return;
+            }
+
+            var existingInstallation = FindExistingInstallation();
+            if (existingInstallation is null && mainPackageInstalled)
+            {
+                var detectedFolder = ReadInstallFolder();
+                if (File.Exists(Path.Combine(detectedFolder, "Files.exe")))
+                    existingInstallation = new ExistingInstallation(detectedFolder, null);
+            }
+
+            if (existingInstallation is not null || mainPackageInstalled)
+            {
+                existingInstallationDetected = true;
+                existingInstallFolder = existingInstallation?.Folder;
+                existingInstallVersion = existingInstallation?.Version;
+
+                if (string.IsNullOrWhiteSpace(existingInstallFolder))
+                {
+                    currentStage = "检查旧版本安装位置";
+                    ShowFailure("检测到已有 Files max 安装，但无法从安装记录中确认原安装目录。为避免把新版装到另一个目录或覆盖错误位置，本次已停止。请先修复旧版安装记录，或卸载旧版后再安装。", "无法确认旧版安装位置");
+                    return;
+                }
+
+                engine.SetVariableString(InstallFolderVariable, existingInstallFolder, formatted: false);
+                existingInstallVersion ??= "旧版本";
+                window?.SetInstallFolder(existingInstallFolder, lockPath: true);
+                window?.SetUpgradeInfo(existingInstallVersion, existingInstallFolder);
+                LogDiagnostic($"Existing installation detected version={existingInstallVersion}, folder={existingInstallFolder}; upgrade path locked");
+            }
+            else if (window is not null)
+            {
+                window.SetInstallFolder(ReadInstallFolder());
             }
 
             Version? installedVersion = null;
@@ -157,7 +210,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
                 return;
             }
 
-            if (mainPackageInstalled && installedVersion is not null)
+            if (existingInstallationDetected && installedVersion is not null)
             {
                 if (!Version.TryParse(GetBundleVersion(), out var incomingVersion))
                 {
@@ -252,6 +305,42 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         }
     }
 
+    private static ExistingInstallation? FindExistingInstallation()
+    {
+        foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
+        {
+            try
+            {
+                using var baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view);
+                using var productKey = baseKey.OpenSubKey("Software\\YeSuper\\Files", writable: false);
+                using var uninstallKey = baseKey.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Files", writable: false);
+
+                var folder = productKey?.GetValue("InstallLocation") as string;
+                if (string.IsNullOrWhiteSpace(folder))
+                    folder = uninstallKey?.GetValue("InstallLocation") as string;
+                if (string.IsNullOrWhiteSpace(folder))
+                    continue;
+
+                folder = Environment.ExpandEnvironmentVariables(folder.Trim().Trim('"'));
+                if (!Path.IsPathFullyQualified(folder) || !File.Exists(Path.Combine(folder, "Files.exe")))
+                    continue;
+
+                var version = productKey?.GetValue("InstallerVersion") as string;
+                if (string.IsNullOrWhiteSpace(version))
+                    version = uninstallKey?.GetValue("DisplayVersion") as string;
+                return new ExistingInstallation(folder, string.IsNullOrWhiteSpace(version) ? null : version.Trim());
+            }
+            catch (Exception exception)
+            {
+                // Continue through the other registry view if this one is
+                // inaccessible or malformed; detection must remain best-effort.
+                Debug.WriteLine($"Could not inspect Files max in {view}: {exception.Message}");
+            }
+        }
+
+        return null;
+    }
+
     private void OnPlanComplete(object? sender, PlanCompleteEventArgs args)
     {
         LogDiagnostic($"Plan complete status=0x{args.Status:X8}, action={plannedAction}");
@@ -300,6 +389,38 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         args.Cancel = cancelRequested;
     }
 
+    private void OnExecuteMsiMessage(object? sender, ExecuteMsiMessageEventArgs args)
+    {
+        if (!existingInstallationDetected || plannedAction != LaunchAction.Install ||
+            !string.Equals(args.PackageId, MainPackageId, StringComparison.OrdinalIgnoreCase) ||
+            args.MessageType != InstallMessage.ActionStart)
+            return;
+
+        var actionData = args.Data ?? Array.Empty<string>();
+        var isRemovingPreviousProduct = actionData.Any(value =>
+                string.Equals(value, "RemoveExistingProducts", StringComparison.OrdinalIgnoreCase)) ||
+            args.Message?.Contains("RemoveExistingProducts", StringComparison.OrdinalIgnoreCase) == true;
+        var isInstallingNewFiles = actionData.Any(value =>
+                string.Equals(value, "InstallFiles", StringComparison.OrdinalIgnoreCase)) ||
+            args.Message?.Contains("InstallFiles", StringComparison.OrdinalIgnoreCase) == true;
+
+        if (!isRemovingPreviousProduct && !isInstallingNewFiles)
+            return;
+
+        if (isRemovingPreviousProduct)
+        {
+            currentStage = "卸载旧版本";
+            LogDiagnostic("MSI entered RemoveExistingProducts; old version removal has started");
+            RunOnUi(() => window?.SetProgressMessage("正在卸载旧版本；原安装目录保持不变……"));
+        }
+        else
+        {
+            currentStage = "安装新版本";
+            LogDiagnostic("MSI entered InstallFiles after RemoveExistingProducts; new version file installation has started");
+            RunOnUi(() => window?.SetProgressMessage("旧版本已移除，正在原安装目录安装新版……"));
+        }
+    }
+
     private void OnError(object? sender, WixToolset.BootstrapperApplicationApi.ErrorEventArgs args)
     {
         var errorMessage = args.ErrorMessage?.Trim();
@@ -331,18 +452,15 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
             }
 
             window?.SetBusy(false);
-            if (plannedAction is LaunchAction.Uninstall or LaunchAction.UnsafeUninstall)
+            window?.CompleteProgressThen(() =>
             {
-                window?.ShowComplete("卸载完成", "Files max 已从这台电脑移除。", canLaunch: false);
-            }
-            else if (plannedAction == LaunchAction.Repair)
-            {
-                window?.ShowComplete("修复完成", "Files max 已修复完成，可以重新启动应用。", canLaunch: true);
-            }
-            else
-            {
-                window?.ShowComplete("安装完成", "Files max 已安装完成，可以开始使用了。", canLaunch: true);
-            }
+                if (plannedAction is LaunchAction.Uninstall or LaunchAction.UnsafeUninstall)
+                    window?.ShowComplete("卸载完成", "Files max 已从这台电脑移除。", canLaunch: false);
+                else if (plannedAction == LaunchAction.Repair)
+                    window?.ShowComplete("修复完成", "Files max 已修复完成，可以重新启动应用。", canLaunch: true);
+                else
+                    window?.ShowComplete("安装完成", "Files max 已安装完成，可以开始使用了。", canLaunch: true);
+            });
         });
     }
 
@@ -425,6 +543,10 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         else if (plannedAction == LaunchAction.Repair)
         {
             window.ShowProgress("正在修复", "正在修复 Files max……");
+        }
+        else if (existingInstallationDetected)
+        {
+            window.ShowProgress("正在升级 Files max", $"检测到 {existingInstallVersion}，将保留安装目录 {existingInstallFolder}，先移除旧版本，再安装新版……");
         }
         else
         {
@@ -531,6 +653,10 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         var packageName = string.Equals(packageId, MainPackageId, StringComparison.OrdinalIgnoreCase)
             ? "Files max"
             : "运行库";
+
+        if (plannedAction == LaunchAction.Install && existingInstallationDetected &&
+            string.Equals(packageId, MainPackageId, StringComparison.OrdinalIgnoreCase))
+            return "正在执行旧版卸载与新版安装；安装目录保持不变……";
 
         return plannedAction switch
         {

@@ -1,12 +1,11 @@
 using System;
 using System.ComponentModel;
 using System.Windows;
-using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Animation;
 using System.Windows.Forms;
 using System.Windows.Interop;
+using System.Windows.Threading;
 
 namespace FilesMax.Installer.Bootstrapper;
 
@@ -28,11 +27,21 @@ public partial class InstallerWindow : Window
     private bool allowClose;
     private bool suppressFolderChanged;
     private string? failureClipboardDetails;
+    private readonly DispatcherTimer progressTimer;
+    private double displayedProgress;
+    private double targetProgress;
+    private DateTime lastProgressTick;
+    private Action? progressCompleted;
 
     public InstallerWindow()
     {
         InitializeComponent();
         InstallFolderTextBox.Text = string.Empty;
+        progressTimer = new DispatcherTimer(DispatcherPriority.Render)
+        {
+            Interval = TimeSpan.FromMilliseconds(20),
+        };
+        progressTimer.Tick += ProgressTimer_Tick;
         ApplyDwmWindowPolicy();
     }
 
@@ -65,12 +74,24 @@ public partial class InstallerWindow : Window
         WelcomeVersionText.Text = $"版本 {version}";
     }
 
-    public void SetInstallFolder(string path)
+    public void SetInstallFolder(string path, bool lockPath = false)
     {
         suppressFolderChanged = true;
         InstallFolderTextBox.Text = path;
         suppressFolderChanged = false;
+        InstallFolderTextBox.IsReadOnly = lockPath;
+        BrowseButton.IsEnabled = !lockPath;
         InstallButton.IsEnabled = LicenseAccepted && !string.IsNullOrWhiteSpace(path);
+    }
+
+    public void SetUpgradeInfo(string version, string installFolder)
+    {
+        var versionText = string.IsNullOrWhiteSpace(version) ? "现有版本" : $"Files max {version}";
+        var message = $"检测到已安装的{versionText}。将沿用原安装目录：{installFolder}。安装时会先卸载旧版本，再安装新版。";
+        WelcomeUpgradeNotice.Text = message;
+        OptionsUpgradeNotice.Text = message;
+        WelcomeUpgradeNotice.Visibility = Visibility.Visible;
+        OptionsUpgradeNotice.Visibility = Visibility.Visible;
     }
 
     public void ShowWelcome()
@@ -93,9 +114,13 @@ public partial class InstallerWindow : Window
 
     public void ShowProgress(string header, string message)
     {
+        progressTimer.Stop();
+        progressCompleted = null;
+        displayedProgress = 0;
+        targetProgress = 0;
+        lastProgressTick = DateTime.UtcNow;
         SetPage(ProgressPage, ProgressActions, "正在处理，请稍候");
         ProgressHeaderText.Text = string.IsNullOrWhiteSpace(header) ? "正在安装" : header;
-        InstallProgressBar.BeginAnimation(RangeBase.ValueProperty, null);
         InstallProgressBar.Value = 0;
         ProgressPercentText.Text = "0%";
         ProgressMessageText.Text = string.IsNullOrWhiteSpace(message) ? "正在准备……" : message;
@@ -104,19 +129,23 @@ public partial class InstallerWindow : Window
 
     public void SetProgress(int percentage, string message)
     {
-        var targetProgress = Math.Clamp(percentage, 0, 100);
-        var animation = new DoubleAnimation
-        {
-            From = InstallProgressBar.Value,
-            To = targetProgress,
-            Duration = TimeSpan.FromMilliseconds(SystemParameters.ClientAreaAnimation ? 220 : 0),
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-            FillBehavior = FillBehavior.HoldEnd,
-        };
-        InstallProgressBar.BeginAnimation(RangeBase.ValueProperty, animation, HandoffBehavior.SnapshotAndReplace);
-        ProgressPercentText.Text = $"{targetProgress}%";
+        targetProgress = Math.Max(targetProgress, Math.Clamp(percentage, 0, 100));
         if (!string.IsNullOrWhiteSpace(message))
             ProgressMessageText.Text = message;
+
+        if (targetProgress > displayedProgress && !progressTimer.IsEnabled)
+        {
+            lastProgressTick = DateTime.UtcNow;
+            progressTimer.Start();
+        }
+    }
+
+    public void CompleteProgressThen(Action completed)
+    {
+        progressCompleted = completed;
+        SetProgress(100, "正在完成最后的配置……");
+        if (displayedProgress >= 100)
+            FinishProgressAnimation();
     }
 
     public void SetProgressMessage(string message)
@@ -127,6 +156,7 @@ public partial class InstallerWindow : Window
 
     public void ShowComplete(string header, string description, bool canLaunch)
     {
+        StopProgressAnimation();
         SetPage(CompletePage, CompleteActions, "操作已完成");
         CompleteHeaderText.Text = header;
         CompleteDescriptionText.Text = description;
@@ -138,6 +168,7 @@ public partial class InstallerWindow : Window
 
     public void ShowFailure(string message, string? header = null, string? clipboardDetails = null)
     {
+        StopProgressAnimation();
         SetPage(FailurePage, FailureActions, "操作未完成");
         FailureHeaderText.Text = string.IsNullOrWhiteSpace(header) ? "安装失败" : header;
         CopyFailureDetailsButton.Content = "复制诊断信息";
@@ -206,6 +237,41 @@ public partial class InstallerWindow : Window
         page.Visibility = Visibility.Visible;
         actions.Visibility = Visibility.Visible;
         StepText.Text = step;
+    }
+
+    private void ProgressTimer_Tick(object? sender, EventArgs e)
+    {
+        var now = DateTime.UtcNow;
+        var elapsedSeconds = Math.Max(0, (now - lastProgressTick).TotalSeconds);
+        lastProgressTick = now;
+
+        // Burn reports real work in coarse jumps. Advance the visible value at
+        // a steady rate so the bar remains continuous without inventing work
+        // beyond the latest reported percentage.
+        displayedProgress = Math.Min(targetProgress, displayedProgress + elapsedSeconds * 42);
+        InstallProgressBar.Value = displayedProgress;
+        var displayedPercent = (int)Math.Floor(displayedProgress);
+        ProgressPercentText.Text = $"{displayedPercent}%";
+
+        if (displayedProgress >= targetProgress)
+            FinishProgressAnimation();
+    }
+
+    private void FinishProgressAnimation()
+    {
+        progressTimer.Stop();
+        displayedProgress = targetProgress;
+        InstallProgressBar.Value = displayedProgress;
+        ProgressPercentText.Text = $"{(int)displayedProgress}%";
+        var completed = progressCompleted;
+        progressCompleted = null;
+        completed?.Invoke();
+    }
+
+    private void StopProgressAnimation()
+    {
+        progressTimer.Stop();
+        progressCompleted = null;
     }
 
     private void LicenseCheckBox_Changed(object sender, RoutedEventArgs e)

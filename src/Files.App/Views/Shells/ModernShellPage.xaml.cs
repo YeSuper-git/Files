@@ -476,20 +476,20 @@ namespace Files.App.Views.Shells
 				new SuppressNavigationTransitionInfo());
 		}
 
-#if FILES_RESOURCE_MANAGER
-		public override async void NavigateToPath(string? navigationPath, Type? sourcePageType, NavigationArguments? navArgs = null)
-#else
 		public override void NavigateToPath(string? navigationPath, Type? sourcePageType, NavigationArguments? navArgs = null)
-#endif
 		{
-#if FILES_RESOURCE_MANAGER
-			if (ItemDisplayFrame?.Content is ResourceManager.ResourceLibraryPage resourceLibraryPage &&
-				!string.IsNullOrWhiteSpace(navigationPath) &&
-				await resourceLibraryPage.TryNavigateToResourcePathAsync(navigationPath))
-				return;
-#endif
 			if (ItemDisplayFrame is not { } itemDisplayFrame)
 				return;
+
+			var leavingResourceLibraryPage = false;
+#if FILES_RESOURCE_MANAGER
+			// Sidebar destinations are ordinary filesystem/app navigation. Do not
+			// reinterpret them as virtual resource-library locations: that used to
+			// consume clicks whenever the target happened to sit under the library
+			// root, leaving the resource page visible. Address-bar navigation inside
+			// the resource browser is routed separately by ShellPage_NavigationRequested.
+			leavingResourceLibraryPage = itemDisplayFrame.Content is ResourceManager.ResourceLibraryPage;
+#endif
 
 			var shellViewModel = ShellViewModel!;
 			shellViewModel.FilesAndFoldersFilter = null;
@@ -508,6 +508,11 @@ namespace Files.App.Views.Shells
 				navArgs ??= new NavigationArguments();
 				navArgs.IsResourceManagerMode = true;
 				navArgs.ResourceLibraryPath = resourceLibraryPath;
+			}
+			else
+			{
+				InstanceViewModel.IsResourceManagerMode = false;
+				InstanceViewModel.ResourceLibraryPath = null;
 			}
 #endif
 
@@ -528,6 +533,7 @@ namespace Files.App.Views.Shells
 					navigationPath.TrimEnd(Path.DirectorySeparatorChar).Equals(
 						shellViewModel.WorkingDirectory.TrimEnd(Path.DirectorySeparatorChar),
 						StringComparison.OrdinalIgnoreCase)) &&
+					!leavingResourceLibraryPage &&
 					(TabBarItemParameter?.NavigationParameter is not string navArg ||
 					string.IsNullOrEmpty(navArg) ||
 					!navArg.StartsWith("tag:"))) // Return if already selected

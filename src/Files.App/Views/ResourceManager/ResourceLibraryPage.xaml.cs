@@ -211,6 +211,16 @@ public sealed partial class ResourceLibraryPage : Page
         SetNativeSelection(selectedItems.Count == 0 ? null : selectedItems);
     }
 
+    private async void OnEditActorInfo(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement element &&
+            element.DataContext is ResourceBrowserItemViewModel { Kind: ResourceBrowserItemKind.ActorFolder } actor)
+        {
+            e.Handled = true;
+            await EditActorDetailsAsync(actor);
+        }
+    }
+
     private void ClearSelectedResourceItems()
     {
         _selectedResourceItems.Clear();
