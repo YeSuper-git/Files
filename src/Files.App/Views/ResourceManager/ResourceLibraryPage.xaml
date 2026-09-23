@@ -12,7 +12,6 @@
     <Grid Padding="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -23,26 +22,22 @@
                 <TextBlock x:Name="LibraryPathText" Margin="0,4,0,0" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
             </StackPanel>
             <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
-                <Button x:Name="BackButton" Content="返回" Click="OnBack" IsEnabled="False" />
-                <Button Content="根目录" Click="OnRoot" />
-                <Button Content="刷新" Click="OnRefresh" />
+                <Button Content="管理隐藏项" Click="OnManageHiddenActors" />
                 <Button Content="更换路径" Click="OnChooseLibrary" />
                 <Button Content="资源工具" Click="OnOpenTools" />
             </StackPanel>
         </Grid>
 
-        <TextBlock x:Name="BreadcrumbText" Grid.Row="1" Margin="0,0,0,12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-
-        <Border Grid.Row="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="12">
+        <Border Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="12">
             <Grid>
                 <ProgressRing x:Name="LoadingRing" Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" IsActive="False" />
                 <GridView
                     x:Name="BrowserGrid"
                     Padding="12"
-                    IsItemClickEnabled="True"
+                    IsItemClickEnabled="False"
                     ItemsSource="{x:Bind BrowserItems, Mode=OneWay}"
-                    ItemClick="OnBrowserItemClick"
-                    SelectionMode="None">
+                    SelectionChanged="OnBrowserSelectionChanged"
+                    SelectionMode="Extended">
                     <GridView.ItemContainerStyle>
                         <Style TargetType="GridViewItem">
                             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -60,7 +55,8 @@
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                 BorderThickness="1"
                                 CornerRadius="10"
-                                RightTapped="OnBrowserItemRightTapped">
+                                RightTapped="OnBrowserItemRightTapped"
+                                DoubleTapped="OnBrowserItemDoubleTapped">
                                 <StackPanel>
                                     <Border Height="{x:Bind PosterHeight}" CornerRadius="10,10,0,0" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
                                         <Grid>
@@ -74,6 +70,20 @@
                                     <StackPanel Padding="12,10,12,12">
                                         <TextBlock Text="{x:Bind Name}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                         <TextBlock Margin="0,3,0,0" Text="{x:Bind Subtitle}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <ItemsControl Margin="0,8,0,0" ItemsSource="{x:Bind Tags, Mode=OneWay}" Visibility="{x:Bind TagListVisibility}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapGrid Orientation="Horizontal" MaximumRowsOrColumns="2" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Margin="0,0,5,5" Padding="7,2" Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="5">
+                                                        <TextBlock Text="{Binding}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -84,6 +94,6 @@
             </Grid>
         </Border>
 
-        <TextBlock x:Name="StatusText" Grid.Row="3" Margin="0,10,0,0" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        <TextBlock x:Name="StatusText" Grid.Row="2" Margin="0,10,0,0" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
     </Grid>
 </Page>

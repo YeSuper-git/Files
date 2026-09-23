@@ -35,5 +35,14 @@ namespace Files.App.Data.EventArguments
 		public bool IsResourceManagerMode { get; set; } = false;
 
 		public string? ResourceLibraryPath { get; set; }
+
+		/// <summary>Marks a navigation entry as a virtual location inside the resource-library browser.</summary>
+		public bool IsResourceLibraryPage { get; set; }
+
+		public string[]? ResourceLocationPaths { get; set; }
+
+		public string[]? ResourceLocationTitles { get; set; }
+
+		public Files.App.Data.Models.ResourceManager.ResourceBrowserLocationKind[]? ResourceLocationKinds { get; set; }
 	}
 }

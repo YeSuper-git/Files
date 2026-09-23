@@ -55,6 +55,9 @@ public sealed class ResourceBrowserService : IResourceBrowserService
                 if (ShouldSkipDirectory(child))
                     continue;
 
+                if (locationKind == ResourceBrowserLocationKind.LibraryRoot && _workspace.IsActorFolderHidden(child.FullName))
+                    continue;
+
                 var kind = locationKind == ResourceBrowserLocationKind.LibraryRoot
                     ? ResourceBrowserItemKind.ActorFolder
                     : HasDirectVideo(child, settings.VideoExtensions, cancellationToken)

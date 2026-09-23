@@ -809,7 +809,60 @@ namespace Files.App.Views.Layouts
 			};
 			subItem.Items.Add(removeTags);
 
+			var createTag = new MenuFlyoutItem
+			{
+				Text = Strings.CreateNewTag.GetLocalizedResource(),
+			};
+			createTag.Click += async (_, _) => await CreateGlobalTagAndApplyAsync(selected);
+			subItem.Items.Add(new MenuFlyoutSeparator());
+			subItem.Items.Add(createTag);
+
 			return subItem;
+		}
+
+		private async Task CreateGlobalTagAndApplyAsync(IEnumerable<ListedItem> selectedItems)
+		{
+			var nameTextBox = new TextBox
+			{
+				PlaceholderText = Strings.CreateNewTag.GetLocalizedResource(),
+				MaxLength = 64,
+			};
+			var dialog = new ContentDialog
+			{
+				Title = Strings.CreateNewTag.GetLocalizedResource(),
+				Content = nameTextBox,
+				PrimaryButtonText = Strings.Create.GetLocalizedResource(),
+				CloseButtonText = Strings.Cancel.GetLocalizedResource(),
+				DefaultButton = ContentDialogButton.Primary,
+				XamlRoot = XamlRoot ?? MainWindow.Instance.Content.XamlRoot,
+			};
+
+			if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+				return;
+
+			var name = nameTextBox.Text.Trim();
+			if (string.IsNullOrWhiteSpace(name))
+				return;
+
+			var tag = FileTagsSettingsService.GetTagsByName(name).FirstOrDefault();
+			if (tag is null)
+			{
+				FileTagsSettingsService.CreateNewTag(name, ColorHelpers.RandomColor());
+				tag = FileTagsSettingsService.GetTagsByName(name).FirstOrDefault();
+			}
+
+			if (tag is null)
+				return;
+
+			foreach (var item in selectedItems.Where(item => item is not null))
+			{
+				var existingTags = item.FileTags ?? [];
+				if (!existingTags.Contains(tag.Uid))
+					item.FileTags = [.. existingTags, tag.Uid];
+			}
+
+			if (ParentShellPageInstance is { } parentShellPage)
+				await parentShellPage.GetRequiredShellViewModel().RefreshTagGroups();
 		}
 
 		public async void SetSelectedItemsOnNavigation()

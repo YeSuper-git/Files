@@ -9,6 +9,7 @@ namespace Files.App.Services.ResourceManager;
 [JsonSourceGenerationOptions(WriteIndented = true)]
 [JsonSerializable(typeof(List<ResourceOperationBatch>))]
 [JsonSerializable(typeof(ResourceWorkspaceState))]
+[JsonSerializable(typeof(ResourceTagDefinition))]
 internal sealed partial class ResourceManagerJsonSerializerContext : JsonSerializerContext
 {
 }

@@ -104,11 +104,11 @@ public sealed partial class ResourceManagerPage : Page
             if (f.Code is not null)
             {
                 var cb = new Border { Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"], CornerRadius = new CornerRadius(4), Padding = new Thickness(8, 2, 8, 2), VerticalAlignment = VerticalAlignment.Center };
-                cb.Child = new TextBlock { Text = f.Code, FontSize = 11, Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemAccentColor"] };
+                cb.Child = new TextBlock { Text = f.Code, FontSize = 11, Foreground = GetSystemAccentBrush() };
                 panel.Children.Add(cb);
             }
             var vs = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
-            vs.Children.Add(new FontIcon { Glyph = "&#xE7F4;", FontSize = 12 });
+            vs.Children.Add(new FontIcon { Glyph = "\uE7F4", FontSize = 12 });
             vs.Children.Add(new TextBlock { Text = f.VideoCount.ToString(), FontSize = 11 });
             panel.Children.Add(vs);
             item.Content = panel;
@@ -182,7 +182,7 @@ public sealed partial class ResourceManagerPage : Page
             DetailPanel.Visibility = Visibility.Visible; DetailContent.Children.Clear();
             AddDetail("名称", folder.Name); AddDetail("路径", folder.Path, true);
             var cp = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-            cp.Children.Add(new TextBlock { Text = folder.Code ?? "未识别", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemAccentColor"] });
+            cp.Children.Add(new TextBlock { Text = folder.Code ?? "未识别", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Foreground = GetSystemAccentBrush() });
             if (folder.Code is not null) { var btn = new Button { Content = "复制", Padding = new Thickness(4, 2, 4, 2), MinHeight = 0, FontSize = 11 }; btn.Click += (_, _) => { var pkg = new Windows.ApplicationModel.DataTransfer.DataPackage(); pkg.SetText(folder.Code); Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(pkg); SetStatus($"已复制：{folder.Code}"); }; cp.Children.Add(btn); }
             DetailContent.Children.Add(new TextBlock { Text = "番号", FontSize = 12, Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"] }); DetailContent.Children.Add(cp);
             var sg = new Grid { ColumnSpacing = 16, RowSpacing = 8 }; sg.ColumnDefinitions.Add(new ColumnDefinition()); sg.ColumnDefinitions.Add(new ColumnDefinition()); sg.RowDefinitions.Add(new RowDefinition()); sg.RowDefinitions.Add(new RowDefinition());
@@ -200,6 +200,17 @@ public sealed partial class ResourceManagerPage : Page
         DetailContent.Children.Add(new TextBlock { Text = label, FontSize = 12, Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"] });
         var t = new TextBlock { Text = value, TextWrapping = TextWrapping.Wrap }; if (small) { t.FontSize = 11; t.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]; } else t.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
         DetailContent.Children.Add(t);
+    }
+
+    private static Microsoft.UI.Xaml.Media.SolidColorBrush GetSystemAccentBrush()
+    {
+        var accentResource = Application.Current.Resources["SystemAccentColor"];
+        return accentResource switch
+        {
+            Windows.UI.Color color => new Microsoft.UI.Xaml.Media.SolidColorBrush(color),
+            Microsoft.UI.Xaml.Media.SolidColorBrush brush => brush,
+            _ => new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.DodgerBlue),
+        };
     }
 
     [DynamicWindowsRuntimeCast(typeof(Microsoft.UI.Xaml.Media.Brush))]

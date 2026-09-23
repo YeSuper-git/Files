@@ -24,8 +24,10 @@ namespace Files.App.UserControls.Menus
 		private IEnumerable<ListedItem> selectedItems = [];
 		public IEnumerable<ListedItem> SelectedItems => selectedItems;
 		private Func<IEnumerable<ListedItem>>? selectedItemsProvider;
+		private string tagMenuSignature = string.Empty;
 
 		private const string RemoveTagsItemTag = "RemoveTags";
+		private const string CreateTagItemTag = "CreateTag";
 
 		public FileTagsContextMenu(IEnumerable<ListedItem> selectedItems)
 		{
@@ -47,7 +49,16 @@ namespace Files.App.UserControls.Menus
 		[DynamicWindowsRuntimeCast(typeof(Geometry))]
 		private void Init()
 		{
-			IEnumerable<IMenuFlyoutItemViewModel> tagItems = FileTagsSettingsService.FileTagList
+			SetValue(MenuFlyoutViewModelHelper.ItemsSourceProperty, CreateMenuItems());
+
+			Opening += Item_Opening;
+		}
+
+		private IEnumerable<IMenuFlyoutItemViewModel> CreateMenuItems()
+		{
+			var tags = FileTagsSettingsService.FileTagList;
+			tagMenuSignature = string.Join("|", tags.Select(tag => $"{tag.Uid}:{tag.Name}:{tag.Color}"));
+			IEnumerable<IMenuFlyoutItemViewModel> tagItems = tags
 				.Select(tag => (IMenuFlyoutItemViewModel)new MenuFlyoutFactoryItemViewModel(() =>
 				{
 					var tagItem = new ToggleMenuFlyoutItem()
@@ -75,11 +86,22 @@ namespace Files.App.UserControls.Menus
 				return removeItem;
 			});
 
-			SetValue(MenuFlyoutViewModelHelper.ItemsSourceProperty, tagItems
-				.Append(new MenuFlyoutSeparatorViewModel())
-				.Append(removeTagsViewModel));
+			var createTagViewModel = new MenuFlyoutFactoryItemViewModel(() =>
+			{
+				var createTagItem = new MenuFlyoutItem
+				{
+					Text = Strings.CreateNewTag.GetLocalizedResource(),
+					Tag = CreateTagItemTag,
+				};
+				createTagItem.Click += CreateTagItem_Click;
+				return createTagItem;
+			});
 
-			Opening += Item_Opening;
+			return tagItems
+				.Append(new MenuFlyoutSeparatorViewModel())
+				.Append(removeTagsViewModel)
+				.Append(new MenuFlyoutSeparatorViewModel())
+				.Append(createTagViewModel);
 		}
 
 		/// <summary>
@@ -110,6 +132,10 @@ namespace Files.App.UserControls.Menus
 		[DynamicWindowsRuntimeCast(typeof(ToggleMenuFlyoutItem))]
 		private void Item_Opening(object? sender, object e)
 		{
+			var currentSignature = string.Join("|", FileTagsSettingsService.FileTagList.Select(tag => $"{tag.Uid}:{tag.Name}:{tag.Color}"));
+			if (!string.Equals(currentSignature, tagMenuSignature, StringComparison.Ordinal))
+				SetValue(MenuFlyoutViewModelHelper.ItemsSourceProperty, CreateMenuItems());
+
 			// Update SelectedItems if using dynamic provider
 			if (selectedItemsProvider is not null)
 				selectedItems = selectedItemsProvider.Invoke();
@@ -168,6 +194,44 @@ namespace Files.App.UserControls.Menus
 		{
 			if (await FileTagsHelper.RemoveTagsAsync(SelectedItems))
 				TagsChanged?.Invoke(this, EventArgs.Empty);
+		}
+
+		private async void CreateTagItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+		{
+			var nameTextBox = new TextBox
+			{
+				PlaceholderText = Strings.CreateNewTag.GetLocalizedResource(),
+				MaxLength = 64,
+			};
+			var dialog = new ContentDialog
+			{
+				Title = Strings.CreateNewTag.GetLocalizedResource(),
+				Content = nameTextBox,
+				PrimaryButtonText = Strings.Create.GetLocalizedResource(),
+				CloseButtonText = Strings.Cancel.GetLocalizedResource(),
+				DefaultButton = ContentDialogButton.Primary,
+				XamlRoot = MainWindow.Instance.Content.XamlRoot,
+			};
+
+			if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+				return;
+
+			var name = nameTextBox.Text.Trim();
+			if (string.IsNullOrWhiteSpace(name))
+				return;
+
+			var tag = FileTagsSettingsService.GetTagsByName(name).FirstOrDefault();
+			if (tag is null)
+			{
+				FileTagsSettingsService.CreateNewTag(name, ColorHelpers.RandomColor());
+				tag = FileTagsSettingsService.GetTagsByName(name).FirstOrDefault();
+			}
+
+			if (tag is null)
+				return;
+
+			SetValue(MenuFlyoutViewModelHelper.ItemsSourceProperty, CreateMenuItems());
+			AddFileTag(SelectedItems, tag);
 		}
 	}
 }
