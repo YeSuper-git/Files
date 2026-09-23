@@ -376,24 +376,19 @@ try {
         throw 'Files identity package was not registered after installation.'
     }
 
-    $registeredRoot = $null
-    try {
-        $registeredRoot = [IO.Path]::GetFullPath($installedApp.InstallLocation)
-    } catch {
-        throw "Unable to resolve the registered Files identity location: $($_.Exception.Message)"
-    }
-
     $expectedRoot = [IO.Path]::GetFullPath($root)
-    if (-not [string]::Equals($registeredRoot.TrimEnd([char]92, [char]47), $expectedRoot.TrimEnd([char]92, [char]47), [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Files identity points to '$registeredRoot' instead of the current install directory '$expectedRoot'."
-    }
-
     $registeredVersion = [version]$installedApp.Version
     if ($registeredVersion -ne $identityVersion) {
         throw "Files identity version mismatch: expected $identityVersion, registered $registeredVersion."
     }
 
-    Write-InstallLog "Verified Files identity registration: version=$registeredVersion location=$registeredRoot"
+    # Get-AppxPackage.InstallLocation is the protected WindowsApps identity
+    # directory for an external-location package, not the external payload
+    # directory passed to Add-AppxPackage. The payload location was already
+    # validated before registration; here we verify the identity version and
+    # record both locations without confusing them.
+    $identityStoreLocation = [string]$installedApp.InstallLocation
+    Write-InstallLog "Verified Files identity registration: version=$registeredVersion identityStore=$identityStoreLocation externalLocation=$expectedRoot"
 
     Set-InstallStage '清理旧版卸载注册'
     if (-not [string]::IsNullOrWhiteSpace($LegacyUninstallKeyName)) {
