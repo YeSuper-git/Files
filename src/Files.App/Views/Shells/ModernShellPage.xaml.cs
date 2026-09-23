@@ -298,6 +298,8 @@ namespace Files.App.Views.Shells
 			var workingDirectory = ShellViewModel?.WorkingDirectory;
 			if (string.IsNullOrEmpty(workingDirectory))
 				return;
+			if (ItemDisplayFrame is not { } itemDisplayFrame)
+				return;
 
 #if FILES_RESOURCE_MANAGER
 			if (InstanceViewModel.IsResourceManagerMode &&
@@ -308,7 +310,7 @@ namespace Files.App.Views.Shells
 			bool isPathRooted = string.Equals(workingDirectory, PathNormalization.GetPathRoot(workingDirectory), StringComparison.OrdinalIgnoreCase);
 			if (isPathRooted)
 			{
-				ItemDisplayFrame.Navigate(
+				itemDisplayFrame.Navigate(
 					typeof(HomePage),
 					new NavigationArguments()
 					{
@@ -330,7 +332,7 @@ namespace Files.App.Views.Shells
 					parentDirectoryOfPath += '\\';
 
 				SelectSidebarItemFromPath();
-				ItemDisplayFrame.Navigate(
+				itemDisplayFrame.Navigate(
 					InstanceViewModel.FolderSettings.GetLayoutType(parentDirectoryOfPath),
 					new NavigationArguments()
 					{
