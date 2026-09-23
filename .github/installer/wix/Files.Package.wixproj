@@ -26,12 +26,14 @@
     <InstallLauncherScript Condition="'$(InstallLauncherScript)' == ''">$(MSBuildThisFileDirectory)..\..\..\Invoke-Install-App.ps1</InstallLauncherScript>
     <IdentityPackage Condition="'$(IdentityPackage)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\Files.Identity.msix</IdentityPackage>
     <Certificate Condition="'$(Certificate)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\Files.cer</Certificate>
-    <AppVersion Condition="'$(AppVersion)' == ''">1.0.0.0</AppVersion>
+    <AppVersion Condition="'$(AppVersion)' == ''">1.0.0</AppVersion>
+    <IdentityVersion Condition="'$(IdentityVersion)' == ''">$(AppVersion).0</IdentityVersion>
     <ProductName Condition="'$(ProductName)' == ''">Files max</ProductName>
 
     <DefineConstants>
       $(DefineConstants);
       AppVersion=$(AppVersion);
+      IdentityVersion=$(IdentityVersion);
       ProductName=$(ProductName);
       PayloadDir=$(PayloadDir);
       InstallScript=$(InstallScript);

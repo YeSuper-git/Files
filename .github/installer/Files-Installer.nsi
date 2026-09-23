@@ -45,6 +45,10 @@ VIAddVersionKey /LANG=2052 "FileDescription" "文件资源管理器安装程序"
 VIAddVersionKey /LANG=2052 "FileVersion" "${APP_VERSION}"
 VIAddVersionKey /LANG=2052 "ProductVersion" "${APP_VERSION}"
 
+!ifndef APP_DISPLAY_VERSION
+!define APP_DISPLAY_VERSION "${APP_VERSION}"
+!endif
+
 !include LogicLib.nsh
 !include ShellIntegration.nsh
 
@@ -78,7 +82,7 @@ Section "Install"
 
     WriteUninstaller "$INSTDIR\Uninstall.exe"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "DisplayName" "文件资源管理器"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "DisplayVersion" "${APP_VERSION}"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "DisplayVersion" "${APP_DISPLAY_VERSION}"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "Publisher" "YeSuper"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "InstallLocation" "$INSTDIR"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "DisplayIcon" "$INSTDIR\Assets\AppTiles\Dev\Logo.ico"

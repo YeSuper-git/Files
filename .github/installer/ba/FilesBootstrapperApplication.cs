@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using Microsoft.Win32;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
@@ -42,6 +43,8 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
     {
         DetectPackageComplete += OnDetectPackageComplete;
         DetectComplete += OnDetectComplete;
+        PlanRelatedBundleType += OnPlanRelatedBundleType;
+        PlanRelatedBundle += OnPlanRelatedBundle;
         PlanComplete += OnPlanComplete;
         ApplyBegin += OnApplyBegin;
         Progress += OnProgress;
@@ -139,14 +142,41 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
             if (window is not null)
                 window.SetInstallFolder(ReadInstallFolder());
 
-            if (command is null || command.Display != Display.Full)
+            var requestedAction = GetCommandAction();
+            if (requestedAction is LaunchAction.Uninstall or LaunchAction.UnsafeUninstall or LaunchAction.Layout or LaunchAction.Cache)
             {
-                StartPlan(GetCommandAction());
+                StartPlan(requestedAction);
                 return;
             }
 
-            var requestedAction = GetCommandAction();
-            if (requestedAction is LaunchAction.Uninstall or LaunchAction.UnsafeUninstall or LaunchAction.Repair or LaunchAction.Layout or LaunchAction.Cache)
+            Version? installedVersion = null;
+            if (mainPackageInstalled && !TryGetInstalledInstallerVersion(out installedVersion, out var versionError))
+            {
+                currentStage = "检查已安装版本";
+                ShowFailure(versionError ?? "无法确认当前安装版本，因此为避免覆盖或破坏现有安装，已停止本次操作。", "版本检查失败");
+                return;
+            }
+
+            if (mainPackageInstalled && installedVersion is not null)
+            {
+                if (!Version.TryParse(GetBundleVersion(), out var incomingVersion))
+                {
+                    currentStage = "验证安装包版本";
+                    ShowFailure($"当前安装包版本无效（{GetBundleVersion()}），无法与已安装版本 {installedVersion} 安全比较，因此已停止本次操作。", "版本检查失败");
+                    return;
+                }
+
+                if (installedVersion.CompareTo(incomingVersion) > 0)
+                {
+                    currentStage = "阻止旧版本覆盖新版";
+                    var details = $"检测到已安装 Files max {installedVersion}，当前安装包为 {incomingVersion}。为避免降级覆盖，安装已停止。请使用不低于已安装版本的安装包。";
+                    LogDiagnostic(details);
+                    ShowFailure(details, "不能安装较旧版本");
+                    return;
+                }
+            }
+
+            if (requestedAction == LaunchAction.Repair || command is null || command.Display != Display.Full)
             {
                 StartPlan(requestedAction);
                 return;
@@ -165,6 +195,61 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
 
             ShowWelcome();
         });
+    }
+
+    private void OnPlanRelatedBundleType(object? sender, PlanRelatedBundleTypeEventArgs args)
+    {
+        if (plannedAction != LaunchAction.Install)
+            return;
+
+        // The one-time move from 4.2.32.x to the canonical 1.0.x line is a
+        // numeric downgrade to Burn. Treat the detected previous Files max
+        // bundle as an upgrade so Burn removes its registration after the new
+        // MSI has migrated the installation. A registry version guard above
+        // prevents this path from replacing a newer canonical 1.0.x install.
+        args.Type = RelatedBundlePlanType.Upgrade;
+        LogDiagnostic($"Treating related bundle {args.BundleId} as the previous Files max release during canonical-version migration.");
+    }
+
+    private void OnPlanRelatedBundle(object? sender, PlanRelatedBundleEventArgs args)
+    {
+        if (plannedAction != LaunchAction.Install)
+            return;
+
+        args.State = RequestState.Absent;
+        LogDiagnostic($"Scheduling previous related bundle {args.BundleId} for removal after the canonical-version upgrade.");
+    }
+
+    private static bool TryGetInstalledInstallerVersion(out Version? version, out string? error)
+    {
+        version = null;
+        error = null;
+
+        try
+        {
+            using var baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+            using var productKey = baseKey.OpenSubKey("Software\\YeSuper\\Files", writable: false);
+            var versionText = productKey?.GetValue("InstallerVersion") as string;
+            if (string.IsNullOrWhiteSpace(versionText))
+            {
+                // Installations made before the canonical 1.0.x marker existed
+                // are eligible for the one-time migration.
+                return true;
+            }
+
+            if (!Version.TryParse(versionText, out version))
+            {
+                error = $"Windows 注册表中的 Files max 版本标记无效（{versionText}）。为保护现有安装，本次未继续。";
+                return false;
+            }
+
+            return true;
+        }
+        catch (Exception exception)
+        {
+            error = $"读取 Files max 安装版本时失败：{exception.Message}";
+            return false;
+        }
     }
 
     private void OnPlanComplete(object? sender, PlanCompleteEventArgs args)

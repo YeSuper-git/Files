@@ -133,12 +133,18 @@ jobs:
           $vcRedistPath = Join-Path $workspace 'artifacts\VC_redist.x64.exe'
           $pfxPath = Join-Path $workspace 'artifacts\sign.pfx'
 
-          $sourcePackageManifest = Join-Path $workspace 'src\Files.App\Package.appxmanifest'
-          [xml]$sourceManifest = Get-Content -LiteralPath $sourcePackageManifest
-          $appVersion = [string]$sourceManifest.Package.Identity.Version
-          if ($appVersion -notmatch '^\d+\.\d+\.\d+\.\d+$') {
-            throw "Invalid package version: $appVersion"
+          $versionFile = Join-Path $workspace '.github\installer\build-version.txt'
+          $installerVersion = (Get-Content -Raw -LiteralPath $versionFile).Trim()
+          if ($installerVersion -notmatch '^(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)$') {
+            throw "Invalid canonical installer version in '$versionFile': $installerVersion"
           }
+          $major = [int]$Matches.major
+          $minor = [int]$Matches.minor
+          $patch = [int]$Matches.patch
+          if ($major -lt 1 -or $major -gt 255 -or $minor -gt 255 -or $patch -gt 65535) {
+            throw "Canonical version exceeds Windows Installer limits: $installerVersion"
+          }
+          $appVersion = '{0}.{1}.{2}.0' -f $major, $minor, $patch
 
           New-Item -ItemType Directory -Path $identityDir -Force | Out-Null
           $identityManifestPath = Join-Path $identityDir 'AppxManifest.xml'
@@ -146,6 +152,9 @@ jobs:
           [xml]$identityManifest = Get-Content -LiteralPath $identityManifestPath
           $identityManifest.Package.Identity.Version = $appVersion
           $identityManifest.Save($identityManifestPath)
+          if ($identityManifest.Package.Identity.Version -ne $appVersion) {
+            throw "Generated baseline identity version mismatch: expected $appVersion, found $($identityManifest.Package.Identity.Version)."
+          }
 
           $identityAssetDir = Join-Path $identityDir 'Assets\AppTiles\Dev'
           New-Item -ItemType Directory -Path $identityAssetDir -Force | Out-Null
@@ -198,6 +207,7 @@ jobs:
           $installScript = Join-Path $workspace 'Install-App.ps1'
           & 'C:\Program Files (x86)\NSIS\makensis.exe' `
             "/DAPP_VERSION=$appVersion" `
+            "/DAPP_DISPLAY_VERSION=$installerVersion" `
             "/DPAYLOAD_DIR=$publishDir" `
             "/DIDENTITY_PACKAGE=$identityPackage" `
             "/DINSTALL_SCRIPT=$installScript" `

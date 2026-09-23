@@ -31,41 +31,43 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Determine installer archive version
+      - name: Determine unified product version
         id: installer_version
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           if ($env:GITHUB_REF_TYPE -eq 'tag') {
             $currentVersion = $env:GITHUB_REF_NAME -replace '^v', ''
-            if ($currentVersion -notmatch '^\d+\.\d+\.\d+$') {
+            if ($currentVersion -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$') {
               throw "Installer tags must use vMAJOR.MINOR.PATCH, got '$env:GITHUB_REF_NAME'."
             }
             $nextVersion = ''
           } else {
             $versionFile = Join-Path $env:GITHUB_WORKSPACE '.github\installer\build-version.txt'
             $currentVersion = (Get-Content -Raw -LiteralPath $versionFile).Trim()
-            $parsedVersion = [regex]::Match($currentVersion, '^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)$')
+            $parsedVersion = [regex]::Match($currentVersion, '^(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)$')
             if (-not $parsedVersion.Success) {
-              throw "Invalid installer archive version in '$versionFile': $currentVersion"
+              throw "Invalid canonical product version in '$versionFile': $currentVersion"
             }
             $major = [int]$parsedVersion.Groups['major'].Value
             $minor = [int]$parsedVersion.Groups['minor'].Value
             $patch = [int]$parsedVersion.Groups['patch'].Value
-            if ($patch -eq [int]::MaxValue) {
-              throw "Installer patch version overflow: $currentVersion"
+            if ($major -lt 1 -or $major -gt 255 -or $minor -gt 255 -or $patch -ge 65535) {
+              throw "Canonical version is outside the supported Windows Installer range or cannot be incremented safely: $currentVersion"
             }
             $nextVersion = '{0}.{1}.{2}' -f $major, $minor, ($patch + 1)
           }
 
           "current=$currentVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "next=$nextVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          Write-Host "This installer artifact will be named Files max Setup $currentVersion."
+          Write-Host "Unified Files max version: $currentVersion."
 
       - name: Preflight installer inputs
         # The MSI custom action runs the inbox Windows PowerShell 5.1 host.
         # Parse installer scripts with that exact engine, not PowerShell 7.
         shell: powershell
+        env:
+          INSTALLER_VERSION: ${{ steps.installer_version.outputs.current }}
         run: |
           $ErrorActionPreference = 'Stop'
           $workspace = $env:GITHUB_WORKSPACE
@@ -141,8 +143,15 @@ jobs:
           if (-not $packageWix.Contains('-File &quot;[#InstallAppLauncherScript]&quot; -Mode Install -AttemptId &quot;[INSTALLERATTEMPTID]&quot;')) {
             throw 'Files.Package.wxs must invoke the diagnostic launcher for install custom actions.'
           }
-          if (-not $packageWix.Contains('-File &quot;[#InstallAppLauncherScript]&quot; -Mode Uninstall -IdentityVersion &quot;[ProductVersion]&quot; -AttemptId &quot;[INSTALLERATTEMPTID]&quot;')) {
-            throw 'Files.Package.wxs must invoke the diagnostic launcher for uninstall custom actions.'
+          if (-not $packageWix.Contains('-File &quot;[#InstallAppLauncherScript]&quot; -Mode Uninstall -IdentityVersion &quot;$(var.IdentityVersion)&quot; -AttemptId &quot;[INSTALLERATTEMPTID]&quot;')) {
+            throw 'Files.Package.wxs must pass the generated four-part identity version to uninstall custom actions.'
+          }
+          if (-not $packageWix.Contains('Name="InstallerVersion"') -or
+              -not $packageWix.Contains('Value="$(var.AppVersion)"')) {
+            throw 'Files.Package.wxs must persist the canonical installer version for downgrade protection.'
+          }
+          if (-not $packageWix.Contains('<MajorUpgrade Schedule="afterInstallInitialize" AllowDowngrades="yes"')) {
+            throw 'Files.Package.wxs must allow the one-time migration from the previous 4.2.32 product version line.'
           }
           $bundleWix = Get-Content -Raw -LiteralPath (Join-Path $workspace '.github\installer\wix\Files.Bundle.wxs')
           if (-not $bundleWix.Contains('Name="InstallerAttemptId"')) {
@@ -154,6 +163,12 @@ jobs:
           $bootstrapperSource = Get-Content -Raw -LiteralPath (Join-Path $workspace '.github\installer\ba\FilesBootstrapperApplication.cs')
           if (-not $bootstrapperSource.Contains('SetVariableString("InstallerAttemptId"')) {
             throw 'The custom bootstrapper must generate and set a unique attempt id before planning the MSI.'
+          }
+          if (-not $bootstrapperSource.Contains('PlanRelatedBundleType += OnPlanRelatedBundleType')) {
+            throw 'The custom bootstrapper must plan the legacy higher-numbered bundle as an upgrade during version migration.'
+          }
+          if (-not $bootstrapperSource.Contains('TryGetInstalledInstallerVersion')) {
+            throw 'The custom bootstrapper must reject stale installers after the version migration.'
           }
           if (-not $installScriptText.Contains('[string]$AttemptId =')) {
             throw 'Install-App.ps1 must accept the attempt id to create correlated unique log files.'
@@ -181,6 +196,9 @@ jobs:
             $nsisText = Get-Content -Raw -LiteralPath $nsisPath
             if (-not $nsisText.Contains('-Mode Uninstall -IdentityVersion "${APP_VERSION}"')) {
               throw "$(Split-Path -Leaf $nsisPath) must pass its own version to the shared identity-uninstall script."
+            }
+            if (-not $nsisText.Contains('"DisplayVersion" "${APP_DISPLAY_VERSION}"')) {
+              throw "$(Split-Path -Leaf $nsisPath) must display the canonical three-part product version in Windows."
             }
           }
           if (-not $installScriptText.Contains('Set-InstallStage')) {
@@ -222,6 +240,22 @@ jobs:
             throw "Required installer inputs are missing: $($missingFiles -join ', ')"
           }
           Write-Host "Installer preflight passed: $($xmlFiles.Count) XML files and $($requiredFiles.Count) required files checked."
+
+          if ($env:INSTALLER_VERSION -notmatch '^(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)$') {
+            throw "Canonical installer version must be MAJOR.MINOR.PATCH: $env:INSTALLER_VERSION"
+          }
+          $major = [int]$Matches.major
+          $minor = [int]$Matches.minor
+          $patch = [int]$Matches.patch
+          if ($major -lt 1 -or $major -gt 255 -or $minor -gt 255 -or $patch -gt 65535) {
+            throw "Canonical version exceeds Windows Installer version limits: $env:INSTALLER_VERSION"
+          }
+          $packageIdentityVersion = '{0}.{1}.{2}.0' -f $major, $minor, $patch
+          [xml]$sourcePackageManifest = Get-Content -Raw -LiteralPath (Join-Path $workspace 'src\Files.App\Package.appxmanifest')
+          if ($sourcePackageManifest.Package.Identity.Version -ne '1.0.0.0') {
+            throw 'The source app manifest must keep only the neutral development default; shipping builds take their version from build-version.txt.'
+          }
+          Write-Host "Canonical product version: $env:INSTALLER_VERSION; package identity format: $packageIdentityVersion."
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -578,33 +612,28 @@ jobs:
             throw "Preflight WiX command-line tool is missing at '$wixTool'."
           }
 
-          $sourcePackageManifest = Join-Path $workspace 'src\Files.App\Package.appxmanifest'
-          [xml]$sourceManifest = Get-Content -LiteralPath $sourcePackageManifest
-          $sourceAppVersion = [version]$sourceManifest.Package.Identity.Version
-          if ($sourceAppVersion.Build -lt 0) {
-            throw "Invalid source package version: $($sourceManifest.Package.Identity.Version)"
+          if ($env:INSTALLER_VERSION -notmatch '^(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)$') {
+            throw "Canonical installer version must be MAJOR.MINOR.PATCH: $env:INSTALLER_VERSION"
           }
-
-          $archiveVersion = [version]$env:INSTALLER_VERSION
-          if ($archiveVersion.Build -lt 0 -or $archiveVersion.Build -gt 65535) {
-            throw "Installer archive patch is outside the Windows package version range: $env:INSTALLER_VERSION"
+          $versionMajor = [int]$Matches.major
+          $versionMinor = [int]$Matches.minor
+          $versionPatch = [int]$Matches.patch
+          if ($versionMajor -lt 1 -or $versionMajor -gt 255 -or $versionMinor -gt 255 -or $versionPatch -gt 65535) {
+            throw "Canonical version exceeds Windows Installer limits: $env:INSTALLER_VERSION"
           }
-
-          # Keep the established 4.2.32 product line so this is an upgrade
-          # over the previously shipped 4.2.32.0 identity, while using the
-          # archive patch as the monotonic build revision. The visible file
-          # remains "Files max Setup 1.0.x.exe"; Windows receives a real
-          # version change instead of another 4.2.32.0 repair package.
-          $appVersion = '{0}.{1}.{2}.{3}' -f `
-            $sourceAppVersion.Major, $sourceAppVersion.Minor, $sourceAppVersion.Build, $archiveVersion.Build
-          Write-Host "Installer archive version: $env:INSTALLER_VERSION; Windows product version: $appVersion"
+          $installerVersion = '{0}.{1}.{2}' -f $versionMajor, $versionMinor, $versionPatch
+          $identityVersion = '{0}.{1}.{2}.0' -f $versionMajor, $versionMinor, $versionPatch
+          Write-Host "Unified Files max version: $installerVersion; MSIX identity uses the required four-part form $identityVersion."
 
           New-Item -ItemType Directory -Path $identityDir -Force | Out-Null
           $identityManifestPath = Join-Path $identityDir 'AppxManifest.xml'
           Copy-Item "$workspace\.github\installer\ExternalLocation.AppxManifest" $identityManifestPath -Force
           [xml]$identityManifest = Get-Content -LiteralPath $identityManifestPath
-          $identityManifest.Package.Identity.Version = $appVersion
+          $identityManifest.Package.Identity.Version = $identityVersion
           $identityManifest.Save($identityManifestPath)
+          if ($identityManifest.Package.Identity.Version -ne $identityVersion) {
+            throw "Generated MSIX identity version mismatch: expected $identityVersion, found $($identityManifest.Package.Identity.Version)."
+          }
 
           $identityAssetDir = Join-Path $identityDir 'Assets\AppTiles\Dev'
           New-Item -ItemType Directory -Path $identityAssetDir -Force | Out-Null
@@ -680,7 +709,8 @@ jobs:
             -m `
             --configuration Release `
             --no-restore `
-            "-p:AppVersion=$appVersion" `
+            "-p:AppVersion=$installerVersion" `
+            "-p:IdentityVersion=$identityVersion" `
             "-p:ProductName=Files max" `
             "-p:PayloadDir=$publishDir" `
             "-p:InstallScript=$installScript" `
@@ -829,7 +859,7 @@ jobs:
             -m `
             --configuration Release `
             --no-restore `
-            "-p:AppVersion=$appVersion" `
+            "-p:AppVersion=$installerVersion" `
             "-p:ProductName=Files max" `
             "-p:MsiPath=$msiPath" `
             "-p:VCRedistPath=$vcRedistPath" `
@@ -884,6 +914,8 @@ jobs:
     needs: build
     runs-on: windows-2025
     timeout-minutes: 10
+    env:
+      INSTALLER_VERSION: ${{ needs.build.outputs.installer_version }}
 
     steps:
       - name: Checkout version state
@@ -980,6 +1012,35 @@ jobs:
           if (-not $identity) {
             throw 'External-location identity was not registered.'
           }
+          $expectedIdentityVersion = '{0}.0' -f $env:INSTALLER_VERSION
+          if ([version]$identity.Version -ne [version]$expectedIdentityVersion) {
+            throw "Identity version mismatch: expected $expectedIdentityVersion from canonical installer version $env:INSTALLER_VERSION, found $($identity.Version)."
+          }
+          $versionMarkerPath = 'HKLM:\Software\YeSuper\Files'
+          $versionMarker = (Get-ItemProperty -LiteralPath $versionMarkerPath -Name InstallerVersion -ErrorAction Stop).InstallerVersion
+          if ($versionMarker -ne $env:INSTALLER_VERSION) {
+            throw "Installed version marker mismatch: expected $env:INSTALLER_VERSION, found '$versionMarker'."
+          }
+          Write-Host "Unified version smoke check passed: installer=$env:INSTALLER_VERSION identity=$($identity.Version)."
+
+          # Verify the installed-version guard prevents an archived older
+          # installer from downgrading a newer canonical release.
+          $installedVersion = [version]$env:INSTALLER_VERSION
+          $newerMarker = '{0}.{1}.{2}' -f $installedVersion.Major, $installedVersion.Minor, ($installedVersion.Build + 1)
+          Set-ItemProperty -LiteralPath $versionMarkerPath -Name InstallerVersion -Value $newerMarker
+          $downgradeLog = Join-Path $env:TEMP 'files-max-installer-downgrade-guard.log'
+          try {
+            $downgradeProcess = Start-Process -FilePath $setupPath -ArgumentList '/quiet', '/norestart', ('/log={0}' -f $downgradeLog) -WorkingDirectory $env:GITHUB_WORKSPACE -Wait -PassThru
+            if ($downgradeProcess.ExitCode -eq 0) {
+              throw 'The installer accepted a lower version while a newer canonical version marker was present.'
+            }
+            if (-not (Test-Path -LiteralPath $installedExe)) {
+              throw 'The downgrade guard removed the installed application instead of safely refusing the operation.'
+            }
+          } finally {
+            Set-ItemProperty -LiteralPath $versionMarkerPath -Name InstallerVersion -Value $env:INSTALLER_VERSION
+          }
+          Write-Host "Stale installer guard passed: $env:INSTALLER_VERSION was refused against marker $newerMarker."
 
           # An older cached MSI can invoke the current shared installer
           # script after this version has registered its identity. Reproduce
@@ -1092,7 +1153,7 @@ jobs:
             throw 'External-location identity remained registered after uninstall.'
           }
 
-      - name: Advance installer archive version
+      - name: Advance unified product version
         if: github.ref_type == 'branch'
         shell: pwsh
         env:
@@ -1114,7 +1175,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -- .github/installer/build-version.txt
-          git commit -m "Advance installer archive version to $env:NEXT_VERSION"
+          git commit -m "Advance Files max version to $env:NEXT_VERSION"
           git push origin "HEAD:refs/heads/$env:BUILD_BRANCH"
 
       - name: Stage versioned installer artifact

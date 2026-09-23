@@ -10,7 +10,10 @@
       Compressed="yes">
 
     <SummaryInformation Description="Files max" Manufacturer="YeSuper" />
-    <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="电脑中已经安装了更新版本的 Files max。" />
+    <!-- The public version line is now 1.0.x. Allow MSI to migrate installations
+         from the former 4.2.32.x line; the Burn BA blocks downgrades between
+         canonical 1.0.x versions before planning this MSI. -->
+    <MajorUpgrade Schedule="afterInstallInitialize" AllowDowngrades="yes" />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <!-- Ask the user to close Files during repair, upgrade, or uninstall so
@@ -114,6 +117,19 @@
         </RegistryKey>
       </Component>
 
+      <!-- This canonical version marker lets the bootstrapper distinguish a
+           legacy 4.2.32 install (no marker) from a newer 1.0.x install, so an
+           archived older installer cannot overwrite the current product. -->
+      <Component Id="InstallerVersionMarker" Guid="B53029E0-AC47-49B6-949D-42B5D18A4DB2">
+        <RegistryValue
+            Root="HKLM"
+            Key="Software\YeSuper\Files"
+            Name="InstallerVersion"
+            Type="string"
+            Value="$(var.AppVersion)"
+            KeyPath="yes" />
+      </Component>
+
       <Component Id="DriveShellIntegration" Guid="3ED18D14-8C7B-4D30-9E83-B0874D6DD9ED">
         <RegistryKey Root="HKLM" Key="Software\Classes\Drive\shell\FilesYeSuper">
           <RegistryValue Name="MUIVerb" Value="在 Files max 中打开" Type="string" />
@@ -159,7 +175,7 @@
 
     <SetProperty
         Id="UnregisterFilesIdentity"
-        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppLauncherScript]&quot; -Mode Uninstall -IdentityVersion &quot;[ProductVersion]&quot; -AttemptId &quot;[INSTALLERATTEMPTID]&quot; -LogFileName &quot;Files max Installer-script.log&quot; -ErrorFileName &quot;Files max Installer-error.log&quot;"
+        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppLauncherScript]&quot; -Mode Uninstall -IdentityVersion &quot;$(var.IdentityVersion)&quot; -AttemptId &quot;[INSTALLERATTEMPTID]&quot; -LogFileName &quot;Files max Installer-script.log&quot; -ErrorFileName &quot;Files max Installer-error.log&quot;"
         Before="UnregisterFilesIdentity"
         Sequence="execute"
         Condition="REMOVE=&quot;ALL&quot;" />
@@ -181,6 +197,7 @@
       <ComponentRef Id="InstallerSupportFiles" />
       <ComponentRef Id="StartMenuShortcut" />
       <ComponentRef Id="DirectoryShellIntegration" />
+      <ComponentRef Id="InstallerVersionMarker" />
       <ComponentRef Id="DriveShellIntegration" />
       <ComponentRef Id="DirectoryBackgroundShellIntegration" />
     </Feature>
