@@ -534,6 +534,8 @@ jobs:
 
       - name: Build external-location identity package and installer
         shell: pwsh
+        env:
+          INSTALLER_VERSION: ${{ steps.installer_version.outputs.current }}
         run: |
           $ErrorActionPreference = 'Stop'
           $workspace = $env:GITHUB_WORKSPACE
@@ -553,10 +555,24 @@ jobs:
 
           $sourcePackageManifest = Join-Path $workspace 'src\Files.App\Package.appxmanifest'
           [xml]$sourceManifest = Get-Content -LiteralPath $sourcePackageManifest
-          $appVersion = [string]$sourceManifest.Package.Identity.Version
-          if ($appVersion -notmatch '^\d+\.\d+\.\d+\.\d+$') {
-            throw "Invalid package version: $appVersion"
+          $sourceAppVersion = [version]$sourceManifest.Package.Identity.Version
+          if ($sourceAppVersion.Build -lt 0) {
+            throw "Invalid source package version: $($sourceManifest.Package.Identity.Version)"
           }
+
+          $archiveVersion = [version]$env:INSTALLER_VERSION
+          if ($archiveVersion.Build -lt 0 -or $archiveVersion.Build -gt 65535) {
+            throw "Installer archive patch is outside the Windows package version range: $env:INSTALLER_VERSION"
+          }
+
+          # Keep the established 4.2.32 product line so this is an upgrade
+          # over the previously shipped 4.2.32.0 identity, while using the
+          # archive patch as the monotonic build revision. The visible file
+          # remains "Files max Setup 1.0.x.exe"; Windows receives a real
+          # version change instead of another 4.2.32.0 repair package.
+          $appVersion = '{0}.{1}.{2}.{3}' -f `
+            $sourceAppVersion.Major, $sourceAppVersion.Minor, $sourceAppVersion.Build, $archiveVersion.Build
+          Write-Host "Installer archive version: $env:INSTALLER_VERSION; Windows product version: $appVersion"
 
           New-Item -ItemType Directory -Path $identityDir -Force | Out-Null
           $identityManifestPath = Join-Path $identityDir 'AppxManifest.xml'
@@ -941,8 +957,20 @@ jobs:
           }
 
           $appProcess = Start-Process -FilePath $installedExe -WorkingDirectory $installDir -PassThru
-          Start-Sleep -Seconds 5
-          if ($appProcess.HasExited) {
+          $windowFound = $false
+          for ($attempt = 0; $attempt -lt 60; $attempt++) {
+            Start-Sleep -Milliseconds 500
+            $appProcess.Refresh()
+            if ($appProcess.HasExited) {
+              break
+            }
+            if ($appProcess.MainWindowHandle -ne 0) {
+              $windowFound = $true
+              break
+            }
+          }
+
+          if ($appProcess.HasExited -or -not $windowFound) {
             $localStateDir = Join-Path $env:LOCALAPPDATA "Packages\$($identity.PackageFamilyName)\LocalState"
             $debugLog = Join-Path $localStateDir 'debug.log'
             if (Test-Path -LiteralPath $debugLog) {
@@ -954,9 +982,12 @@ jobs:
                 ForEach-Object { Get-ChildItem -Path $_.FullName -Recurse -Filter 'debug.log' -File -ErrorAction SilentlyContinue } |
                 ForEach-Object { Write-Host "Candidate log: $($_.FullName)"; Get-Content -LiteralPath $_.FullName }
             }
-            throw "Files exited during startup with code $($appProcess.ExitCode)."
+            if ($appProcess.HasExited) {
+              throw "Files exited during startup with code $($appProcess.ExitCode)."
+            }
+            throw 'Files process stayed alive but did not create a visible main window within 30 seconds.'
           }
-          Write-Host "Startup smoke test passed with process id $($appProcess.Id)."
+          Write-Host "Startup smoke test passed with process id $($appProcess.Id), window handle $($appProcess.MainWindowHandle), title '$($appProcess.MainWindowTitle)'."
           Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
 
           $repairProcess = Start-Process -FilePath $setupPath -ArgumentList '/repair', '/quiet', '/norestart' -Wait -PassThru

@@ -300,6 +300,7 @@ try {
 
     Set-InstallStage '读取应用身份包'
     $identityVersion = Get-IdentityPackageVersion $IdentityPackagePath
+    Write-InstallLog "Identity package version: $identityVersion"
 
     Set-InstallStage '验证应用签名证书'
     $certificate = Join-Path $root $CertificateFileName
@@ -374,6 +375,25 @@ try {
     if (-not $installedApp) {
         throw 'Files identity package was not registered after installation.'
     }
+
+    $registeredRoot = $null
+    try {
+        $registeredRoot = [IO.Path]::GetFullPath($installedApp.InstallLocation)
+    } catch {
+        throw "Unable to resolve the registered Files identity location: $($_.Exception.Message)"
+    }
+
+    $expectedRoot = [IO.Path]::GetFullPath($root)
+    if (-not [string]::Equals($registeredRoot.TrimEnd([char]92, [char]47), $expectedRoot.TrimEnd([char]92, [char]47), [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Files identity points to '$registeredRoot' instead of the current install directory '$expectedRoot'."
+    }
+
+    $registeredVersion = [version]$installedApp.Version
+    if ($registeredVersion -ne $identityVersion) {
+        throw "Files identity version mismatch: expected $identityVersion, registered $registeredVersion."
+    }
+
+    Write-InstallLog "Verified Files identity registration: version=$registeredVersion location=$registeredRoot"
 
     Set-InstallStage '清理旧版卸载注册'
     if (-not [string]::IsNullOrWhiteSpace($LegacyUninstallKeyName)) {
