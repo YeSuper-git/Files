@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 using CommunityToolkit.Mvvm.DependencyInjection;
-using CommunityToolkit.WinUI.Controls;
 using Files.App.Data.EventArguments;
 using Files.App.Data.Models;
 using Files.App.Data.Models.ResourceManager;
@@ -544,11 +543,11 @@ public sealed partial class ResourceLibraryPage : Page
     {
         var selectedTagIds = ReadTagIds(item.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
         ContentDialog? dialog = null;
-        var (tagEditor, _) = CreateTagEditor(selectedTagIds, () =>
+        var tagEditor = CreateTagEditor(selectedTagIds, () =>
         {
             dialog?.Hide();
             _ = ManageResourceTagsAsync();
-        });
+        }).Panel;
 
         dialog = new ContentDialog
         {
@@ -733,11 +732,11 @@ public sealed partial class ResourceLibraryPage : Page
         content.Children.Add(bodyGrid);
         content.Children.Add(new TextBlock { Text = "资源管理标签", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Margin = new Thickness(0, 4, 0, -6) });
         ContentDialog? actorDialog = null;
-        var (tagEditor, _) = CreateTagEditor(selectedTagIds, () =>
+        var tagEditor = CreateTagEditor(selectedTagIds, () =>
         {
             actorDialog?.Hide();
             _ = ManageResourceTagsAsync();
-        });
+        }).Panel;
         content.Children.Add(tagEditor);
 
         actorDialog = new ContentDialog
@@ -752,7 +751,7 @@ public sealed partial class ResourceLibraryPage : Page
         actorDialog.PrimaryButtonClick += (_, args) =>
         {
             if (!string.IsNullOrWhiteSpace(retirementBox.Text) &&
-                !TryParseRetirementDate(retirementBox.Text, out _))
+                !TryParseRetirementDate(retirementBox.Text, out var ignoredRetirementDate))
             {
                 args.Cancel = true;
                 retirementBox.Focus(FocusState.Programmatic);
@@ -764,7 +763,7 @@ public sealed partial class ResourceLibraryPage : Page
                 nameBox.Focus(FocusState.Programmatic);
             }
             else if (!string.IsNullOrWhiteSpace(heightBox.Text) &&
-                !int.TryParse(heightBox.Text, NumberStyles.None, CultureInfo.InvariantCulture, out _))
+                !int.TryParse(heightBox.Text, NumberStyles.None, CultureInfo.InvariantCulture, out var ignoredHeight))
             {
                 args.Cancel = true;
                 validationText.Text = "身高请输入整数厘米数值。";
@@ -772,7 +771,7 @@ public sealed partial class ResourceLibraryPage : Page
                 heightBox.Focus(FocusState.Programmatic);
             }
             else if (!string.IsNullOrWhiteSpace(weightBox.Text) &&
-                !decimal.TryParse(weightBox.Text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out _))
+                !decimal.TryParse(weightBox.Text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var ignoredWeight))
             {
                 args.Cancel = true;
                 validationText.Text = "体重请输入有效的 kg 数值。";
@@ -904,7 +903,7 @@ public sealed partial class ResourceLibraryPage : Page
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             var nameBox = new TextBox { Text = tag.Name, PlaceholderText = "标签名称", MinWidth = 180 };
-            var colorPicker = new ColorPicker
+            var colorPicker = new CommunityToolkit.WinUI.Controls.ColorPicker
             {
                 Color = ColorHelpers.FromHex(tag.Color),
                 IsAlphaEnabled = false,
@@ -1023,7 +1022,7 @@ public sealed partial class ResourceLibraryPage : Page
                 {
                     RecurseSubdirectories = true,
                     IgnoreInaccessible = true,
-                    AttributesToSkip = FileAttributes.ReparsePoint,
+                    AttributesToSkip = System.IO.FileAttributes.ReparsePoint,
                 };
                 return Directory.EnumerateFiles(actorFolderPath, "*", options)
                     .Count(path => videoExtensions.Contains(Path.GetExtension(path).TrimStart('.')));

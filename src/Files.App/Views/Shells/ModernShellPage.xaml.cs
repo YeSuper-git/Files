@@ -295,16 +295,17 @@ namespace Files.App.Views.Shells
 				return;
 
 			ToolbarViewModel.CanNavigateToParent = false;
-			if (string.IsNullOrEmpty(ShellViewModel?.WorkingDirectory))
+			var workingDirectory = ShellViewModel?.WorkingDirectory;
+			if (string.IsNullOrEmpty(workingDirectory))
 				return;
 
 #if FILES_RESOURCE_MANAGER
 			if (InstanceViewModel.IsResourceManagerMode &&
-				ResourceManagerPathScope.IsLibraryRoot(ShellViewModel.WorkingDirectory, InstanceViewModel.ResourceLibraryPath))
+				ResourceManagerPathScope.IsLibraryRoot(workingDirectory, InstanceViewModel.ResourceLibraryPath))
 				return;
 #endif
 
-			bool isPathRooted = string.Equals(ShellViewModel.WorkingDirectory, PathNormalization.GetPathRoot(ShellViewModel.WorkingDirectory), StringComparison.OrdinalIgnoreCase);
+			bool isPathRooted = string.Equals(workingDirectory, PathNormalization.GetPathRoot(workingDirectory), StringComparison.OrdinalIgnoreCase);
 			if (isPathRooted)
 			{
 				ItemDisplayFrame.Navigate(
@@ -318,13 +319,13 @@ namespace Files.App.Views.Shells
 			}
 			else
 			{
-				string parentDirectoryOfPath = ShellViewModel.WorkingDirectory.TrimEnd('\\', '/');
+				string parentDirectoryOfPath = workingDirectory.TrimEnd('\\', '/');
 
 				var lastSlashIndex = parentDirectoryOfPath.LastIndexOf('\\');
 				if (lastSlashIndex == -1)
 					lastSlashIndex = parentDirectoryOfPath.LastIndexOf('/');
 				if (lastSlashIndex != -1)
-					parentDirectoryOfPath = ShellViewModel.WorkingDirectory.Remove(lastSlashIndex);
+					parentDirectoryOfPath = workingDirectory.Remove(lastSlashIndex);
 				if (parentDirectoryOfPath.EndsWith(':'))
 					parentDirectoryOfPath += '\\';
 
