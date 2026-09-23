@@ -208,7 +208,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
         // MSI has migrated the installation. A registry version guard above
         // prevents this path from replacing a newer canonical 1.0.x install.
         args.Type = RelatedBundlePlanType.Upgrade;
-        LogDiagnostic($"Treating related bundle {args.BundleId} as the previous Files max release during canonical-version migration.");
+        LogDiagnostic($"Treating related bundle {args.BundleCode} as the previous Files max release during canonical-version migration.");
     }
 
     private void OnPlanRelatedBundle(object? sender, PlanRelatedBundleEventArgs args)
@@ -217,7 +217,7 @@ public sealed class FilesBootstrapperApplication : BootstrapperApplication
             return;
 
         args.State = RequestState.Absent;
-        LogDiagnostic($"Scheduling previous related bundle {args.BundleId} for removal after the canonical-version upgrade.");
+        LogDiagnostic($"Scheduling previous related bundle {args.BundleCode} for removal after the canonical-version upgrade.");
     }
 
     private static bool TryGetInstalledInstallerVersion(out Version? version, out string? error)
