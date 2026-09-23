@@ -76,10 +76,6 @@
                                     <StackPanel Padding="12,10,12,12">
                                         <TextBlock Text="{x:Bind Name}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                         <TextBlock Margin="0,3,0,0" Text="{x:Bind Subtitle}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                        <TextBlock Margin="0,6,0,0" Text="{x:Bind ActorInfoSummary}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                   TextWrapping="Wrap" MaxLines="2" Visibility="{x:Bind ActorInfoVisibility}" />
-                                        <Button Margin="0,8,0,0" Padding="8,4" HorizontalAlignment="Left" Content="编辑演员信息"
-                                                Visibility="{x:Bind ActorInfoVisibility}" Click="OnEditActorInfo" />
                                         <ItemsControl Margin="0,8,0,0" ItemsSource="{x:Bind Tags, Mode=OneWay}" Visibility="{x:Bind TagListVisibility}">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>

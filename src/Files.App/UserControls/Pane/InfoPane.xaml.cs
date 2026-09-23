@@ -66,6 +66,9 @@ namespace Files.App.UserControls
 		private void MenuFlyoutItem_Tapped(object sender, TappedRoutedEventArgs e)
 			=> ViewModel?.UpdateSelectedItemPreviewAsync(true);
 
+		private async void EditActorDetails_Click(object sender, RoutedEventArgs e)
+			=> await ViewModel.EditSelectedResourceActorAsync();
+
 		[DynamicWindowsRuntimeCast(typeof(UserControl))]
 		private void FileTag_PointerEntered(object sender, PointerRoutedEventArgs e)
 		{

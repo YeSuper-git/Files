@@ -2,6 +2,8 @@
 // Licensed under the MIT License.
 
 using Files.App.UserControls.FilePreviews;
+using Files.App.Data.Items.ResourceManager;
+using Files.App.ViewModels.Properties;
 using Files.App.ViewModels.Previews;
 using Files.Shared.Helpers;
 using Microsoft.Extensions.Logging;
@@ -56,6 +58,7 @@ namespace Files.App.ViewModels.UserControls
 					UpdateTagsItems();
 					SetDriveItem();
 					OnPropertyChanged(nameof(LoadTagsList));
+					RefreshResourceActorDetails();
 
 					if (value is not null)
 						value.PropertyChanged += SelectedItem_PropertyChanged;
@@ -140,7 +143,88 @@ namespace Files.App.ViewModels.UserControls
 			PreviewPaneState is PreviewPaneStates.NoPreviewAvailable ||
 			PreviewPaneState is PreviewPaneStates.PreviewAndDetailsAvailable;
 
+		public string SelectedItemDisplayName
+			=> SelectedItem is ResourceActorListedItem actor && !string.IsNullOrWhiteSpace(actor.ActorDetails.Name)
+				? actor.ActorDetails.Name
+				: SelectedItem?.Name ?? string.Empty;
+
+		public Visibility ResourceActorDetailsVisibility
+			=> SelectedItem is ResourceActorListedItem ? Visibility.Visible : Visibility.Collapsed;
+
+		public ObservableCollection<FileProperty> ResourceActorProperties { get; } = [];
+
 		public ObservableCollection<TagsListItem> Items { get; } = [];
+
+		public async Task EditSelectedResourceActorAsync()
+		{
+			if (SelectedItem is not ResourceActorListedItem actor || actor.EditActorDetailsAsync is not { } editActorDetailsAsync)
+				return;
+
+			await editActorDetailsAsync();
+			RefreshResourceActorDetails();
+		}
+
+		private void RefreshResourceActorDetails()
+		{
+			ResourceActorProperties.Clear();
+			OnPropertyChanged(nameof(SelectedItemDisplayName));
+			OnPropertyChanged(nameof(ResourceActorDetailsVisibility));
+
+			if (SelectedItem is not ResourceActorListedItem actor)
+				return;
+
+			var details = actor.ActorDetails;
+			AddActorProperty("别名", details.Aliases);
+			AddActorProperty("身高", string.IsNullOrWhiteSpace(details.HeightCm) ? string.Empty : $"{details.HeightCm} cm");
+			AddActorProperty("体重", string.IsNullOrWhiteSpace(details.WeightKg) ? string.Empty : $"{details.WeightKg} kg");
+
+			var measurements = new List<string>();
+			if (!string.IsNullOrWhiteSpace(details.Bust))
+				measurements.Add($"B {details.Bust}");
+			if (!string.IsNullOrWhiteSpace(details.Waist))
+				measurements.Add($"W {details.Waist}");
+			if (!string.IsNullOrWhiteSpace(details.Hip))
+				measurements.Add($"H {details.Hip}");
+			if (!string.IsNullOrWhiteSpace(details.CupSize))
+				measurements.Add($"罩杯 {details.CupSize}");
+			AddActorProperty("数值", string.Join(" / ", measurements));
+			AddActorProperty("生涯", details.CareerRetirementDate is { } retiredDate ? $"退役（{retiredDate:yyyy-MM-dd}）" : "在役");
+
+			var workCountProperty = new FileProperty { LocalizedName = "作品数量", Value = "正在统计…" };
+			ResourceActorProperties.Add(workCountProperty);
+			if (actor.CountActorVideosAsync is { } countActorVideosAsync)
+				_ = UpdateActorVideoCountAsync(actor, workCountProperty, countActorVideosAsync);
+		}
+
+		private void AddActorProperty(string name, string value)
+		{
+			if (!string.IsNullOrWhiteSpace(value))
+				ResourceActorProperties.Add(new FileProperty { LocalizedName = name, Value = value });
+		}
+
+		private async Task UpdateActorVideoCountAsync(ResourceActorListedItem actor, FileProperty workCountProperty, Func<Task<int>> countActorVideosAsync)
+		{
+			try
+			{
+				var count = await countActorVideosAsync();
+				if (SelectedItem != actor || !ResourceActorProperties.Contains(workCountProperty))
+					return;
+
+				var propertyIndex = ResourceActorProperties.IndexOf(workCountProperty);
+				if (propertyIndex >= 0)
+					ResourceActorProperties[propertyIndex] = new FileProperty { LocalizedName = "作品数量", Value = $"{count} 个" };
+			}
+			catch (Exception ex)
+			{
+				App.Logger.LogWarning(ex, "Unable to count actor videos for {ActorPath}", actor.ItemPath);
+				if (SelectedItem == actor && ResourceActorProperties.Contains(workCountProperty))
+				{
+					var propertyIndex = ResourceActorProperties.IndexOf(workCountProperty);
+					if (propertyIndex >= 0)
+						ResourceActorProperties[propertyIndex] = new FileProperty { LocalizedName = "作品数量", Value = "无法统计" };
+				}
+			}
+		}
 
 		public InfoPaneViewModel()
 		{

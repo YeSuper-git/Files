@@ -234,7 +234,7 @@
 					FontSize="20"
 					FontWeight="Bold"
 					IsTextSelectionEnabled="True"
-					Text="{x:Bind ViewModel.SelectedItem.Name, Mode=OneWay}"
+					Text="{x:Bind ViewModel.SelectedItemDisplayName, Mode=OneWay}"
 					TextAlignment="Center"
 					TextWrapping="Wrap"
 					Visibility="Collapsed" />
@@ -358,6 +358,27 @@
 						</DataTemplate>
 					</ItemsControl.ItemTemplate>
 				</ItemsControl>
+
+				<ItemsControl
+					Margin="12,12,12,0"
+					ItemsSource="{x:Bind ViewModel.ResourceActorProperties, Mode=OneWay}"
+					Visibility="{x:Bind ViewModel.ResourceActorDetailsVisibility, Mode=OneWay}">
+					<ItemsControl.ItemTemplate>
+						<DataTemplate x:DataType="properties:FileProperty">
+							<StackPanel Padding="0,8,0,8" Spacing="4">
+								<TextBlock Style="{StaticResource Local.FileDetailsHeaderTextBlockStyle}" Text="{x:Bind Name, Mode=OneWay}" />
+								<TextBlock IsTextSelectionEnabled="True" Style="{StaticResource Local.FileDetailsTextBlockStyle}" Text="{x:Bind ValueText, Mode=OneWay}" TextWrapping="Wrap" />
+							</StackPanel>
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+
+				<Button
+					Margin="12,12,12,0"
+					HorizontalAlignment="Left"
+					Content="编辑演员信息"
+					Click="EditActorDetails_Click"
+					Visibility="{x:Bind ViewModel.ResourceActorDetailsVisibility, Mode=OneWay}" />
 
 				<!--  Tags List  -->
 				<StackPanel

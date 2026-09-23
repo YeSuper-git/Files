@@ -3,6 +3,7 @@
 
 using CommunityToolkit.Mvvm.DependencyInjection;
 using Files.App.Data.EventArguments;
+using Files.App.Data.Items.ResourceManager;
 using Files.App.Data.Models;
 using Files.App.Data.Models.ResourceManager;
 using Files.App.Helpers;
@@ -211,16 +212,6 @@ public sealed partial class ResourceLibraryPage : Page
         SetNativeSelection(selectedItems.Count == 0 ? null : selectedItems);
     }
 
-    [DynamicWindowsRuntimeCast(typeof(FrameworkElement))]
-    private async void OnEditActorInfo(object sender, RoutedEventArgs e)
-    {
-        if (sender is FrameworkElement element &&
-            element.DataContext is ResourceBrowserItemViewModel { Kind: ResourceBrowserItemKind.ActorFolder } actor)
-        {
-            await EditActorDetailsAsync(actor);
-        }
-    }
-
     private void ClearSelectedResourceItems()
     {
         _selectedResourceItems.Clear();
@@ -232,7 +223,7 @@ public sealed partial class ResourceLibraryPage : Page
             shellPage.ToolbarViewModel.SelectedItems = items;
     }
 
-    private static ListedItem CreateListedItem(ResourceBrowserItemViewModel item)
+    private ListedItem CreateListedItem(ResourceBrowserItemViewModel item)
     {
         var isFile = item.Kind == ResourceBrowserItemKind.VideoFile;
         var info = isFile ? (FileSystemInfo)new FileInfo(item.Path) : new DirectoryInfo(item.Path);
@@ -249,19 +240,34 @@ public sealed partial class ResourceLibraryPage : Page
             // Resource browsing and native previews should still work on volumes without tag support.
         }
 
-        var listedItem = new ListedItem
+        ResourceActorListedItem? actorListedItem = null;
+        ListedItem listedItem = item.Kind == ResourceBrowserItemKind.ActorFolder
+            ? actorListedItem = new ResourceActorListedItem
+            {
+                ActorDetails = _workspace.GetActorDetails(item.Path),
+                CountActorVideosAsync = () => CountActorVideosAsync(item.Path),
+            }
+            : new ListedItem();
+
+        if (actorListedItem is not null)
         {
-            ItemPath = item.Path,
-            ItemNameRaw = Path.GetFileName(item.Path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)),
-            PrimaryItemAttribute = isFile ? StorageItemTypes.File : StorageItemTypes.Folder,
-            ItemType = isFile ? $"视频文件（{Path.GetExtension(item.Path).TrimStart('.').ToUpperInvariant()}）" : "文件夹",
-            FileExtension = isFile ? Path.GetExtension(item.Path) : null,
-            ItemDateModifiedReal = new DateTimeOffset(info.LastWriteTimeUtc, TimeSpan.Zero),
-            ItemDateCreatedReal = new DateTimeOffset(info.CreationTimeUtc, TimeSpan.Zero),
-            ItemDateAccessedReal = new DateTimeOffset(info.LastAccessTimeUtc, TimeSpan.Zero),
-            FileTags = fileTags,
-            FileFRN = fileReference,
-        };
+            actorListedItem.EditActorDetailsAsync = async () =>
+            {
+                await EditActorDetailsAsync(item);
+                actorListedItem.ActorDetails = _workspace.GetActorDetails(item.Path);
+            };
+        }
+
+        listedItem.ItemPath = item.Path;
+        listedItem.ItemNameRaw = Path.GetFileName(item.Path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        listedItem.PrimaryItemAttribute = isFile ? StorageItemTypes.File : StorageItemTypes.Folder;
+        listedItem.ItemType = isFile ? $"视频文件（{Path.GetExtension(item.Path).TrimStart('.').ToUpperInvariant()}）" : "文件夹";
+        listedItem.FileExtension = isFile ? Path.GetExtension(item.Path) : null;
+        listedItem.ItemDateModifiedReal = new DateTimeOffset(info.LastWriteTimeUtc, TimeSpan.Zero);
+        listedItem.ItemDateCreatedReal = new DateTimeOffset(info.CreationTimeUtc, TimeSpan.Zero);
+        listedItem.ItemDateAccessedReal = new DateTimeOffset(info.LastAccessTimeUtc, TimeSpan.Zero);
+        listedItem.FileTags = fileTags;
+        listedItem.FileFRN = fileReference;
 
         if (info is FileInfo fileInfo)
         {
@@ -826,6 +832,9 @@ public sealed partial class ResourceLibraryPage : Page
 
         await SaveTagsAsync(item.Path, selectedTagIds);
         await RefreshAsync();
+        var refreshedActor = BrowserItems.FirstOrDefault(candidate => string.Equals(candidate.Path, item.Path, StringComparison.OrdinalIgnoreCase));
+        if (refreshedActor is not null)
+            BrowserGrid.SelectedItems.Add(refreshedActor);
         StatusText.Text = $"已保存“{nameBox.Text.Trim()}”的演员信息。";
     }
 
