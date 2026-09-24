@@ -782,7 +782,7 @@ public sealed partial class ResourceLibraryPage : Page
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = XamlRoot,
         };
-        actorDialog.PrimaryButtonClick += (_, args) =>
+        actorDialog.PrimaryButtonClick += (sender, args) =>
         {
             if (!string.IsNullOrWhiteSpace(birthDateBox.Text) &&
                 !TryParseRetirementDate(birthDateBox.Text, out _))

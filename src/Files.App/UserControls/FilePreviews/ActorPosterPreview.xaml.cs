@@ -5,6 +5,7 @@ using Files.App.Data.Items.ResourceManager;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
+using System.IO;
 using Windows.Storage;
 
 namespace Files.App.UserControls.FilePreviews;
@@ -23,11 +24,12 @@ public sealed partial class ActorPosterPreview : UserControl
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        if (!string.IsNullOrWhiteSpace(actor.MainPosterPath) &&
-            File.Exists(actor.MainPosterPath) &&
-            !_posterPaths.Contains(actor.MainPosterPath, StringComparer.OrdinalIgnoreCase))
+        var mainPosterPath = actor.MainPosterPath;
+        if (!string.IsNullOrWhiteSpace(mainPosterPath) &&
+            File.Exists(mainPosterPath) &&
+            !_posterPaths.Contains(mainPosterPath, StringComparer.OrdinalIgnoreCase))
         {
-            _posterPaths.Insert(0, actor.MainPosterPath);
+            _posterPaths.Insert(0, mainPosterPath);
         }
 
         InitializeComponent();
