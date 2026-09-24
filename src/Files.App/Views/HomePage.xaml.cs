@@ -39,6 +39,7 @@ namespace Files.App.Views
 			AttachHomeAssistantPanel();
 		}
 
+		[DynamicWindowsRuntimeCast(typeof(FrameworkElement))]
 		private void AttachHomeAssistantPanel()
 		{
 			if (Content is not FrameworkElement widgetsContent)
