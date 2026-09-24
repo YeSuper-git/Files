@@ -5,7 +5,6 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:vm="using:Files.App.ViewModels.ResourceManager"
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
@@ -35,7 +34,7 @@
                     x:Name="BrowserGrid"
                     Padding="12"
                     IsItemClickEnabled="False"
-                    ItemsSource="{x:Bind BrowserItems, Mode=OneWay}"
+                    ItemsSource="{Binding BrowserItems, Mode=OneWay}"
                     SelectionChanged="OnBrowserSelectionChanged"
                     SelectionMode="Extended">
                     <GridView.ItemsPanel>
@@ -52,11 +51,10 @@
                         </Style>
                     </GridView.ItemContainerStyle>
                     <GridView.ItemTemplate>
-                        <DataTemplate x:DataType="vm:ResourceBrowserItemViewModel">
+                        <DataTemplate>
                             <Border
-                                Width="{x:Bind CardWidth}"
+                                Width="{Binding CardWidth, Mode=OneWay}"
                                 Padding="0"
-                                DataContext="{x:Bind}"
                                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                 BorderThickness="1"
@@ -64,19 +62,19 @@
                                 RightTapped="OnBrowserItemRightTapped"
                                 DoubleTapped="OnBrowserItemDoubleTapped">
                                 <StackPanel>
-                                    <Border Height="{x:Bind PosterHeight}" CornerRadius="10,10,0,0" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                    <Border Height="{Binding PosterHeight, Mode=OneWay}" CornerRadius="10,10,0,0" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
                                         <Grid>
-                                            <Image Source="{x:Bind Poster, Mode=OneWay}" Stretch="UniformToFill" Visibility="{x:Bind PosterVisibility}" />
-                                            <FontIcon Glyph="{x:Bind FallbackGlyph}" FontSize="42" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorTertiaryBrush}" Visibility="{x:Bind FallbackVisibility}" />
+                                            <Image Source="{Binding Poster, Mode=OneWay}" Stretch="UniformToFill" Visibility="{Binding PosterVisibility, Mode=OneWay}" />
+                                            <FontIcon Glyph="{Binding FallbackGlyph, Mode=OneWay}" FontSize="42" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorTertiaryBrush}" Visibility="{Binding FallbackVisibility, Mode=OneWay}" />
                                             <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Padding="7,3" Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}" CornerRadius="5">
-                                                <TextBlock Text="{x:Bind KindLabel}" FontSize="12" />
+                                                <TextBlock Text="{Binding KindLabel, Mode=OneWay}" FontSize="12" />
                                             </Border>
                                         </Grid>
                                     </Border>
                                     <StackPanel Padding="12,10,12,12">
-                                        <TextBlock Text="{x:Bind Name}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Margin="0,3,0,0" Text="{x:Bind Subtitle}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                        <ItemsControl Margin="0,8,0,0" ItemsSource="{x:Bind Tags, Mode=OneWay}" Visibility="{x:Bind TagListVisibility}">
+                                        <TextBlock Text="{Binding Name, Mode=OneWay}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Margin="0,3,0,0" Text="{Binding Subtitle, Mode=OneWay}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding Tags, Mode=OneWay}" Visibility="{Binding TagListVisibility, Mode=OneWay}">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>
                                                     <WrapGrid Orientation="Horizontal" MaximumRowsOrColumns="2" />

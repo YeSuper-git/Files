@@ -42,6 +42,7 @@ public sealed partial class ResourceLibraryPage : Page
     public ResourceLibraryPage()
     {
         InitializeComponent();
+        DataContext = this;
         Unloaded += OnPageUnloaded;
     }
 

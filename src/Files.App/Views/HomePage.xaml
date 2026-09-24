@@ -415,13 +415,8 @@
 
 	</UserControl.Resources>
 
-	<!-- Keep the original home widgets intact; the assistant is an additional docked component. -->
-	<Grid>
-		<Grid.RowDefinitions>
-			<RowDefinition Height="*" />
-			<RowDefinition Height="Auto" />
-		</Grid.RowDefinitions>
-		<ScrollViewer Grid.Row="0" Background="Transparent" RightTapped="ScrollViewer_RightTapped">
+	<!--  Widget List  -->
+	<ScrollViewer Background="Transparent" RightTapped="ScrollViewer_RightTapped">
 		<FlyoutBase.AttachedFlyout>
 			<MenuFlyout x:Name="HomePageContextMenu">
 				<MenuFlyoutSubItem Text="{helpers:ResourceString Name=Widgets}">
@@ -551,59 +546,6 @@
 				<TransitionCollection />
 			</ListView.ItemContainerTransitions>
 		</ListView>
-		</ScrollViewer>
-
-		<Border
-			Grid.Row="1"
-			MaxWidth="920"
-			Margin="24,8,24,16"
-			Padding="18,14"
-			HorizontalAlignment="Center"
-			Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-			BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-			BorderThickness="1"
-			CornerRadius="16">
-			<StackPanel Spacing="10">
-				<StackPanel Spacing="2">
-					<TextBlock FontSize="16" FontWeight="SemiBold" Text="今天想看点什么？" />
-					<TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="选一个提示词开始，或者直接描述你想看的作品。" TextWrapping="Wrap" />
-				</StackPanel>
-				<ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-					<StackPanel Orientation="Horizontal" Spacing="8">
-						<Button Click="AssistantPromptButton_Click" Tag="今天想看哪位演员的作品？" Content="今天想看哪位演员？" />
-						<Button Click="AssistantPromptButton_Click" Tag="推荐没看过的作品" Content="推荐没看过的" />
-						<Button Click="AssistantPromptButton_Click" Tag="想二刷已看过的作品" Content="想二刷已看过的" />
-						<Button Click="AssistantPromptButton_Click" Tag="直接随机推荐几部作品" Content="直接随机推荐" />
-					</StackPanel>
-				</ScrollViewer>
-				<Grid ColumnSpacing="8">
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="*" />
-						<ColumnDefinition Width="Auto" />
-					</Grid.ColumnDefinitions>
-					<TextBox
-						x:Name="HomeAssistantInput"
-						MinHeight="48"
-						MaxHeight="96"
-						AcceptsReturn="True"
-						PlaceholderText="输入演员名、观看状态或想找的内容……"
-						TextWrapping="Wrap"
-						KeyDown="HomeAssistantInput_KeyDown" />
-					<Button
-						Grid.Column="1"
-						MinWidth="112"
-						VerticalAlignment="Bottom"
-						Click="SendHomeAssistant_Click"
-						Content="开始对话"
-						Style="{StaticResource AccentButtonStyle}" />
-				</Grid>
-				<TextBlock
-					x:Name="HomeAssistantStatusText"
-					Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-					TextWrapping="Wrap"
-					Visibility="Collapsed" />
-			</StackPanel>
-		</Border>
-	</Grid>
+	</ScrollViewer>
 
 </Page>
