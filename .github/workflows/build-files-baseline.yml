@@ -180,11 +180,40 @@ jobs:
 
           $makeAppx = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\makeappx.exe' |
             Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          $makePri = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\makepri.exe' |
+            Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
           $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe' |
             Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
-          if (-not $makeAppx -or -not $signtool) {
-            throw 'Windows SDK makeappx.exe or signtool.exe was not found.'
+          if (-not $makeAppx -or -not $makePri -or -not $signtool) {
+            throw 'Windows SDK makeappx.exe, makepri.exe, or signtool.exe was not found.'
           }
+
+          # The external-location identity package must index its alternate-form
+          # assets. Merely copying the unplated PNGs into the MSIX leaves them
+          # invisible to Windows resource selection, so the shell falls back to
+          # the plated VisualElements logo for taskbar icons.
+          $identityPriPath = Join-Path $identityDir 'resources.pri'
+          $identityPriConfigPath = Join-Path $identityDir 'priconfig.xml'
+          $identityPriDumpPath = Join-Path $identityDir 'resources-dump.xml'
+          & $makePri createconfig /cf $identityPriConfigPath /dq en-US
+          if ($LASTEXITCODE -ne 0) {
+            throw "Identity package PRI configuration creation failed with exit code $LASTEXITCODE."
+          }
+          & $makePri new /pr $identityDir /cf $identityPriConfigPath /mn $identityManifestPath /of $identityPriPath /o
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $identityPriPath -PathType Leaf)) {
+            throw "Identity package resources.pri generation failed with exit code $LASTEXITCODE."
+          }
+          & $makePri dump /if $identityPriPath /of $identityPriDumpPath
+          if ($LASTEXITCODE -ne 0) {
+            throw "Identity package resources.pri verification failed with exit code $LASTEXITCODE."
+          }
+          $identityPriDump = Get-Content -LiteralPath $identityPriDumpPath -Raw
+          $unindexedTaskbarIcons = @($taskbarIconAssets | Where-Object { $identityPriDump -notlike "*$($_.Name)*" })
+          if ($unindexedTaskbarIcons.Count -gt 0) {
+            throw "Identity resources.pri does not index taskbar variants: $($unindexedTaskbarIcons.Name -join ', ')"
+          }
+          Remove-Item -LiteralPath $identityPriConfigPath, $identityPriDumpPath -Force
+          Write-Host "Generated resources.pri and verified all $($taskbarIconAssets.Count) taskbar icon variants are indexed."
 
           & $makeAppx pack /o /d $identityDir /nv /p $identityPackage
           if ($LASTEXITCODE -ne 0) {
@@ -194,6 +223,9 @@ jobs:
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $identityArchive = [IO.Compression.ZipFile]::OpenRead($identityPackage)
           try {
+            if (-not $identityArchive.GetEntry('resources.pri')) {
+              throw 'Identity MSIX is missing resources.pri; Windows cannot resolve taskbar icon variants.'
+            }
             $missingPackagedTaskbarIcons = @(
               foreach ($asset in $taskbarIconAssets) {
                 $entryName = "Assets/AppTiles/Dev/$($asset.Name)"

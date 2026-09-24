@@ -38,9 +38,9 @@ namespace Files.App
 			AppWindow.TitleBar.ButtonPressedBackgroundColor = Colors.Transparent;
 			AppWindow.TitleBar.ButtonHoverBackgroundColor = Colors.Transparent;
 
-			// Set the icon before the window is first shown. Windows 11 can cache
-			// the taskbar icon during initial activation, so deferring this call
-			// can leave the default square executable icon in the taskbar.
+			// Keep the native window icon on the same Logo.ico used by the installer.
+			// For this packaged WinUI app, Windows resolves the taskbar icon from the
+			// identity manifest and its PRI-indexed altform-unplated assets instead.
 			AppWindow.SetIcon(AppLifecycleHelper.AppIconPath);
 		}
 

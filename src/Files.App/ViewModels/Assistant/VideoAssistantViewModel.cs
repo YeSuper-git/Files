@@ -156,33 +156,41 @@ public sealed partial class VideoAssistantViewModel : ObservableObject
     {
         var previousLibraryPath = _context.LibraryPath;
         _context = context;
-        _actors = await _searchService.GetActorsAsync(context.LibraryPath);
-
-        if (!_hasBeenConfigured)
+        IsBusy = true;
+        try
         {
-            _hasBeenConfigured = true;
-            await StartConversationAsync();
-            return;
-        }
+            _actors = await _searchService.GetActorsAsync(context.LibraryPath);
 
-        if (!PathEquals(previousLibraryPath, context.LibraryPath) && _actors.Count > 0)
-        {
-            await StartConversationAsync();
-            return;
-        }
-
-        if (!string.IsNullOrWhiteSpace(context.CurrentActorPath))
-        {
-            var contextualActor = _actors.FirstOrDefault(actor => PathEquals(actor.Path, context.CurrentActorPath));
-            if (contextualActor is not null && (_selectedActor is null || !PathEquals(_selectedActor.Path, contextualActor.Path)))
+            if (!_hasBeenConfigured)
             {
-                _selectedActor = contextualActor;
-                _watchFilter = VideoAssistantWatchFilter.Any;
-                _selectedTagId = null;
-                _keyword = string.Empty;
-                _excludedPaths.Clear();
-                await AskWatchStatusAsync();
+                _hasBeenConfigured = true;
+                await StartConversationAsync();
+                return;
             }
+
+            if (!PathEquals(previousLibraryPath, context.LibraryPath) && _actors.Count > 0)
+            {
+                await StartConversationAsync();
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(context.CurrentActorPath))
+            {
+                var contextualActor = _actors.FirstOrDefault(actor => PathEquals(actor.Path, context.CurrentActorPath));
+                if (contextualActor is not null && (_selectedActor is null || !PathEquals(_selectedActor.Path, contextualActor.Path)))
+                {
+                    _selectedActor = contextualActor;
+                    _watchFilter = VideoAssistantWatchFilter.Any;
+                    _selectedTagId = null;
+                    _keyword = string.Empty;
+                    _excludedPaths.Clear();
+                    await AskWatchStatusAsync();
+                }
+            }
+        }
+        finally
+        {
+            IsBusy = false;
         }
     }
 
@@ -248,6 +256,9 @@ public sealed partial class VideoAssistantViewModel : ObservableObject
         }
     }
 
+    public void ShowNotice(string message)
+        => AddAssistantMessage(message);
+
     public async Task ChooseAsync(VideoAssistantChoice choice)
     {
         if (IsBusy)
@@ -266,7 +277,12 @@ public sealed partial class VideoAssistantViewModel : ObservableObject
                     if (_selectedActor is not null)
                     {
                         _actorPage = 0;
-                        await AskWatchStatusAsync();
+                        if (_watchFilter == VideoAssistantWatchFilter.Any)
+                            await AskWatchStatusAsync();
+                        else
+                            await RecommendAsync(_watchFilter == VideoAssistantWatchFilter.Watched
+                                ? $"我来找“{_selectedActor.Name}”已看过、适合二刷的作品。"
+                                : $"我来找“{_selectedActor.Name}”还没看过的作品。", true);
                     }
                     break;
                 case VideoAssistantChoiceKind.RandomActor:

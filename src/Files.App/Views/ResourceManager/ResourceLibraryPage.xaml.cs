@@ -34,6 +34,7 @@ public sealed partial class ResourceLibraryPage : Page
     private readonly List<ResourceBrowserLocation> _locations = [];
     private readonly Dictionary<string, (ListedItem Item, ResourceBrowserItemViewModel ViewModel)> _selectedResourceItems = new(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource? _loadCancellation;
+    private VideoAssistantChatView? _assistantChatView;
     private string _libraryPath = string.Empty;
 
     public System.Collections.ObjectModel.ObservableCollection<ResourceBrowserItemViewModel> BrowserItems { get; } = [];
@@ -41,7 +42,6 @@ public sealed partial class ResourceLibraryPage : Page
     public ResourceLibraryPage()
     {
         InitializeComponent();
-        AssistantChatView.CloseRequested += (_, _) => AssistantFloatingPanel.Visibility = Visibility.Collapsed;
         Unloaded += OnPageUnloaded;
     }
 
@@ -50,24 +50,39 @@ public sealed partial class ResourceLibraryPage : Page
         if (AssistantFloatingPanel.Visibility == Visibility.Visible)
             return;
 
-        var actorPath = _locations.FirstOrDefault(location => location.Kind == ResourceBrowserLocationKind.ActorFolder)?.Path;
-        await AssistantChatView.ConfigureAsync(new VideoAssistantContext
+        try
         {
-            LibraryPath = _libraryPath,
-            CurrentActorPath = actorPath,
-            OpenResourceManagerAsync = () =>
+            if (_assistantChatView is null)
             {
-                AssistantFloatingPanel.Visibility = Visibility.Collapsed;
-                _contentPageContext.ShellPage?.NavigateToResourceManager();
-                return Task.CompletedTask;
-            },
-            OpenLocationAsync = async candidate =>
+                _assistantChatView = new VideoAssistantChatView();
+                _assistantChatView.CloseRequested += (_, _) => AssistantFloatingPanel.Visibility = Visibility.Collapsed;
+                AssistantFloatingPanel.Child = _assistantChatView;
+            }
+
+            AssistantFloatingPanel.Visibility = Visibility.Visible;
+            var actorPath = _locations.FirstOrDefault(location => location.Kind == ResourceBrowserLocationKind.ActorFolder)?.Path;
+            await _assistantChatView.ConfigureAsync(new VideoAssistantContext
             {
-                AssistantFloatingPanel.Visibility = Visibility.Collapsed;
-                await TryNavigateToResourcePathAsync(candidate.FolderPath);
-            },
-        });
-        AssistantFloatingPanel.Visibility = Visibility.Visible;
+                LibraryPath = _libraryPath,
+                CurrentActorPath = actorPath,
+                OpenResourceManagerAsync = () =>
+                {
+                    AssistantFloatingPanel.Visibility = Visibility.Collapsed;
+                    _contentPageContext.ShellPage?.NavigateToResourceManager();
+                    return Task.CompletedTask;
+                },
+                OpenLocationAsync = async candidate =>
+                {
+                    AssistantFloatingPanel.Visibility = Visibility.Collapsed;
+                    await TryNavigateToResourcePathAsync(candidate.FolderPath);
+                },
+            });
+        }
+        catch (Exception ex)
+        {
+            AssistantFloatingPanel.Visibility = Visibility.Collapsed;
+            StatusText.Text = $"视频助手打开失败：{ex.Message}";
+        }
     }
 
     protected override async void OnNavigatedTo(NavigationEventArgs e)
@@ -144,6 +159,7 @@ public sealed partial class ResourceLibraryPage : Page
     private void OnPageUnloaded(object sender, RoutedEventArgs e)
     {
         _loadCancellation?.Cancel();
+        AssistantFloatingPanel.Visibility = Visibility.Collapsed;
         ClearSelectedResourceItems();
     }
 

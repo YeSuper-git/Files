@@ -6,7 +6,6 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:vm="using:Files.App.ViewModels.ResourceManager"
-    xmlns:assistant="using:Files.App.UserControls.Assistant"
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
@@ -115,9 +114,7 @@
             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
             CornerRadius="14"
-            Visibility="Collapsed">
-            <assistant:VideoAssistantChatView x:Name="AssistantChatView" />
-        </Border>
+            Visibility="Collapsed" />
         <Button
             Grid.RowSpan="3"
             Margin="0,0,0,0"

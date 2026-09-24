@@ -9,6 +9,7 @@ using Files.App.Data.Models;
 using Files.App.Services.ResourceManager;
 using Files.App.UserControls.Assistant;
 using Files.App.ViewModels.Assistant;
+using Windows.System;
 using WinRT;
 
 namespace Files.App.Views
@@ -23,6 +24,7 @@ namespace Files.App.Views
 		// Properties
 
 		private IShellPage? appInstance;
+		private bool isVideoAssistantOpening;
 		private IShellPage AppInstance
 			=> appInstance ?? throw new InvalidOperationException("The home page has not been initialized.");
 
@@ -39,45 +41,101 @@ namespace Files.App.Views
 				ViewModel.ReloadWidgetsCommand.Execute(e);
 		}
 
-		private async void OpenVideoAssistant_Click(object sender, RoutedEventArgs e)
+		private async void AssistantPromptButton_Click(object sender, RoutedEventArgs e)
 		{
-			var workspace = Ioc.Default.GetRequiredService<IResourceWorkspaceService>();
-			var assistantView = new VideoAssistantChatView();
-			ContentDialog? dialog = null;
-			dialog = new ContentDialog
+			if (sender is Button { Tag: string prompt })
+				await OpenVideoAssistantAsync(prompt);
+		}
+
+		private async void SendHomeAssistant_Click(object sender, RoutedEventArgs e)
+			=> await OpenVideoAssistantAsync(HomeAssistantInput.Text);
+
+		private async void HomeAssistantInput_KeyDown(object sender, KeyRoutedEventArgs e)
+		{
+			if (e.Key != VirtualKey.Enter || Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down))
+				return;
+
+			e.Handled = true;
+			await OpenVideoAssistantAsync(HomeAssistantInput.Text);
+		}
+
+		private async Task OpenVideoAssistantAsync(string? initialPrompt = null)
+		{
+			if (isVideoAssistantOpening)
+				return;
+
+			isVideoAssistantOpening = true;
+			try
 			{
-				Content = assistantView,
-				CloseButtonText = "关闭",
-				DefaultButton = ContentDialogButton.Close,
-				MaxWidth = 860,
-				XamlRoot = XamlRoot,
-			};
-			assistantView.CloseRequested += (_, _) => dialog.Hide();
-			await assistantView.ConfigureAsync(new VideoAssistantContext
+				HomeAssistantStatusText.Text = string.Empty;
+				HomeAssistantStatusText.Visibility = Visibility.Collapsed;
+				var workspace = Ioc.Default.GetRequiredService<IResourceWorkspaceService>();
+				var assistantView = new VideoAssistantChatView();
+				var dialog = new ContentDialog
+				{
+					Content = assistantView,
+					CloseButtonText = "关闭",
+					DefaultButton = ContentDialogButton.Close,
+					MaxWidth = 860,
+					XamlRoot = XamlRoot,
+				};
+				assistantView.CloseRequested += (_, _) => dialog.Hide();
+				dialog.Opened += (_, _) => _ = ConfigureVideoAssistantAsync(assistantView, workspace, initialPrompt, dialog);
+				await dialog.ShowAsync();
+			}
+			catch (Exception ex)
 			{
-				LibraryPath = workspace.LibraryPath,
-				OpenResourceManagerAsync = () =>
+				HomeAssistantStatusText.Text = $"视频助手打开失败：{ex.Message}";
+				HomeAssistantStatusText.Visibility = Visibility.Visible;
+			}
+			finally
+			{
+				isVideoAssistantOpening = false;
+				HomeAssistantInput.Text = string.Empty;
+			}
+		}
+
+		private async Task ConfigureVideoAssistantAsync(
+			VideoAssistantChatView assistantView,
+			IResourceWorkspaceService workspace,
+			string? initialPrompt,
+			ContentDialog dialog)
+		{
+			try
+			{
+				await assistantView.ConfigureAsync(new VideoAssistantContext
 				{
-					dialog.Hide();
-					AppInstance.NavigateToResourceManager();
-					return Task.CompletedTask;
-				},
-				OpenLocationAsync = candidate =>
-				{
-					dialog.Hide();
-					AppInstance.NavigateToResourceLibraryLocation(new NavigationArguments
+					LibraryPath = workspace.LibraryPath,
+					OpenResourceManagerAsync = () =>
 					{
-						NavPathParam = "ResourceManager",
-						IsResourceLibraryPage = true,
-						ResourceLibraryPath = workspace.LibraryPath,
-						ResourceLocationPaths = candidate.LocationPaths.ToArray(),
-						ResourceLocationKinds = candidate.LocationKinds.ToArray(),
-						ResourceLocationTitles = candidate.LocationTitles.ToArray(),
-					});
-					return Task.CompletedTask;
-				},
-			});
-			await dialog.ShowAsync();
+						dialog.Hide();
+						AppInstance.NavigateToResourceManager();
+						return Task.CompletedTask;
+					},
+					OpenLocationAsync = candidate =>
+					{
+						dialog.Hide();
+						AppInstance.NavigateToResourceLibraryLocation(new NavigationArguments
+						{
+							NavPathParam = "ResourceManager",
+							IsResourceLibraryPage = true,
+							ResourceLibraryPath = workspace.LibraryPath,
+							ResourceLocationPaths = candidate.LocationPaths.ToArray(),
+							ResourceLocationKinds = candidate.LocationKinds.ToArray(),
+							ResourceLocationTitles = candidate.LocationTitles.ToArray(),
+						});
+						return Task.CompletedTask;
+					},
+				});
+
+				if (!string.IsNullOrWhiteSpace(initialPrompt) &&
+					!initialPrompt.Contains("今天想看哪位演员", StringComparison.Ordinal))
+					await assistantView.ViewModel.SubmitAsync(initialPrompt);
+			}
+			catch (Exception ex)
+			{
+				assistantView.ViewModel.ShowNotice($"视频助手初始化失败：{ex.Message}");
+			}
 		}
 
 		// Methods
