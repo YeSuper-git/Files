@@ -51,7 +51,7 @@ public sealed class VideoAssistantMessage(string text, bool isUser, IReadOnlyLis
     public IReadOnlyList<VideoAssistantCandidateViewModel> Results { get; } = results ?? [];
 }
 
-public sealed class VideoAssistantCandidateViewModel(VideoAssistantCandidate candidate) : ObservableObject
+public sealed partial class VideoAssistantCandidateViewModel(VideoAssistantCandidate candidate) : ObservableObject
 {
     private BitmapImage? _poster;
     private ResourceVideoWatchStatus _watchStatus = candidate.WatchStatus;
@@ -107,7 +107,7 @@ public sealed class VideoAssistantCandidateViewModel(VideoAssistantCandidate can
     public string? PosterPath { get; } = candidate.PosterPath;
 }
 
-public sealed class VideoAssistantViewModel : ObservableObject
+public sealed partial class VideoAssistantViewModel : ObservableObject
 {
     private const int ActorsPerPage = 8;
     private readonly VideoAssistantSearchService _searchService;
