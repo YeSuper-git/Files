@@ -1,5 +1,21 @@
 # Files max installer build history
 
+## 2026-09-24 — 1.0.13
+
+- Workflow: [Build Files max run 36010956224](https://github.com/YeSuper-git/Files/actions/runs/36010956224)
+- Result: succeeded on the first attempt. Windows smoke tests passed for silent install, version/upgrade guards, startup, repair, and uninstall; no failed attempts.
+- Time: 12m39s end-to-end (10m41s build job + 1m45s smoke-test job).
+- Artifact: `Files max Setup 1.0.13.exe`, 205,363,857 bytes, SHA-256 `a8ea9643f91a6d524c539c3ff18f787b6ebef1f1f4adaded5af2b118aca8f802`.
+- Local copy: `artifacts/installer-1.0.13/Files max Setup 1.0.13.exe` (ignored build output; not committed).
+- Version state advanced by the workflow from 1.0.13 to 1.0.14 after the smoke test passed.
+- Taskbar identity package check passed: generated `resources.pri`, verified all 28 taskbar icon variants were indexed and included in the MSIX.
+
+### Timing and post-build review
+
+- The NuGet package cache hit, but the source-keyed application publish cache missed because app source had changed since the prior installer. Main app publish took 4m47.6s; identity/MSI/Burn packaging took 2m44s. The successful run populated the current-source publish cache (`Windows-files-max-publish-true-e306c1058698f2a216fc663d1ceddfc7feed1d8ff011447a06b6c590ad825d76`), so a same-source fast build can skip that publish phase next time.
+- No build or smoke-test failure occurred, so there were no failed attempts or failure causes to repair.
+- Warnings to track: CS0618 for the `NativeStorageLegacyService` registration (logged twice); IL2104 from third-party `TagLibSharp` and `FluentFTP`; nine IL3054 generic-recursion diagnostics in nested `BulkConcurrentObservableCollection<GroupedCollection<...>>` instantiations; and two WIX1076/ICE61 diagnostics because the MSI upgrade table has no maximum version while downgrades are allowed. None were suppressed. The collection recursion warning merits a separate code-path/AOT review; changing the MSI range without validating downgrade and data-preserving upgrade behavior would be unsafe. The smoke test passed those installer scenarios.
+
 ## 2026-09-24 — 1.0.12
 
 - Workflow: [Build Files max run 35944331577](https://github.com/YeSuper-git/Files/actions/runs/35944331577)
