@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Navigation;
+using Microsoft.Extensions.Logging;
 using System.IO;
 using Windows.System;
 #if FILES_RESOURCE_MANAGER
@@ -46,6 +47,9 @@ namespace Files.App.Views.Shells
 		public ModernShellPage() : base(new CurrentInstanceViewModel())
 		{
 			InitializeComponent();
+#if FILES_RESOURCE_MANAGER
+			ItemDisplayFrame.NavigationFailed += ItemDisplayFrame_NavigationFailed;
+#endif
 
 			ShellViewModel = new ShellViewModel(InstanceViewModel.FolderSettings);
 			ShellViewModel.WorkingDirectoryModified += ViewModel_WorkingDirectoryModified;
@@ -200,55 +204,128 @@ namespace Files.App.Views.Shells
 
 		private async void ItemDisplayFrame_Navigated(object sender, NavigationEventArgs e)
 		{
-			ContentPage = await GetContentOrNullAsync();
-
-			ToolbarViewModel.UpdateAdditionalActions();
-			if (ItemDisplayFrame.CurrentSourcePageType == typeof(DetailsLayoutPage) ||
-				ItemDisplayFrame.CurrentSourcePageType == typeof(GridLayoutPage))
+			try
 			{
-				// Reset DataGrid Rows that may be in "cut" command mode
-				ContentPage!.ResetItemOpacity();
-			}
+				ContentPage = await GetContentOrNullAsync();
 
-			var parameters = (e.Parameter as NavigationArguments)!;
-			var isTagSearch = parameters.NavPathParam is not null && parameters.NavPathParam.StartsWith("tag:");
-			TabBarItemParameter = new()
-			{
-				InitialPageType = typeof(ModernShellPage),
-				NavigationParameter = parameters.IsSearchResultPage && !isTagSearch ? parameters.SearchPathParam : parameters.NavPathParam
-			};
+				ToolbarViewModel.UpdateAdditionalActions();
+				if (ItemDisplayFrame.CurrentSourcePageType == typeof(DetailsLayoutPage) ||
+					ItemDisplayFrame.CurrentSourcePageType == typeof(GridLayoutPage))
+				{
+					// Reset DataGrid Rows that may be in "cut" command mode
+					ContentPage!.ResetItemOpacity();
+				}
 
-			if (parameters.IsLayoutSwitch)
-				FilesystemViewModel_DirectoryInfoUpdated(sender, EventArgs.Empty);
+				var parameters = (e.Parameter as NavigationArguments)!;
+				var isTagSearch = parameters.NavPathParam is not null && parameters.NavPathParam.StartsWith("tag:");
+				TabBarItemParameter = new()
+				{
+					InitialPageType = typeof(ModernShellPage),
+					NavigationParameter = parameters.IsSearchResultPage && !isTagSearch ? parameters.SearchPathParam : parameters.NavPathParam
+				};
 
-			// Update the ShellViewModel with the current working directory
-			// Fixes https://github.com/files-community/Files/issues/17469
-			if (parameters.IsSearchResultPage == false)
-				ShellViewModel!.IsSearchResults = false;
+				if (parameters.IsLayoutSwitch)
+					FilesystemViewModel_DirectoryInfoUpdated(sender, EventArgs.Empty);
+
+				// Update the ShellViewModel with the current working directory
+				// Fixes https://github.com/files-community/Files/issues/17469
+				if (parameters.IsSearchResultPage == false)
+					ShellViewModel!.IsSearchResults = false;
 
 #if FILES_RESOURCE_MANAGER
-			if (parameters.IsResourceLibraryPage)
-			{
-				InstanceViewModel.IsResourceManagerMode = false;
-				InstanceViewModel.ResourceLibraryPath = null;
-				InstanceViewModel.IsPageTypeNotHome = true;
-				InstanceViewModel.IsPageTypeRecycleBin = false;
-				InstanceViewModel.IsPageTypeMtpDevice = false;
-				InstanceViewModel.IsPageTypeFtp = false;
-				InstanceViewModel.IsPageTypeZipFolder = false;
-				InstanceViewModel.IsPageTypeLibrary = false;
-				InstanceViewModel.IsPageTypeCloudDrive = false;
-				InstanceViewModel.IsPageTypeSearchResults = false;
-				InstanceViewModel.IsPageTypeReleaseNotes = false;
-				InstanceViewModel.IsPageTypeSettings = false;
-				ToolbarViewModel.SelectedItems = null;
-				UpdateResourceAddressBar(parameters);
-			}
+				if (parameters.IsResourceLibraryPage)
+				{
+					InstanceViewModel.IsResourceManagerMode = false;
+					InstanceViewModel.ResourceLibraryPath = null;
+					InstanceViewModel.IsPageTypeNotHome = true;
+					InstanceViewModel.IsPageTypeRecycleBin = false;
+					InstanceViewModel.IsPageTypeMtpDevice = false;
+					InstanceViewModel.IsPageTypeFtp = false;
+					InstanceViewModel.IsPageTypeZipFolder = false;
+					InstanceViewModel.IsPageTypeLibrary = false;
+					InstanceViewModel.IsPageTypeCloudDrive = false;
+					InstanceViewModel.IsPageTypeSearchResults = false;
+					InstanceViewModel.IsPageTypeReleaseNotes = false;
+					InstanceViewModel.IsPageTypeSettings = false;
+					ToolbarViewModel.SelectedItems = null;
+					UpdateResourceAddressBar(parameters);
+				}
 #endif
 
-			_navigationInteractionTracker.CanNavigateBackward = CanNavigateBackward;
-			_navigationInteractionTracker.CanNavigateForward = CanNavigateForward;
+				_navigationInteractionTracker.CanNavigateBackward = CanNavigateBackward;
+				_navigationInteractionTracker.CanNavigateForward = CanNavigateForward;
+			}
+			catch (Exception ex) when (IsResourceManagerNavigation(e.SourcePageType, e.Parameter))
+			{
+				App.Logger.LogError(ex, "Shell initialization failed after navigating to a resource page");
+				ToolbarViewModel.PathControlDisplayText = "资源管理加载失败";
+				await ShowResourceNavigationFailureAsync(e.SourcePageType, ex);
+			}
 		}
+
+		private static bool IsResourceManagerNavigation(Type sourcePageType, object? parameter)
+		{
+#if FILES_RESOURCE_MANAGER
+			if (sourcePageType == typeof(ResourceManager.ResourceLibraryPage) ||
+				sourcePageType == typeof(ResourceManager.ResourceManagerPage))
+				return true;
+#endif
+			return parameter is NavigationArguments arguments &&
+				(arguments.IsResourceLibraryPage || arguments.NavPathParam is "ResourceManager" or "ResourceManagerTools");
+		}
+
+#if FILES_RESOURCE_MANAGER
+		private void ItemDisplayFrame_NavigationFailed(object sender, NavigationFailedEventArgs e)
+		{
+			if (e.SourcePageType != typeof(ResourceManager.ResourceLibraryPage) &&
+				e.SourcePageType != typeof(ResourceManager.ResourceManagerPage))
+				return;
+
+			// A failed custom-page navigation used to escape as an unhandled exception and
+			// terminate the whole app. Preserve the real exception and keep the shell alive.
+			App.Logger.LogError(e.Exception, "Navigation to resource page {PageType} failed", e.SourcePageType.FullName);
+			e.Handled = true;
+			_ = ShowResourceNavigationFailureAsync(e.SourcePageType, e.Exception);
+		}
+
+		private async Task ShowResourceNavigationFailureAsync(Type pageType, Exception exception)
+		{
+			try
+			{
+				var details = $"页面：{pageType.FullName}{Environment.NewLine}错误：{exception}";
+				var errorText = new TextBox
+				{
+					Text = details,
+					IsReadOnly = true,
+					AcceptsReturn = true,
+					TextWrapping = TextWrapping.Wrap,
+					MinHeight = 120,
+					MaxHeight = 360,
+					VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+				};
+				var dialog = new ContentDialog
+				{
+					Title = "资源管理页面打开失败",
+					Content = errorText,
+					PrimaryButtonText = "复制诊断信息",
+					CloseButtonText = "关闭",
+					DefaultButton = ContentDialogButton.Primary,
+					XamlRoot = ItemDisplayFrame.XamlRoot,
+				};
+				dialog.PrimaryButtonClick += (_, _) =>
+				{
+					var package = new Windows.ApplicationModel.DataTransfer.DataPackage();
+					package.SetText(details);
+					Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
+				};
+				await dialog.ShowAsync();
+			}
+			catch (Exception dialogException)
+			{
+				App.Logger.LogError(dialogException, "Unable to show the resource-page navigation error dialog");
+			}
+		}
+#endif
 
 		private void OverscrollNavigationRequested(object? sender, OverscrollNavigationEventArgs e)
 		{
@@ -351,6 +428,9 @@ namespace Files.App.Views.Shells
 			if (ShellViewModel is not null)
 				ShellViewModel.FocusFilterHeader -= ShellViewModel_FocusFilterHeader;
 			ItemDisplayFrame.Navigated -= ItemDisplayFrame_Navigated;
+#if FILES_RESOURCE_MANAGER
+			ItemDisplayFrame.NavigationFailed -= ItemDisplayFrame_NavigationFailed;
+#endif
 			_navigationInteractionTracker.NavigationRequested -= OverscrollNavigationRequested;
 			_navigationInteractionTracker.Dispose();
 

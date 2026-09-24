@@ -219,8 +219,6 @@ jobs:
             'src\Files.App\Assets\AppTiles\Dev\StoreLogo.scale-100.png',
             'src\Files.App\Assets\AppTiles\Dev\Square150x150Logo.scale-100.png',
             'src\Files.App\Assets\AppTiles\Dev\Square44x44Logo.scale-100.png',
-            'src\Files.App\Assets\AppTiles\Dev\Square44x44Logo.targetsize-32_altform-unplated.png',
-            'src\Files.App\Assets\AppTiles\Dev\Square44x44Logo.targetsize-32_altform-lightunplated_theme-light.png',
             'src\Files.App\Assets\archives\ExtensionIcon.png',
             '.github\installer\wix\Files-Setup.Card.png',
             '.github\installer\wix\Files-Setup.CardTall.png',
@@ -651,17 +649,42 @@ jobs:
           Copy-Item "$workspace\src\Files.App\Assets\AppTiles\Dev\Square44x44Logo.scale-100.png" $identityAssetDir -Force
           $taskbarIconSourceDir = Join-Path $workspace 'src\Files.App\Assets\AppTiles\Dev'
           $taskbarIconSizes = @('16', '20', '24', '30', '32', '36', '40', '48', '60', '64', '72', '80', '96', '256')
+          $appIconPath = Join-Path $taskbarIconSourceDir 'Logo.ico'
+          if (-not (Test-Path -LiteralPath $appIconPath -PathType Leaf)) {
+            throw "The shared application icon is missing: $appIconPath"
+          }
+
+          # Windows chooses these package-identity variants for the running
+          # app's taskbar button. Keep them pixel-identical to the ICO used by
+          # the installer and native window icon instead of copying a second,
+          # independently maintained set of PNG artwork.
+          Add-Type -AssemblyName System.Drawing
+          $taskbarIconAssets = @()
           foreach ($size in $taskbarIconSizes) {
-            foreach ($variant in @("${size}_altform-unplated.png", "${size}_altform-lightunplated_theme-light.png")) {
-              $assetName = "Square44x44Logo.targetsize-$variant"
-              $assetPath = Join-Path $taskbarIconSourceDir $assetName
-              if (-not (Test-Path -LiteralPath $assetPath -PathType Leaf)) {
-                throw "Required Windows taskbar icon variant is missing: $assetPath"
+            $icon = $null
+            $bitmap = $null
+            try {
+              $icon = [System.Drawing.Icon]::new($appIconPath, [int]$size, [int]$size)
+              $bitmap = $icon.ToBitmap()
+              if ($bitmap.Width -ne [int]$size -or $bitmap.Height -ne [int]$size) {
+                throw "Logo.ico produced an unexpected ${size}px taskbar icon size ($($bitmap.Width)x$($bitmap.Height))."
+              }
+
+              foreach ($variant in @("${size}_altform-unplated.png", "${size}_altform-lightunplated_theme-light.png")) {
+                $assetName = "Square44x44Logo.targetsize-$variant"
+                $assetPath = Join-Path $identityAssetDir $assetName
+                $bitmap.Save($assetPath, [System.Drawing.Imaging.ImageFormat]::Png)
+                $taskbarIconAssets += Get-Item -LiteralPath $assetPath
               }
             }
+            finally {
+              if ($bitmap) { $bitmap.Dispose() }
+              if ($icon) { $icon.Dispose() }
+            }
           }
-          $taskbarIconAssets = @(Get-ChildItem -LiteralPath $taskbarIconSourceDir -Filter 'Square44x44Logo.targetsize-*_altform-*.png' -File)
-          Copy-Item -LiteralPath $taskbarIconAssets.FullName -Destination $identityAssetDir -Force
+          if ($taskbarIconAssets.Count -ne ($taskbarIconSizes.Count * 2)) {
+            throw "Expected $($taskbarIconSizes.Count * 2) taskbar icon variants, generated $($taskbarIconAssets.Count)."
+          }
           $archiveAssetDir = Join-Path $identityDir 'Assets\archives'
           New-Item -ItemType Directory -Path $archiveAssetDir -Force | Out-Null
           Copy-Item "$workspace\src\Files.App\Assets\archives\ExtensionIcon.png" $archiveAssetDir -Force

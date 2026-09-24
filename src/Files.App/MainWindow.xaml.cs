@@ -38,9 +38,9 @@ namespace Files.App
 			AppWindow.TitleBar.ButtonPressedBackgroundColor = Colors.Transparent;
 			AppWindow.TitleBar.ButtonHoverBackgroundColor = Colors.Transparent;
 
-			// Keep the native window icon on the same Logo.ico used by the installer.
-			// For this packaged WinUI app, Windows resolves the taskbar icon from the
-			// identity manifest and its PRI-indexed altform-unplated assets instead.
+			// Use the installer's Logo.ico for the native window icon. The installer
+			// build also derives the package-identity taskbar variants from this ICO,
+			// because Windows selects those assets for the running app's taskbar button.
 			AppWindow.SetIcon(AppLifecycleHelper.AppIconPath);
 		}
 

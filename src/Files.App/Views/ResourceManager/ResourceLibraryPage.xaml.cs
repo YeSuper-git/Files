@@ -13,6 +13,7 @@ using Files.App.Utils.FileTags;
 using Files.App.UserControls.Assistant;
 using Files.App.ViewModels.Assistant;
 using Files.App.ViewModels.ResourceManager;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -88,35 +89,38 @@ public sealed partial class ResourceLibraryPage : Page
 
     protected override async void OnNavigatedTo(NavigationEventArgs e)
     {
-        base.OnNavigatedTo(e);
-        var args = e.Parameter as NavigationArguments;
         try
         {
+            base.OnNavigatedTo(e);
+            var args = e.Parameter as NavigationArguments;
             _libraryPath = Path.GetFullPath(args?.ResourceLibraryPath ?? _workspace.LibraryPath);
-        }
-        catch
-        {
-            _libraryPath = string.Empty;
-        }
 
-        if (string.IsNullOrWhiteSpace(_libraryPath) || !Directory.Exists(_libraryPath))
-        {
-            StatusText.Text = "资源库路径不可用，请重新选择路径。";
-            return;
-        }
+            if (string.IsNullOrWhiteSpace(_libraryPath) || !Directory.Exists(_libraryPath))
+            {
+                StatusText.Text = "资源库路径不可用，请重新选择路径。";
+                return;
+            }
 
-        _locations.Clear();
-        if (args?.IsResourceLibraryPage == true && TryRestoreLocations(args))
-        {
-            // The navigation entry already contains a validated virtual path trail.
-        }
-        else
-        {
-            _locations.Add(new ResourceBrowserLocation(_libraryPath, ResourceBrowserLocationKind.LibraryRoot, _libraryPath));
-        }
+            _locations.Clear();
+            if (args?.IsResourceLibraryPage == true && TryRestoreLocations(args))
+            {
+                // The navigation entry already contains a validated virtual path trail.
+            }
+            else
+            {
+                _locations.Add(new ResourceBrowserLocation(_libraryPath, ResourceBrowserLocationKind.LibraryRoot, _libraryPath));
+            }
 
-        SetNativeSelection(null);
-        await LoadLocationAsync(_locations[^1]);
+            SetNativeSelection(null);
+            await LoadLocationAsync(_locations[^1]);
+        }
+        catch (Exception ex)
+        {
+            App.Logger.LogError(ex, "Unable to initialize the resource library page for {LibraryPath}", _libraryPath);
+            StatusText.Text = $"资源管理初始化失败：{ex.Message}";
+            EmptyText.Visibility = Visibility.Visible;
+            LoadingRing.IsActive = false;
+        }
     }
 
     private bool TryRestoreLocations(NavigationArguments args)
@@ -178,22 +182,24 @@ public sealed partial class ResourceLibraryPage : Page
 
     private async Task LoadLocationAsync(ResourceBrowserLocation location)
     {
-        _loadCancellation?.Cancel();
-        _loadCancellation?.Dispose();
-        _loadCancellation = new CancellationTokenSource();
-        var cancellationToken = _loadCancellation.Token;
-
-        ClearSelectedResourceItems();
-        SetNativeSelection(null);
-        BrowserGrid.SelectedItems.Clear();
-        LoadingRing.IsActive = true;
-        BrowserItems.Clear();
-        EmptyText.Visibility = Visibility.Collapsed;
-        LibraryPathText.Text = _libraryPath;
-        StatusText.Text = "正在加载资源……";
-
+        CancellationTokenSource? currentLoad = null;
+        CancellationToken cancellationToken = default;
         try
         {
+            _loadCancellation?.Cancel();
+            _loadCancellation?.Dispose();
+            currentLoad = _loadCancellation = new CancellationTokenSource();
+            cancellationToken = currentLoad.Token;
+
+            ClearSelectedResourceItems();
+            SetNativeSelection(null);
+            BrowserGrid.SelectedItems.Clear();
+            LoadingRing.IsActive = true;
+            BrowserItems.Clear();
+            EmptyText.Visibility = Visibility.Collapsed;
+            LibraryPathText.Text = _libraryPath;
+            StatusText.Text = "正在加载资源……";
+
             var items = await _browser.GetChildrenAsync(location.Path, location.Kind, _workspace.Settings, cancellationToken);
             foreach (var item in items)
             {
@@ -210,16 +216,19 @@ public sealed partial class ResourceLibraryPage : Page
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            StatusText.Text = "已停止加载。";
+            if (ReferenceEquals(currentLoad, _loadCancellation))
+                StatusText.Text = "已停止加载。";
         }
         catch (Exception ex)
         {
+            App.Logger.LogError(ex, "Unable to load resource library location {LocationPath}", location.Path);
             EmptyText.Visibility = Visibility.Visible;
             StatusText.Text = $"资源加载失败：{ex.Message}";
         }
         finally
         {
-            LoadingRing.IsActive = false;
+            if (currentLoad is null || ReferenceEquals(currentLoad, _loadCancellation))
+                LoadingRing.IsActive = false;
         }
     }
 

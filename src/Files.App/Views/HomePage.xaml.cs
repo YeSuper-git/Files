@@ -5,7 +5,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Navigation;
-using Microsoft.UI.Xaml.Media;
+using Microsoft.Extensions.Logging;
 using Files.App.Data.Models;
 using Files.App.Services.ResourceManager;
 using Files.App.UserControls.Assistant;
@@ -26,8 +26,6 @@ namespace Files.App.Views
 
 		private IShellPage? appInstance;
 		private bool isVideoAssistantOpening;
-		private TextBox homeAssistantInput = null!;
-		private TextBlock homeAssistantStatusText = null!;
 		private IShellPage AppInstance
 			=> appInstance ?? throw new InvalidOperationException("The home page has not been initialized.");
 
@@ -36,125 +34,6 @@ namespace Files.App.Views
 		public HomePage()
 		{
 			InitializeComponent();
-			AttachHomeAssistantPanel();
-		}
-
-		[DynamicWindowsRuntimeCast(typeof(FrameworkElement))]
-		private void AttachHomeAssistantPanel()
-		{
-			if (Content is not FrameworkElement widgetsContent)
-				return;
-
-			var host = new Grid();
-			host.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-			host.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-			Content = null;
-			Grid.SetRow(widgetsContent, 0);
-			host.Children.Add(widgetsContent);
-
-			var assistantPanel = CreateHomeAssistantPanel();
-			Grid.SetRow(assistantPanel, 1);
-			host.Children.Add(assistantPanel);
-			Content = host;
-		}
-
-		private Border CreateHomeAssistantPanel()
-		{
-			var stack = new StackPanel { Spacing = 10 };
-			var heading = new StackPanel { Spacing = 2 };
-			heading.Children.Add(new TextBlock
-			{
-				Text = "今天想看点什么？",
-				FontSize = 16,
-				FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-			});
-			heading.Children.Add(new TextBlock
-			{
-				Text = "选一个提示词开始，或者直接描述你想看的作品。",
-				Foreground = GetAppResource<Brush>("TextFillColorSecondaryBrush"),
-				TextWrapping = TextWrapping.Wrap,
-			});
-			stack.Children.Add(heading);
-
-			var promptButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-			AddPromptButton(promptButtons, "今天想看哪位演员？", "今天想看哪位演员的作品？");
-			AddPromptButton(promptButtons, "推荐没看过的", "推荐没看过的作品");
-			AddPromptButton(promptButtons, "想二刷已看过的", "想二刷已看过的作品");
-			AddPromptButton(promptButtons, "直接随机推荐", "直接随机推荐几部作品");
-			stack.Children.Add(new ScrollViewer
-			{
-				HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-				VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-				Content = promptButtons,
-			});
-
-			homeAssistantInput = new TextBox
-			{
-				MinHeight = 48,
-				MaxHeight = 96,
-				AcceptsReturn = true,
-				PlaceholderText = "输入演员名、观看状态或想找的内容……",
-				TextWrapping = TextWrapping.Wrap,
-			};
-			homeAssistantInput.KeyDown += HomeAssistantInput_KeyDown;
-
-			var inputRow = new Grid { ColumnSpacing = 8 };
-			inputRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-			inputRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-			inputRow.Children.Add(homeAssistantInput);
-
-			var sendButton = new Button
-			{
-				Content = "开始对话",
-				MinWidth = 112,
-				VerticalAlignment = VerticalAlignment.Bottom,
-				Style = GetAppResource<Style>("AccentButtonStyle"),
-			};
-			sendButton.Click += SendHomeAssistant_Click;
-			Grid.SetColumn(sendButton, 1);
-			inputRow.Children.Add(sendButton);
-			stack.Children.Add(inputRow);
-
-			homeAssistantStatusText = new TextBlock
-			{
-				Foreground = GetAppResource<Brush>("SystemFillColorCriticalBrush"),
-				TextWrapping = TextWrapping.Wrap,
-				Visibility = Visibility.Collapsed,
-			};
-			stack.Children.Add(homeAssistantStatusText);
-
-			return new Border
-			{
-				MaxWidth = 920,
-				Margin = new Thickness(24, 8, 24, 16),
-				Padding = new Thickness(18, 14, 18, 14),
-				HorizontalAlignment = HorizontalAlignment.Center,
-				Background = GetAppResource<Brush>("CardBackgroundFillColorDefaultBrush"),
-				BorderBrush = GetAppResource<Brush>("CardStrokeColorDefaultBrush"),
-				BorderThickness = new Thickness(1),
-				CornerRadius = new CornerRadius(16),
-				Child = stack,
-			};
-		}
-
-		private void AddPromptButton(Panel panel, string label, string prompt)
-		{
-			var button = new Button { Content = label, Tag = prompt };
-			button.Click += AssistantPromptButton_Click;
-			panel.Children.Add(button);
-		}
-
-		private static T? GetAppResource<T>(string key) where T : class
-		{
-			try
-			{
-				return Application.Current.Resources[key] as T;
-			}
-			catch
-			{
-				return null;
-			}
 		}
 
 		private void HomePage_Loaded(object sender, RoutedEventArgs e)
@@ -170,7 +49,7 @@ namespace Files.App.Views
 		}
 
 		private async void SendHomeAssistant_Click(object sender, RoutedEventArgs e)
-			=> await OpenVideoAssistantAsync(homeAssistantInput.Text);
+			=> await OpenVideoAssistantAsync(HomeAssistantInput.Text);
 
 		private async void HomeAssistantInput_KeyDown(object sender, KeyRoutedEventArgs e)
 		{
@@ -178,7 +57,7 @@ namespace Files.App.Views
 				return;
 
 			e.Handled = true;
-			await OpenVideoAssistantAsync(homeAssistantInput.Text);
+			await OpenVideoAssistantAsync(HomeAssistantInput.Text);
 		}
 
 		private async Task OpenVideoAssistantAsync(string? initialPrompt = null)
@@ -189,8 +68,8 @@ namespace Files.App.Views
 			isVideoAssistantOpening = true;
 			try
 			{
-				homeAssistantStatusText.Text = string.Empty;
-				homeAssistantStatusText.Visibility = Visibility.Collapsed;
+				HomeAssistantStatusText.Text = string.Empty;
+				HomeAssistantStatusText.Visibility = Visibility.Collapsed;
 				var workspace = Ioc.Default.GetRequiredService<IResourceWorkspaceService>();
 				var assistantView = new VideoAssistantChatView();
 				var dialog = new ContentDialog
@@ -207,13 +86,14 @@ namespace Files.App.Views
 			}
 			catch (Exception ex)
 			{
-				homeAssistantStatusText.Text = $"视频助手打开失败：{ex.Message}";
-				homeAssistantStatusText.Visibility = Visibility.Visible;
+				App.Logger.LogError(ex, "Unable to open the video assistant from the home page");
+				HomeAssistantStatusText.Text = $"视频助手打开失败：{ex.Message}";
+				HomeAssistantStatusText.Visibility = Visibility.Visible;
 			}
 			finally
 			{
 				isVideoAssistantOpening = false;
-				homeAssistantInput.Text = string.Empty;
+				HomeAssistantInput.Text = string.Empty;
 			}
 		}
 
@@ -256,6 +136,7 @@ namespace Files.App.Views
 			}
 			catch (Exception ex)
 			{
+				App.Logger.LogError(ex, "Unable to initialize the video assistant conversation");
 				assistantView.ViewModel.ShowNotice($"视频助手初始化失败：{ex.Message}");
 			}
 		}

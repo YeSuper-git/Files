@@ -18,6 +18,12 @@ Run [36021681070](https://github.com/YeSuper-git/Files/actions/runs/36021681070)
 - The successful run had a NuGet cache hit but missed the source-keyed publish cache because the home/resource-page source had changed. Application publish took about 4m35s, followed by about 1m55s for the identity package and installer; the remaining build-job time was dependency restore, launcher build, and workflow setup/teardown.
 - Workflow annotations surfaced a new CsWinRT trim warning for the runtime cast to `FrameworkElement` in `HomePage.AttachHomeAssistantPanel`, plus the existing obsolete `NativeStorageLegacyService` registration warning (reported twice). Added `[DynamicWindowsRuntimeCast(typeof(FrameworkElement))]` to the method and pushed it in `19bad13d6` for the next explicitly requested build; it is intentionally not included in 1.0.14. The obsolete service warning is unchanged and remains for separate review.
 
+### Follow-up from the installed 1.0.14 report
+
+- The home assistant was still absent. The 1.0.14 home page attached it only after a runtime `Content is FrameworkElement` check; that exact cast generated the new trim warning above, and the false branch silently returned without adding the panel. Replaced this runtime construction with declarative XAML so release trimming cannot omit the UI.
+- The prior taskbar change only ensured the package indexed and carried a separate collection of PNG variants. The running packaged app gets its taskbar image from those identity-package `altform` assets; `AppWindow.SetIcon(Logo.ico)` only sets the native window icon. Both installer workflows now generate every identity taskbar variant from the same `Logo.ico` used by the installer.
+- The smoke test passed because it checked only that `Files.exe` remained alive and exposed a main window; it did not open Home's assistant or navigate into Resource Manager. The Resource Manager crash's originating exception is not available from the screenshot, so its exact cause is not yet verified. Added page initialization/load logging and a handled navigation-failure dialog with one-click diagnostic copy to keep the app alive and expose the real exception on the next run.
+
 ## 2026-09-24 — 1.0.13
 
 - Workflow: [Build Files max run 36010956224](https://github.com/YeSuper-git/Files/actions/runs/36010956224)

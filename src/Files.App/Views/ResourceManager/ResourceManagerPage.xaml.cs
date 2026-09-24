@@ -8,6 +8,7 @@ using Microsoft.UI.Xaml.Shapes;
 using Files.App.Data.Models.ResourceManager;
 using Files.App.Services.ResourceManager;
 using Files.App.ViewModels.ResourceManager;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -38,16 +39,24 @@ public sealed partial class ResourceManagerPage : Page
     private async void OnPageLoaded(object sender, RoutedEventArgs e)
     {
         Loaded -= OnPageLoaded;
-        UpdateUI();
-        if (string.IsNullOrWhiteSpace(_vm.LibraryPath))
-            return;
-        if (!Directory.Exists(_vm.LibraryPath))
+        try
         {
-            SetStatus("上次资源库路径不可用，请重新选择文件夹");
-            return;
-        }
+            UpdateUI();
+            if (string.IsNullOrWhiteSpace(_vm.LibraryPath))
+                return;
+            if (!Directory.Exists(_vm.LibraryPath))
+            {
+                SetStatus("上次资源库路径不可用，请重新选择文件夹");
+                return;
+            }
 
-        await RefreshAsync();
+            await RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            App.Logger.LogError(ex, "Unable to initialize the Resource Manager tools page for {LibraryPath}", _vm.LibraryPath);
+            SetStatus($"资源工具初始化失败：{ex.Message}");
+        }
     }
 
     private void OnPageUnloaded(object sender, RoutedEventArgs e) => _operationCancellation?.Cancel();
