@@ -1,5 +1,23 @@
 # Files max installer build history
 
+## 2026-09-25 — 1.0.14
+
+- Workflow: [Build Files max run 36023224779](https://github.com/YeSuper-git/Files/actions/runs/36023224779)
+- Result: succeeded on attempt 2. The Windows smoke test passed silent install, application startup, and uninstall.
+- Time: 14m02s end-to-end (11m34s build job + 2m20s smoke-test job; remaining 8s was workflow handoff). Including the failed first attempt, total workflow elapsed time was 26m00s.
+- Artifact: `Files max Setup 1.0.14.exe`, 205,982,920 bytes, SHA-256 `c1dfb844fd6d7f7af05d6dcc9d79868d2bdc706da20675f8fdee80fce5595eee`.
+- Local copy: `artifacts/installer-1.0.14/Files max Setup 1.0.14.exe` (ignored build output; not committed).
+- Version state advanced by the workflow from 1.0.14 to 1.0.15 after the smoke test passed.
+
+### Failed attempt 1
+
+Run [36021681070](https://github.com/YeSuper-git/Files/actions/runs/36021681070) failed after 11m58s during **Publish unpackaged application**. Compilation reported two errors in `HomePage.xaml.cs`: `Grid.SetRow` was passed a `UIElement` where `FrameworkElement` is required, and `Thickness` was constructed with only two arguments. These were corrected in `ae522219e`; attempt 2 then built and passed smoke testing. This was a source compile failure, not an installer execution failure.
+
+### Timing and post-build review
+
+- The successful run had a NuGet cache hit but missed the source-keyed publish cache because the home/resource-page source had changed. Application publish took about 4m35s, followed by about 1m55s for the identity package and installer; the remaining build-job time was dependency restore, launcher build, and workflow setup/teardown.
+- Workflow annotations surfaced a new CsWinRT trim warning for the runtime cast to `FrameworkElement` in `HomePage.AttachHomeAssistantPanel`, plus the existing obsolete `NativeStorageLegacyService` registration warning (reported twice). Added `[DynamicWindowsRuntimeCast(typeof(FrameworkElement))]` to the method and pushed it in `19bad13d6` for the next explicitly requested build; it is intentionally not included in 1.0.14. The obsolete service warning is unchanged and remains for separate review.
+
 ## 2026-09-24 — 1.0.13
 
 - Workflow: [Build Files max run 36010956224](https://github.com/YeSuper-git/Files/actions/runs/36010956224)
