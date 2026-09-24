@@ -41,7 +41,7 @@ namespace Files.App.Views
 
 		private void AttachHomeAssistantPanel()
 		{
-			if (Content is not UIElement widgetsContent)
+			if (Content is not FrameworkElement widgetsContent)
 				return;
 
 			var host = new Grid();
@@ -127,7 +127,7 @@ namespace Files.App.Views
 			{
 				MaxWidth = 920,
 				Margin = new Thickness(24, 8, 24, 16),
-				Padding = new Thickness(18, 14),
+				Padding = new Thickness(18, 14, 18, 14),
 				HorizontalAlignment = HorizontalAlignment.Center,
 				Background = GetAppResource<Brush>("CardBackgroundFillColorDefaultBrush"),
 				BorderBrush = GetAppResource<Brush>("CardStrokeColorDefaultBrush"),
