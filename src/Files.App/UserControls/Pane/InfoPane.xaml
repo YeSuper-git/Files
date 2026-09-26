@@ -142,8 +142,8 @@
 		CornerRadius="8">
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />
-			<RowDefinition Height="2*" />
-			<RowDefinition x:Name="PropertiesRow" Height="3*" />
+			<RowDefinition x:Name="PreviewRow" Height="{x:Bind ViewModel.PreviewRowHeight, Mode=OneWay}" />
+			<RowDefinition x:Name="PropertiesRow" Height="{x:Bind ViewModel.PropertiesRowHeight, Mode=OneWay}" />
 		</Grid.RowDefinitions>
 		<Grid.ColumnDefinitions>
 			<ColumnDefinition Width="2*" />
@@ -188,8 +188,9 @@
 			VerticalAlignment="Stretch"
 			AutomationProperties.Name="{helpers:ResourceString Name=PreviewPaneFilePreview/AutomationProperties/Name}">
 			<Grid.ContextFlyout>
-				<MenuFlyout>
+				<MenuFlyout Opening="PreviewContextFlyout_Opening">
 					<MenuFlyoutItem
+						x:Name="LoadCloudItemMenuItem"
 						HorizontalAlignment="Stretch"
 						IsEnabled="{x:Bind ViewModel.ShowCloudItemButton, Mode=OneWay}"
 						Tapped="MenuFlyoutItem_Tapped"
@@ -225,8 +226,13 @@
 			Grid.Column="0"
 			Grid.ColumnSpan="2"
 			AutomationProperties.Name="{helpers:ResourceString Name=PreviewPaneFileDetails/AutomationProperties/Name}"
+			HorizontalScrollBarVisibility="Disabled"
+			HorizontalScrollMode="Disabled"
+			VerticalScrollBarVisibility="Auto"
+			VerticalScrollMode="Auto"
+			ZoomMode="Disabled"
 			Visibility="Visible">
-			<StackPanel Orientation="Vertical">
+			<StackPanel HorizontalAlignment="Stretch" Orientation="Vertical">
 				<TextBlock
 					x:Name="DetailsListHeader"
 					HorizontalAlignment="Center"
@@ -238,6 +244,13 @@
 					TextAlignment="Center"
 					TextWrapping="Wrap"
 					Visibility="Collapsed" />
+				<Button
+					Margin="0,4,0,8"
+					HorizontalAlignment="Center"
+					Padding="8,3"
+					Content="{x:Bind ViewModel.ResourceVideoFolderTitleActionText, Mode=OneWay}"
+					Visibility="{x:Bind ViewModel.ResourceVideoFolderTitleActionVisibility, Mode=OneWay}"
+					Click="ToggleResourceVideoFolderTitle_Click" />
 				<TextBlock
 					x:Name="DetailsActorAliasesTextBlock"
 					Margin="12,0,12,12"
@@ -373,15 +386,36 @@
 					Margin="12,12,12,0"
 					ItemsSource="{x:Bind ViewModel.ResourceActorProperties, Mode=OneWay}"
 					Visibility="{x:Bind ViewModel.ResourceActorDetailsVisibility, Mode=OneWay}">
-					<ItemsControl.ItemTemplate>
+	<ItemsControl.ItemTemplate>
 						<DataTemplate x:DataType="properties:FileProperty">
-							<StackPanel Padding="0,8,0,8" Spacing="4">
-								<TextBlock Style="{StaticResource Local.FileDetailsHeaderTextBlockStyle}" Text="{x:Bind Name, Mode=OneWay}" />
-								<TextBlock IsTextSelectionEnabled="True" Style="{StaticResource Local.FileDetailsTextBlockStyle}" Text="{x:Bind ValueText, Mode=OneWay}" TextWrapping="Wrap" />
-							</StackPanel>
+							<Grid Padding="0,7,0,7" ColumnDefinitions="Auto,*" ColumnSpacing="8" AutomationProperties.Name="{x:Bind Name, Mode=OneWay}">
+								<TextBlock
+									VerticalAlignment="Center"
+									Style="{StaticResource Local.FileDetailsHeaderTextBlockStyle}"
+									Text="{x:Bind Name, Mode=OneWay}" />
+								<TextBlock
+									Grid.Column="1"
+									VerticalAlignment="Center"
+									IsTextSelectionEnabled="True"
+									Style="{StaticResource Local.FileDetailsTextBlockStyle}"
+									Text="{x:Bind ValueText, Mode=OneWay}"
+									TextWrapping="Wrap" />
+							</Grid>
 						</DataTemplate>
 					</ItemsControl.ItemTemplate>
 				</ItemsControl>
+
+				<StackPanel
+					Margin="12,12,12,0"
+					Spacing="4"
+					Visibility="{x:Bind ViewModel.ResourceActorDetailsVisibility, Mode=OneWay}">
+					<TextBlock Style="{StaticResource Local.FileDetailsHeaderTextBlockStyle}" Text="简介" />
+					<TextBlock
+						IsTextSelectionEnabled="True"
+						Style="{StaticResource Local.FileDetailsTextBlockStyle}"
+						Text="{x:Bind ViewModel.SelectedActorBiography, Mode=OneWay}"
+						TextWrapping="Wrap" />
+				</StackPanel>
 
 				<Button
 					Margin="12,12,12,0"
@@ -394,7 +428,7 @@
 				<StackPanel
 					x:Name="DetailsTagsList"
 					Margin="12,8,12,0"
-					Visibility="Collapsed">
+					Visibility="{x:Bind ViewModel.DetailsTagsListVisibility, Mode=OneWay}">
 
 					<TextBlock
 						HorizontalAlignment="Stretch"
@@ -511,7 +545,7 @@
 					Command="{x:Bind Commands.OpenProperties}"
 					IsEnabled="{x:Bind Commands.OpenProperties.IsExecutable, Mode=OneWay}"
 					ToolTipService.ToolTip="{x:Bind Commands.OpenProperties.LabelWithHotKey, Mode=OneWay}"
-					Visibility="Collapsed">
+					Visibility="{x:Bind ViewModel.DetailsOpenPropertiesVisibility, Mode=OneWay}">
 					<Button.Content>
 						<StackPanel Orientation="Horizontal" Spacing="8">
 							<controls:ThemedIcon Style="{x:Bind Commands.OpenProperties.ThemedIconStyle}" />
@@ -538,8 +572,6 @@
 						<Setter Target="PreviewErrorText.Visibility" Value="Visible" />
 						<Setter Target="PreviewErrorText.Text" Value="{helpers:ResourceString Name=DetailsPanePreviewNotAvaliableText}" />
 						<Setter Target="FileDetailsRepeater.Visibility" Value="Visible" />
-						<Setter Target="DetailsTagsList.Visibility" Value="Visible" />
-						<Setter Target="DetailsOpenProperties.Visibility" Value="Visible" />
 						<Setter Target="DetailsListHeader.Visibility" Value="Visible" />
 						<Setter Target="PreviewControlPresenter.Visibility" Value="Collapsed" />
 					</VisualState.Setters>
@@ -552,8 +584,6 @@
 						<Setter Target="PreviewErrorText.Visibility" Value="Visible" />
 						<Setter Target="PreviewErrorText.Text" Value="{helpers:ResourceString Name=DetailsPanePreviewNotAvaliableText}" />
 						<Setter Target="FileDetailsRepeater.Visibility" Value="Collapsed" />
-						<Setter Target="DetailsTagsList.Visibility" Value="Collapsed" />
-						<Setter Target="DetailsOpenProperties.Visibility" Value="Collapsed" />
 						<Setter Target="PreviewControlPresenter.Visibility" Value="Collapsed" />
 					</VisualState.Setters>
 				</VisualState>
@@ -564,8 +594,6 @@
 					<VisualState.Setters>
 						<Setter Target="PreviewErrorText.Visibility" Value="Collapsed" />
 						<Setter Target="FileDetailsRepeater.Visibility" Value="Visible" />
-						<Setter Target="DetailsTagsList.Visibility" Value="Visible" />
-						<Setter Target="DetailsOpenProperties.Visibility" Value="Visible" />
 						<Setter Target="PreviewControlPresenter.Visibility" Value="Visible" />
 						<Setter Target="DetailsListHeader.Visibility" Value="Visible" />
 					</VisualState.Setters>
@@ -577,8 +605,6 @@
 					<VisualState.Setters>
 						<Setter Target="PreviewErrorText.Visibility" Value="Collapsed" />
 						<Setter Target="FileDetailsRepeater.Visibility" Value="Collapsed" />
-						<Setter Target="DetailsTagsList.Visibility" Value="Collapsed" />
-						<Setter Target="DetailsOpenProperties.Visibility" Value="Collapsed" />
 						<Setter Target="DetailsListHeader.Visibility" Value="Visible" />
 						<Setter Target="PreviewControlPresenter.Visibility" Value="Collapsed" />
 						<Setter Target="PreviewLoadingIndicator.Visibility" Value="Visible" />
@@ -591,8 +617,6 @@
 					<VisualState.Setters>
 						<Setter Target="PreviewErrorText.Visibility" Value="Collapsed" />
 						<Setter Target="FileDetailsRepeater.Visibility" Value="Collapsed" />
-						<Setter Target="DetailsTagsList.Visibility" Value="Collapsed" />
-						<Setter Target="DetailsOpenProperties.Visibility" Value="Visible" />
 						<Setter Target="PreviewControlPresenter.Visibility" Value="Visible" />
 						<Setter Target="DetailsListHeader.Visibility" Value="Visible" />
 						<Setter Target="DriveFormatAndTypeTextBlock.Visibility" Value="Visible" />
@@ -609,7 +633,6 @@
 					</VisualState.StateTriggers>
 					<VisualState.Setters>
 						<Setter Target="RootPropertiesScrollViewer.Visibility" Value="Visible" />
-						<Setter Target="PropertiesRow.Height" Value="3*" />
 						<Setter Target="PropertiesColumn.Width" Value="3*" />
 					</VisualState.Setters>
 				</VisualState>
@@ -619,7 +642,6 @@
 					</VisualState.StateTriggers>
 					<VisualState.Setters>
 						<Setter Target="RootPropertiesScrollViewer.Visibility" Value="Collapsed" />
-						<Setter Target="PropertiesRow.Height" Value="0" />
 						<Setter Target="PropertiesColumn.Width" Value="0" />
 					</VisualState.Setters>
 				</VisualState>

@@ -3,8 +3,10 @@
 
 using Files.App.ViewModels.Properties;
 using Files.App.Data.Items.ResourceManager;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Media.Imaging;
 using System.IO;
+using Windows.Storage;
 
 namespace Files.App.ViewModels.Previews
 {
@@ -32,14 +34,35 @@ namespace Files.App.ViewModels.Previews
 
 			Folder = folder;
 
-			var result = await FileThumbnailHelper.GetIconAsync(
-				Item.ItemPath,
-				Constants.ShellIconSizes.Jumbo,
-				true,
-				IconOptions.None);
+			var loadedResourcePoster = false;
+			if (Item is ResourceVideoFolderListedItem { PosterPath: { } posterPath } && File.Exists(posterPath))
+			{
+				try
+				{
+					var posterFile = await StorageFile.GetFileFromPathAsync(posterPath);
+					using var posterStream = await posterFile.OpenReadAsync();
+					var poster = new BitmapImage { DecodePixelWidth = 960 };
+					await poster.SetSourceAsync(posterStream);
+					Thumbnail = poster;
+					loadedResourcePoster = true;
+				}
+				catch (Exception ex)
+				{
+					App.Logger.LogDebug(ex, "Unable to load resource video folder poster at {PosterPath}", posterPath);
+				}
+			}
 
-			if (result is not null)
-				Thumbnail = await result.ToBitmapAsync();
+			if (!loadedResourcePoster)
+			{
+				var result = await FileThumbnailHelper.GetIconAsync(
+					Item.ItemPath,
+					Constants.ShellIconSizes.Jumbo,
+					true,
+					IconOptions.None);
+
+				if (result is not null)
+					Thumbnail = await result.ToBitmapAsync();
+			}
 
 			// If the selected item is the root of a drive (e.g. "C:\") or a cloud drive,
 			// we do not need to load the properties below, since they will not be shown.

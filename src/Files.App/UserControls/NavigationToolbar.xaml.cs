@@ -76,13 +76,6 @@ namespace Files.App.UserControls
 				args.Handled = true;
 		}
 
-		private void ResourceManagerButton_Click(object sender, RoutedEventArgs e)
-		{
-#if FILES_RESOURCE_MANAGER
-			ContentPageContext.ShellPage?.NavigateToResourceManagerTools();
-#endif
-		}
-
 		private async void BackHistoryFlyout_Opening(object? sender, object e)
 		{
 			var shellPage = Ioc.Default.GetRequiredService<IContentPageContext>().ShellPage;

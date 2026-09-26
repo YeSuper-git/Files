@@ -20,5 +20,10 @@ namespace Files.App.Data.Contracts
 		/// This is used when prompting users to restart after changing the app language.
 		/// </summary>
 		bool RestoreTabsOnStartup { get; set; }
+
+		/// <summary>
+		/// Gets or sets the title translation provider used by Resource Manager.
+		/// </summary>
+		string ResourceManagerTranslationProvider { get; set; }
 	}
 }

@@ -331,7 +331,14 @@ namespace Files.App.Views.Shells
 					headBranch);
 			}
 
+			#if FILES_RESOURCE_MANAGER
+			if (ItemDisplay.Content is not ResourceManager.ResourceLibraryPage)
+			{
+				contentPage.StatusBarViewModel.DirectoryItemCount = $"{shellViewModel.FilesAndFolders.Count} {directoryItemCountLocalization}";
+			}
+			#else
 			contentPage.StatusBarViewModel.DirectoryItemCount = $"{shellViewModel.FilesAndFolders.Count} {directoryItemCountLocalization}";
+			#endif
 			contentPage.InfoPaneViewModel.DirectoryItemCount = $"{shellViewModel.FilesAndFolders.Count} {directoryItemCountLocalization}";
 			contentPage.UpdateSelectionSize();
 		}

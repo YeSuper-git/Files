@@ -1704,10 +1704,10 @@
     <value>文件版本</value>
   </data>
   <data name="PreviewPaneLoadCloudItemButton.Text" xml:space="preserve">
-    <value>加载完整预览</value>
+    <value>下载云端文件并预览</value>
   </data>
   <data name="PreviewPaneLoadCloudItemButton.ToolTipService.ToolTip" xml:space="preserve">
-    <value>从云端下载该项并加载预览</value>
+    <value>该文件仅保存在云端，下载后才能在此处预览。</value>
   </data>
   <data name="DetailsArchiveItems" xml:space="preserve">
     <value>{0, plural, other {# 个项目}} ({1, plural, other {# 个文件}}, {2, plural, other {# 个文件夹}})</value>
@@ -4727,5 +4727,65 @@
   </data>
   <data name="ConfirmRemoveTagsDialogContent" xml:space="preserve">
     <value>您确定要从所选项目中删除标签吗？</value>
+  </data>
+  <data name="SettingsItemResourceManager" xml:space="preserve">
+    <value>资源管理</value>
+  </data>
+  <data name="ResourceManagerTranslationSettingsTitle" xml:space="preserve">
+    <value>资源管理</value>
+  </data>
+  <data name="ResourceManagerTranslationProvider" xml:space="preserve">
+    <value>翻译模型</value>
+  </data>
+  <data name="ResourceManagerTranslationProviderDescription" xml:space="preserve">
+    <value>选择用于翻译视频标题的阿里云服务。两种服务分别缓存译名。</value>
+  </data>
+  <data name="ResourceManagerFinishEditing" xml:space="preserve">
+    <value>完成</value>
+  </data>
+  <data name="ResourceManagerMachineTranslation" xml:space="preserve">
+    <value>阿里云机器翻译（通用版）</value>
+  </data>
+  <data name="ResourceManagerMachineTranslationDescription" xml:space="preserve">
+    <value>调用通用文本翻译接口。每月有免费额度，超出额度后可能按字符计费。凭证安全保存在 Windows 凭据管理器中。</value>
+  </data>
+  <data name="ResourceManagerBailianQwenMt" xml:space="preserve">
+    <value>阿里云百炼（Qwen-MT Plus）</value>
+  </data>
+  <data name="ResourceManagerBailianQwenMtDescription" xml:space="preserve">
+    <value>调用百炼 Qwen-MT Plus，按 Token 计费。当前额度和价格请查看百炼控制台。API Key 安全保存在 Windows 凭据管理器中。</value>
+  </data>
+  <data name="ResourceManagerAccessKeyId" xml:space="preserve">
+    <value>AccessKey ID</value>
+  </data>
+  <data name="ResourceManagerAccessKeySecret" xml:space="preserve">
+    <value>AccessKey Secret</value>
+  </data>
+  <data name="ResourceManagerApiKey" xml:space="preserve">
+    <value>百炼 API Key</value>
+  </data>
+  <data name="ResourceManagerCredentialEmpty" xml:space="preserve">
+    <value>输入凭证</value>
+  </data>
+  <data name="ResourceManagerCredentialSaved" xml:space="preserve">
+    <value>已保存，留空可保留当前凭证</value>
+  </data>
+  <data name="ResourceManagerSaveCredentials" xml:space="preserve">
+    <value>保存凭证</value>
+  </data>
+  <data name="ResourceManagerRemoveCredentials" xml:space="preserve">
+    <value>移除已保存凭证</value>
+  </data>
+  <data name="ResourceManagerCredentialsMissing" xml:space="preserve">
+    <value>请填写所需凭证后再保存。</value>
+  </data>
+  <data name="ResourceManagerCredentialsSaved" xml:space="preserve">
+    <value>凭证已保存在 Windows 凭据管理器中。</value>
+  </data>
+  <data name="ResourceManagerCredentialsRemoved" xml:space="preserve">
+    <value>已移除保存的凭证。</value>
+  </data>
+  <data name="ResourceManagerCredentialsSaveFailed" xml:space="preserve">
+    <value>无法保存凭证。</value>
   </data>
 </root>

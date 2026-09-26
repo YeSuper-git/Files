@@ -14,5 +14,8 @@ namespace Files.App.Data.Enums
 		DevToolsPage,
 		AdvancedPage,
 		AboutPage,
+#if FILES_RESOURCE_MANAGER
+		ResourceManagerPage,
+#endif
 	}
 }

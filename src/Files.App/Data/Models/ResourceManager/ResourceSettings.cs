@@ -15,7 +15,7 @@ public sealed class ResourceSettings
         VideoExtensions = [.. (VideoExtensions ?? [])],
         ImageExtensions = [.. (ImageExtensions ?? [])],
         PosterQualityKb = PosterQualityKb,
-        SubtitleKeywords = [.. (SubtitleKeywords ?? [])]
+        SubtitleKeywords = [.. (SubtitleKeywords ?? [])],
     };
 
     public void Normalize()

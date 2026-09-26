@@ -1704,10 +1704,10 @@
     <value>File version</value>
   </data>
   <data name="PreviewPaneLoadCloudItemButton.Text" xml:space="preserve">
-    <value>Load full preview</value>
+    <value>Download cloud file and preview</value>
   </data>
   <data name="PreviewPaneLoadCloudItemButton.ToolTipService.ToolTip" xml:space="preserve">
-    <value>Downloads the item from the cloud and loads the preview</value>
+    <value>This file is stored online only. Download it before previewing it here.</value>
   </data>
   <data name="DetailsArchiveItems" xml:space="preserve">
     <value>{0, plural, one {# item} other {# items}} ({1, plural, one {# file} other {# files}}, {2, plural, one {# folder} other {# folders}})</value>
@@ -4733,5 +4733,65 @@
   </data>
   <data name="ConfirmRemoveTagsDialogContent" xml:space="preserve">
     <value>Are you sure you want to remove tags from the selected items?</value>
+  </data>
+  <data name="SettingsItemResourceManager" xml:space="preserve">
+    <value>Resource manager</value>
+  </data>
+  <data name="ResourceManagerTranslationSettingsTitle" xml:space="preserve">
+    <value>Resource manager</value>
+  </data>
+  <data name="ResourceManagerTranslationProvider" xml:space="preserve">
+    <value>Translation model</value>
+  </data>
+  <data name="ResourceManagerTranslationProviderDescription" xml:space="preserve">
+    <value>Choose the Alibaba Cloud service used to translate video titles. Each service keeps a separate translation cache.</value>
+  </data>
+  <data name="ResourceManagerFinishEditing" xml:space="preserve">
+    <value>Done</value>
+  </data>
+  <data name="ResourceManagerMachineTranslation" xml:space="preserve">
+    <value>Alibaba Cloud Machine Translation (General)</value>
+  </data>
+  <data name="ResourceManagerMachineTranslationDescription" xml:space="preserve">
+    <value>Uses the general text translation API. It includes a monthly free quota; requests beyond the quota may be billed by character. Credentials are stored in Windows Credential Manager.</value>
+  </data>
+  <data name="ResourceManagerBailianQwenMt" xml:space="preserve">
+    <value>Alibaba Cloud Model Studio (Qwen-MT Plus)</value>
+  </data>
+  <data name="ResourceManagerBailianQwenMtDescription" xml:space="preserve">
+    <value>Uses Qwen-MT Plus in Model Studio and is billed by tokens. Check the Model Studio console for current quotas and pricing. The API Key is stored in Windows Credential Manager.</value>
+  </data>
+  <data name="ResourceManagerAccessKeyId" xml:space="preserve">
+    <value>AccessKey ID</value>
+  </data>
+  <data name="ResourceManagerAccessKeySecret" xml:space="preserve">
+    <value>AccessKey Secret</value>
+  </data>
+  <data name="ResourceManagerApiKey" xml:space="preserve">
+    <value>Model Studio API Key</value>
+  </data>
+  <data name="ResourceManagerCredentialEmpty" xml:space="preserve">
+    <value>Enter credential</value>
+  </data>
+  <data name="ResourceManagerCredentialSaved" xml:space="preserve">
+    <value>Saved; leave blank to keep the current value</value>
+  </data>
+  <data name="ResourceManagerSaveCredentials" xml:space="preserve">
+    <value>Save credentials</value>
+  </data>
+  <data name="ResourceManagerRemoveCredentials" xml:space="preserve">
+    <value>Remove saved credentials</value>
+  </data>
+  <data name="ResourceManagerCredentialsMissing" xml:space="preserve">
+    <value>Enter the required credentials before saving.</value>
+  </data>
+  <data name="ResourceManagerCredentialsSaved" xml:space="preserve">
+    <value>Credentials saved in Windows Credential Manager.</value>
+  </data>
+  <data name="ResourceManagerCredentialsRemoved" xml:space="preserve">
+    <value>Saved credentials removed.</value>
+  </data>
+  <data name="ResourceManagerCredentialsSaveFailed" xml:space="preserve">
+    <value>Unable to save credentials.</value>
   </data>
 </root>

@@ -14,12 +14,18 @@ public sealed class ResourceOperationsService : IResourceOperationsService
 
     private readonly IResourceCodeParser _codeParser;
     private readonly IResourceScanner _scanner;
+    private readonly IResourceWorkspaceService _workspace;
     private readonly ILogger<ResourceOperationsService> _logger;
 
-    public ResourceOperationsService(IResourceCodeParser codeParser, IResourceScanner scanner, ILogger<ResourceOperationsService> logger)
+    public ResourceOperationsService(
+        IResourceCodeParser codeParser,
+        IResourceScanner scanner,
+        IResourceWorkspaceService workspace,
+        ILogger<ResourceOperationsService> logger)
     {
         _codeParser = codeParser;
         _scanner = scanner;
+        _workspace = workspace;
         _logger = logger;
     }
 
@@ -33,63 +39,108 @@ public sealed class ResourceOperationsService : IResourceOperationsService
             var effectiveSettings = settings?.Clone() ?? new ResourceSettings();
             effectiveSettings.Normalize();
             var extensions = effectiveSettings.VideoExtensions.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var ops = new List<ResourceFileOperation>();
-            var plannedTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var files = EnumerateFiles(root, 0, int.MaxValue, ct)
+                .Select(file => (File: file, Code: _codeParser.ParseCode(file.Directory?.Name ?? string.Empty)?.Normalized));
+            return CreateRenameOperations(files, extensions, ct);
+        }, ct);
+    }
 
-            foreach (var file in EnumerateFiles(root, 0, 4, ct))
+    public async Task<List<ResourceFileOperation>> PreviewRenameVideosInFoldersAsync(
+        string root,
+        IEnumerable<string> videoFolderPaths,
+        ResourceSettings? settings = null,
+        CancellationToken ct = default)
+    {
+        var folders = videoFolderPaths?.Distinct(StringComparer.OrdinalIgnoreCase).ToArray() ?? [];
+        return await Task.Run(() =>
+        {
+            var effectiveSettings = settings?.Clone() ?? new ResourceSettings();
+            effectiveSettings.Normalize();
+            var extensions = effectiveSettings.VideoExtensions.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var files = new List<(FileInfo File, string? Code)>();
+            foreach (var folderPath in folders)
             {
                 ct.ThrowIfCancellationRequested();
-                if (!IsVideoFile(file, extensions))
+                if (!IsPathInsideRoot(root, folderPath))
                     continue;
 
-                var parent = file.Directory;
-                if (parent is null)
-                    continue;
-
-                var code = FindNearestCode(parent, root);
-                if (code is null)
+                try
                 {
-                    ops.Add(new ResourceFileOperation
+                    var directory = new DirectoryInfo(folderPath);
+                    if (directory.Exists)
                     {
-                        Operation = "rename",
-                        Source = file.FullName,
-                        Status = "skip",
-                        Reason = "上级文件夹无法识别番号"
-                    });
-                    continue;
+                        var code = _codeParser.ParseCode(directory.Name)?.Normalized;
+                        foreach (var file in EnumerateFilesRecursive(directory, 0, 0, int.MaxValue, ct))
+                            files.Add((file, code));
+                    }
                 }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Unable to enumerate videos in resource folder {Path}", folderPath);
+                }
+            }
 
-                var ext = file.Extension.TrimStart('.');
-                var suffix = _codeParser.HasChineseSubtitle(file.Name, effectiveSettings.SubtitleKeywords)
-                    || _codeParser.HasChineseSubtitle(parent.Name, effectiveSettings.SubtitleKeywords)
-                    ? "-C"
-                    : string.Empty;
-                var target = Path.Combine(parent.FullName, $"{code.Normalized}{suffix}.{ext}");
-                var samePath = PathsEqual(file.FullName, target);
-                var targetAlreadyPlanned = !samePath && !plannedTargets.Add(target);
-                var status = samePath
-                    ? "ok"
-                    : targetAlreadyPlanned || PathExists(target)
-                        ? "conflict"
-                        : "ready";
+            return CreateRenameOperations(files, extensions, ct);
+        }, ct);
+    }
 
+    private List<ResourceFileOperation> CreateRenameOperations(
+        IEnumerable<(FileInfo File, string? Code)> files,
+        IReadOnlySet<string> extensions,
+        CancellationToken ct)
+    {
+        var ops = new List<ResourceFileOperation>();
+        var plannedTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var entry in files)
+        {
+            ct.ThrowIfCancellationRequested();
+            var file = entry.File;
+            if (!IsVideoFile(file, extensions))
+                continue;
+
+            var parent = file.Directory;
+            if (parent is null)
+                continue;
+
+            if (string.IsNullOrWhiteSpace(entry.Code))
+            {
                 ops.Add(new ResourceFileOperation
                 {
                     Operation = "rename",
                     Source = file.FullName,
-                    Target = target,
-                    Code = code.Normalized,
-                    Status = status,
-                    Reason = targetAlreadyPlanned
-                        ? "多个视频映射到了同一个目标文件名"
-                        : status == "conflict"
-                            ? "目标文件已存在"
-                            : null
+                    Status = "skip",
+                    Reason = "视频所在文件夹无法识别番号"
                 });
+                continue;
             }
 
-            return ops;
-        }, ct);
+            var ext = file.Extension.TrimStart('.');
+            var target = Path.Combine(parent.FullName, $"{entry.Code}.{ext}");
+            var samePath = PathsEqual(file.FullName, target);
+            var targetAlreadyPlanned = !samePath && !plannedTargets.Add(target);
+            var status = samePath
+                ? "ok"
+                : targetAlreadyPlanned || PathExists(target)
+                    ? "conflict"
+                    : "ready";
+
+            ops.Add(new ResourceFileOperation
+            {
+                Operation = "rename",
+                Source = file.FullName,
+                Target = target,
+                Code = entry.Code,
+                Status = status,
+                Reason = targetAlreadyPlanned
+                    ? "多个视频映射到了同一个目标文件名"
+                    : status == "conflict"
+                        ? "目标文件已存在"
+                        : null
+            });
+        }
+
+        return ops;
     }
 
     public async Task<List<ResourceFileOperation>> PreviewClassifySubtitlesAsync(
@@ -237,6 +288,7 @@ public sealed class ResourceOperationsService : IResourceOperationsService
         return await Task.Run(() =>
         {
             var results = new List<ResourceFileOperation>(ops.Count);
+            var directoryPathMappings = new List<(string SourcePath, string TargetPath)>();
             foreach (var op in ops)
             {
                 ct.ThrowIfCancellationRequested();
@@ -302,6 +354,7 @@ public sealed class ResourceOperationsService : IResourceOperationsService
                         }
 
                         Directory.Move(op.Source, op.Target);
+                        directoryPathMappings.Add((op.Source, op.Target));
                         results.Add(DoneOperation(op));
                         continue;
                     }
@@ -340,9 +393,139 @@ public sealed class ResourceOperationsService : IResourceOperationsService
                 }
             }
 
+            if (directoryPathMappings.Count > 0)
+                _workspace.RemapItemPaths(directoryPathMappings);
+
             var done = results.Where(r => r.Status == "done").ToList();
             if (done.Count > 0)
                 AppendHistory(root, done);
+            return results;
+        }, ct);
+    }
+
+    public async Task<List<ResourceFileOperation>> RestoreOperationsAsync(string root, List<ResourceFileOperation> ops, CancellationToken ct = default)
+    {
+        return await Task.Run(() =>
+        {
+            var results = new List<ResourceFileOperation>(ops.Count);
+            var directoryPathMappings = new List<(string SourcePath, string TargetPath)>();
+            foreach (var op in ops.AsEnumerable().Reverse())
+            {
+                ct.ThrowIfCancellationRequested();
+                var restored = new ResourceFileOperation
+                {
+                    Operation = op.Operation,
+                    Source = op.Source,
+                    Target = op.Target,
+                    Code = op.Code,
+                    Status = op.Status,
+                    Reason = op.Reason,
+                    Backup = op.Backup,
+                };
+
+                if (op.Status is "restored" or "already_restored")
+                {
+                    results.Add(restored);
+                    continue;
+                }
+
+                if (!IsPathInsideRoot(root, op.Source) || !IsPathInsideRoot(root, op.Target)
+                    || (!string.IsNullOrWhiteSpace(op.Backup) && !IsPathInsideRoot(root, op.Backup)))
+                {
+                    restored.Status = "conflict";
+                    restored.Reason = "快照中的操作路径不在资源库内";
+                    results.Add(restored);
+                    continue;
+                }
+
+                if (PathsEqual(op.Source, op.Target))
+                {
+                    restored.Status = "already_restored";
+                    results.Add(restored);
+                    continue;
+                }
+
+                var sourceExists = PathExists(op.Source);
+                var targetExists = PathExists(op.Target);
+                var backupExists = !string.IsNullOrWhiteSpace(op.Backup) && File.Exists(op.Backup);
+
+                // A prior attempt may have moved the changed file back but failed
+                // while restoring the displaced target from its backup.
+                if (sourceExists && !targetExists && backupExists)
+                {
+                    try
+                    {
+                        File.Move(op.Backup!, op.Target);
+                        TryDeleteEmptyBackupDirectory(op.Backup!);
+                        restored.Status = "restored";
+                        restored.Reason = null;
+                    }
+                    catch (Exception ex)
+                    {
+                        restored.Status = "conflict";
+                        restored.Reason = ex.Message;
+                    }
+                    results.Add(restored);
+                    continue;
+                }
+
+                // The operation never ran, or a previous attempt already restored it.
+                if (sourceExists && !targetExists && !backupExists)
+                {
+                    restored.Status = "already_restored";
+                    restored.Reason = null;
+                    results.Add(restored);
+                    continue;
+                }
+
+                if (!targetExists || sourceExists)
+                {
+                    restored.Status = "conflict";
+                    restored.Reason = "原路径或目标路径已变化，无法安全回退";
+                    results.Add(restored);
+                    continue;
+                }
+
+                try
+                {
+                    if (backupExists && (Directory.Exists(op.Source) || Directory.Exists(op.Target)))
+                        throw new IOException("目录操作不能带有覆盖备份");
+
+                    var parent = Path.GetDirectoryName(op.Source);
+                    if (parent is not null)
+                        Directory.CreateDirectory(parent);
+
+                    if (Directory.Exists(op.Target))
+                    {
+                        Directory.Move(op.Target, op.Source);
+                        directoryPathMappings.Add((op.Target, op.Source));
+                    }
+                    else
+                        File.Move(op.Target, op.Source);
+
+                    if (backupExists)
+                    {
+                        if (PathExists(op.Target))
+                            throw new IOException("恢复的原文件名已被占用，无法还原覆盖前文件");
+                        File.Move(op.Backup!, op.Target);
+                        TryDeleteEmptyBackupDirectory(op.Backup!);
+                    }
+
+                    restored.Status = "restored";
+                    restored.Reason = null;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Unable to restore resource operation {Source} -> {Target}", op.Source, op.Target);
+                    restored.Status = "conflict";
+                    restored.Reason = ex.Message;
+                }
+
+                results.Add(restored);
+            }
+
+            if (directoryPathMappings.Count > 0)
+                _workspace.RemapItemPaths(directoryPathMappings);
             return results;
         }, ct);
     }
@@ -378,6 +561,7 @@ public sealed class ResourceOperationsService : IResourceOperationsService
 
             var batch = history[^1];
             var reversed = new List<ResourceFileOperation>();
+            var directoryPathMappings = new List<(string SourcePath, string TargetPath)>();
             foreach (var op in batch.Operations.AsEnumerable().Reverse().ToList())
             {
                 ct.ThrowIfCancellationRequested();
@@ -423,7 +607,10 @@ public sealed class ResourceOperationsService : IResourceOperationsService
                         Directory.CreateDirectory(parent);
 
                     if (Directory.Exists(undo.Source))
+                    {
                         Directory.Move(undo.Source, undo.Target);
+                        directoryPathMappings.Add((undo.Source, undo.Target));
+                    }
                     else
                         File.Move(undo.Source, undo.Target);
 
@@ -444,6 +631,9 @@ public sealed class ResourceOperationsService : IResourceOperationsService
 
                 reversed.Add(undo);
             }
+
+            if (directoryPathMappings.Count > 0)
+                _workspace.RemapItemPaths(directoryPathMappings);
 
             history.RemoveAll(x => x.Operations.Count == 0);
             if (batch.Operations.Count > 0 && !history.Contains(batch))
@@ -472,18 +662,6 @@ public sealed class ResourceOperationsService : IResourceOperationsService
         Status = status,
         Reason = reason
     };
-
-    private ResourceCodeInfo? FindNearestCode(DirectoryInfo directory, string root)
-    {
-        for (var current = directory; current is not null && IsPathInsideRoot(root, current.FullName); current = current.Parent)
-        {
-            var code = _codeParser.ParseCode(current.Name);
-            if (code is not null)
-                return code;
-        }
-
-        return null;
-    }
 
     private static bool IsDirectoryOperation(ResourceFileOperation op) =>
         op.Operation.StartsWith("classify", StringComparison.OrdinalIgnoreCase)

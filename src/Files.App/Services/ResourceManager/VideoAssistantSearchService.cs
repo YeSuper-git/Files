@@ -11,6 +11,7 @@ public sealed record VideoAssistantActor(string Name, string Path, string Aliase
 public sealed class VideoAssistantCandidate
 {
     public string Name { get; init; } = string.Empty;
+    public string Code { get; init; } = string.Empty;
     public string Path { get; init; } = string.Empty;
     public string FolderPath { get; init; } = string.Empty;
     public string ActorName { get; init; } = string.Empty;
@@ -18,6 +19,7 @@ public sealed class VideoAssistantCandidate
     public string? PosterPath { get; init; }
     public IReadOnlyList<string> Tags { get; init; } = [];
     public ResourceVideoWatchStatus WatchStatus { get; init; }
+    public DateTimeOffset? LastWatchedAt { get; init; }
     public string Reason { get; init; } = string.Empty;
     public IReadOnlyList<string> LocationPaths { get; init; } = [];
     public IReadOnlyList<ResourceBrowserLocationKind> LocationKinds { get; init; } = [];
@@ -26,17 +28,30 @@ public sealed class VideoAssistantCandidate
 
 public sealed class VideoAssistantSearchService
 {
-    private const int MaxResults = 6;
+    private const int MaxResults = 5;
     private const int MaxDepth = 32;
 
     private readonly IResourceBrowserService _browser;
     private readonly IResourceWorkspaceService _workspace;
+    private readonly IResourceCodeParser _codeParser;
 
-    public VideoAssistantSearchService(IResourceBrowserService browser, IResourceWorkspaceService workspace)
+    public VideoAssistantSearchService(
+        IResourceBrowserService browser,
+        IResourceWorkspaceService workspace,
+        IResourceCodeParser codeParser)
     {
         _browser = browser;
         _workspace = workspace;
+        _codeParser = codeParser;
     }
+
+    public string GetVideoTitle(string itemName)
+        => ParseVideoFolderName(itemName).Title;
+
+    public string GetVideoTitleTranslationKey(string itemName, string itemPath, string provider)
+        => $"{(_codeParser.ParseCode(itemName)?.Normalized is { Length: > 0 } code
+            ? $"code:{code}"
+            : itemPath)}|provider:{provider}";
 
     public async Task<IReadOnlyList<VideoAssistantActor>> GetActorsAsync(string libraryPath, CancellationToken cancellationToken = default)
     {
@@ -125,6 +140,7 @@ public sealed class VideoAssistantSearchService
             cancellationToken.ThrowIfCancellationRequested();
             if (child.Kind == ResourceBrowserItemKind.VideoFolder)
             {
+                var (title, code) = ParseVideoFolderName(child.Name);
                 var videoFolderTrail = new List<ResourceAssistantLocation>(trail)
                 {
                     new(child.Path, ResourceBrowserLocationKind.VideoFolder, child.Name),
@@ -138,14 +154,16 @@ public sealed class VideoAssistantSearchService
 
                     candidates.Add(new VideoAssistantCandidate
                     {
-                        Name = Path.GetFileNameWithoutExtension(video.Name),
+                        Name = title,
+                        Code = code,
                         Path = video.Path,
                         FolderPath = child.Path,
                         ActorName = actor.Name,
                         ActorPath = actor.Path,
-                        PosterPath = video.PosterPath,
+                        PosterPath = child.PosterPath ?? video.PosterPath,
                         Tags = tagNames,
                         WatchStatus = watchStatus,
+                        LastWatchedAt = _workspace.GetVideoLastWatchedAt(video.Path),
                         Reason = tagNames.Length > 0 ? string.Join(" · ", tagNames) : "资源库匹配",
                         LocationPaths = videoFolderTrail.Select(location => location.Path).ToArray(),
                         LocationKinds = videoFolderTrail.Select(location => location.Kind).ToArray(),
@@ -162,6 +180,49 @@ public sealed class VideoAssistantSearchService
                 await CollectActorVideosAsync(actor, child.Path, ResourceBrowserLocationKind.CategoryFolder, categoryTrail, candidates, depth + 1, cancellationToken);
             }
         }
+    }
+
+    private (string Title, string Code) ParseVideoFolderName(string folderName)
+    {
+        var title = string.Empty;
+        var parsedCode = _codeParser.ParseCode(folderName);
+        var openingBracket = folderName.IndexOfAny(['[', '【']);
+        if (openingBracket >= 0)
+        {
+            var closingBracket = folderName.IndexOf(folderName[openingBracket] == '[' ? ']' : '】', openingBracket + 1);
+            if (closingBracket > openingBracket)
+                title = folderName[(openingBracket + 1)..closingBracket].Trim();
+        }
+
+        if (parsedCode is not null && title.Contains(parsedCode.Raw, StringComparison.OrdinalIgnoreCase))
+            title = string.Empty;
+
+        var displayCode = parsedCode?.Normalized ?? string.Empty;
+        if (parsedCode is not null)
+        {
+            var codeStart = folderName.IndexOf(parsedCode.Raw, StringComparison.OrdinalIgnoreCase);
+            var suffixStart = codeStart < 0 ? -1 : codeStart + parsedCode.Raw.Length;
+            if (suffixStart >= 0 && folderName.AsSpan(suffixStart).StartsWith("-C", StringComparison.OrdinalIgnoreCase))
+                displayCode += "-C";
+        }
+
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            title = folderName;
+            if (parsedCode is not null)
+            {
+                var codeStart = folderName.IndexOf(parsedCode.Raw, StringComparison.OrdinalIgnoreCase);
+                if (codeStart >= 0)
+                {
+                    title = folderName[(codeStart + parsedCode.Raw.Length)..];
+                    if (title.StartsWith("-C", StringComparison.OrdinalIgnoreCase))
+                        title = title[2..];
+                }
+            }
+            title = title.Trim(' ', '-', '_', '[', ']', '【', '】');
+        }
+
+        return (string.IsNullOrWhiteSpace(title) ? folderName : title, displayCode);
     }
 
     private static bool MatchesWatchFilter(ResourceVideoWatchStatus status, VideoAssistantWatchFilter filter)

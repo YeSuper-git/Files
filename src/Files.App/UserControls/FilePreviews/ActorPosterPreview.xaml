@@ -8,13 +8,73 @@
 	d:DesignHeight="300"
 	d:DesignWidth="240"
 	mc:Ignorable="d">
-	<Grid Background="{ThemeResource SubtleFillColorSecondaryBrush}">
-		<Grid.RowDefinitions>
-			<RowDefinition Height="*" />
-			<RowDefinition Height="Auto" />
-		</Grid.RowDefinitions>
-		<Grid>
-			<Image x:Name="PosterImage" Stretch="Uniform" />
+	<Grid Background="Transparent">
+		<Grid
+			x:Name="PosterViewport"
+			Background="Transparent"
+			PointerEntered="PosterViewport_PointerEntered"
+			PointerExited="PosterViewport_PointerExited">
+			<Grid.ContextFlyout>
+				<MenuFlyout>
+					<MenuFlyoutItem
+						x:Name="AddPosterMenuItem"
+						Text="添加海报"
+						Click="AddPosterMenuItem_Click"
+						Visibility="{x:Bind PosterActionsVisibility, Mode=OneWay}" />
+					<MenuFlyoutItem
+						x:Name="SetMainPosterMenuItem"
+						Text="设为主海报"
+						IsEnabled="False"
+						Click="SetMainPosterMenuItem_Click"
+						Visibility="{x:Bind PosterActionsVisibility, Mode=OneWay}" />
+					<MenuFlyoutItem
+						x:Name="DeletePosterMenuItem"
+						Text="删除当前海报"
+						Click="DeletePosterMenuItem_Click"
+						Visibility="{x:Bind PosterActionsVisibility, Mode=OneWay}" />
+					<MenuFlyoutSeparator Visibility="{x:Bind PosterActionsVisibility, Mode=OneWay}" />
+					<MenuFlyoutItem
+						x:Name="SaveOriginalMenuItem"
+						Text="保存原图"
+						Click="SaveOriginalMenuItem_Click" />
+				</MenuFlyout>
+			</Grid.ContextFlyout>
+			<Image x:Name="PosterImage" Stretch="Uniform">
+				<Image.RenderTransform>
+					<TranslateTransform x:Name="PosterTranslateTransform" />
+				</Image.RenderTransform>
+			</Image>
+			<Border
+				HorizontalAlignment="Center"
+				VerticalAlignment="Bottom"
+				Margin="0,0,0,8"
+				Padding="9,3"
+				Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+				CornerRadius="10">
+				<TextBlock
+					x:Name="PosterCountText"
+					Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+					FontSize="12" />
+			</Border>
+			<Button
+				x:Name="PreviousButton"
+				Width="32"
+				Height="32"
+				MinWidth="32"
+				Padding="0"
+				HorizontalAlignment="Left"
+				VerticalAlignment="Center"
+				Margin="6,0"
+				Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+				BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+				BorderThickness="1"
+				CornerRadius="16"
+				Click="PreviousButton_Click"
+				Visibility="Collapsed"
+				ToolTipService.ToolTip="上一张海报"
+				AutomationProperties.Name="上一张海报">
+				<SymbolIcon Symbol="Back" />
+			</Button>
 			<TextBlock
 				x:Name="EmptyPosterText"
 				HorizontalAlignment="Center"
@@ -23,37 +83,24 @@
 				Text="暂无海报"
 				Visibility="Collapsed" />
 			<Button
-				x:Name="PreviousButton"
-				Width="40"
-				Height="48"
-				HorizontalAlignment="Left"
-				VerticalAlignment="Center"
-				Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
-				Click="PreviousButton_Click"
-				Content="‹"
-				FontSize="28"
-				ToolTipService.ToolTip="上一张海报" />
-			<Button
 				x:Name="NextButton"
-				Width="40"
-				Height="48"
+				Width="32"
+				Height="32"
+				MinWidth="32"
+				Padding="0"
 				HorizontalAlignment="Right"
 				VerticalAlignment="Center"
-				Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+				Margin="6,0"
+				Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+				BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+				BorderThickness="1"
+				CornerRadius="16"
 				Click="NextButton_Click"
-				Content="›"
-				FontSize="28"
-				ToolTipService.ToolTip="下一张海报" />
+				Visibility="Collapsed"
+				ToolTipService.ToolTip="下一张海报"
+				AutomationProperties.Name="下一张海报">
+				<SymbolIcon Symbol="Forward" />
+			</Button>
 		</Grid>
-		<StackPanel
-			Grid.Row="1"
-			HorizontalAlignment="Center"
-			Orientation="Horizontal"
-			Padding="4"
-			Spacing="6">
-			<Button Content="添加海报" Click="AddPosterButton_Click" />
-			<Button x:Name="SetMainPosterButton" Content="设为主海报" Click="SetMainPosterButton_Click" />
-			<TextBlock x:Name="PosterCountText" VerticalAlignment="Center" Margin="2,0" />
-		</StackPanel>
 	</Grid>
 </UserControl>

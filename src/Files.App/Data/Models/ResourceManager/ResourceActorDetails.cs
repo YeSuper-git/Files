@@ -11,6 +11,7 @@ public sealed class ResourceActorDetails
 {
     public string Name { get; set; } = string.Empty;
     public string Aliases { get; set; } = string.Empty;
+    public string Biography { get; set; } = string.Empty;
     public string HeightCm { get; set; } = string.Empty;
     public string WeightKg { get; set; } = string.Empty;
     public string Bust { get; set; } = string.Empty;
@@ -21,11 +22,13 @@ public sealed class ResourceActorDetails
     public bool? IsCurrentlyActive { get; set; }
     public DateTime? CareerRetirementDate { get; set; }
     public List<string> PosterPaths { get; set; } = [];
+    public List<string> ExcludedPosterPaths { get; set; } = [];
 
     public ResourceActorDetails Clone() => new()
     {
         Name = Name,
         Aliases = Aliases,
+        Biography = Biography,
         HeightCm = HeightCm,
         WeightKg = WeightKg,
         Bust = Bust,
@@ -36,5 +39,6 @@ public sealed class ResourceActorDetails
         IsCurrentlyActive = IsCurrentlyActive,
         CareerRetirementDate = CareerRetirementDate,
         PosterPaths = [.. (PosterPaths ?? [])],
+        ExcludedPosterPaths = [.. (ExcludedPosterPaths ?? [])],
     };
 }

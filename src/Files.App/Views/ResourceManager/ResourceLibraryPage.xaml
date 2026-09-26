@@ -8,39 +8,41 @@
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
-    <Grid Padding="24">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+    <Page.Resources>
+        <Style x:Key="ActorGroupSelectedButtonStyle" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}" />
+    </Page.Resources>
 
-        <Grid Grid.Row="0" Margin="0,0,0,16">
-            <StackPanel>
-                <TextBlock Text="资源管理" Style="{StaticResource SubtitleTextBlockStyle}" />
-                <TextBlock x:Name="LibraryPathText" Margin="0,4,0,0" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-            </StackPanel>
-            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
-                <Button Content="管理隐藏项" Click="OnManageHiddenActors" />
-                <Button Content="更换路径" Click="OnChooseLibrary" />
-                <Button Content="资源工具" Click="OnOpenTools" />
-            </StackPanel>
-        </Grid>
-
-        <Border Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="12">
+    <Grid Padding="0">
+        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
             <Grid>
-                <ProgressRing x:Name="LoadingRing" Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" IsActive="False" />
-                <GridView
-                    x:Name="BrowserGrid"
-                    Padding="12"
-                    IsItemClickEnabled="False"
-                    ItemsSource="{Binding BrowserItems, Mode=OneWay}"
-                    SelectionChanged="OnBrowserSelectionChanged"
-                    SelectionMode="Extended">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <ScrollViewer
+                        x:Name="ActorGroupSelector"
+                        Grid.Row="0"
+                        Margin="16,10,16,0"
+                        HorizontalScrollBarVisibility="Hidden"
+                        VerticalScrollBarVisibility="Disabled"
+                        Visibility="Collapsed">
+                        <StackPanel x:Name="ActorGroupButtons" Orientation="Horizontal" Spacing="8" />
+                    </ScrollViewer>
+                    <Grid Grid.Row="1">
+                    <ProgressRing x:Name="LoadingRing" Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" IsActive="False" />
+                    <GridView
+                        x:Name="BrowserGrid"
+                        Padding="12"
+                        SizeChanged="BrowserGrid_SizeChanged"
+                        IsItemClickEnabled="False"
+                        ItemsSource="{Binding BrowserItems, Mode=OneWay}"
+                        SelectionChanged="OnBrowserSelectionChanged"
+                        SelectionMode="Extended">
                     <GridView.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <!-- Reserve the widest poster card (244px) plus item padding; otherwise ItemsWrapGrid takes the first item's width and clips later video posters. -->
-                            <ItemsWrapGrid Orientation="Horizontal" ItemWidth="252" />
+                            <!-- Keep the wider actor portrait cards aligned with each row while leaving room for the larger poster. -->
+                            <ItemsWrapGrid Orientation="Horizontal" ItemWidth="276" />
                         </ItemsPanelTemplate>
                     </GridView.ItemsPanel>
                     <GridView.ItemContainerStyle>
@@ -58,74 +60,110 @@
                                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                 BorderThickness="1"
-                                CornerRadius="10"
+                                CornerRadius="14"
                                 RightTapped="OnBrowserItemRightTapped"
                                 DoubleTapped="OnBrowserItemDoubleTapped">
                                 <StackPanel>
                                     <Border Height="{Binding PosterHeight, Mode=OneWay}" CornerRadius="10,10,0,0" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
                                         <Grid>
-                                            <Image Source="{Binding Poster, Mode=OneWay}" Stretch="UniformToFill" Visibility="{Binding PosterVisibility, Mode=OneWay}" />
+                                            <Image Source="{Binding Poster, Mode=OneWay}" Stretch="{Binding PosterStretch, Mode=OneWay}" Visibility="{Binding PosterVisibility, Mode=OneWay}" />
                                             <FontIcon Glyph="{Binding FallbackGlyph, Mode=OneWay}" FontSize="42" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorTertiaryBrush}" Visibility="{Binding FallbackVisibility, Mode=OneWay}" />
-                                            <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Padding="7,3" Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}" CornerRadius="5">
+                                            <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Padding="7,3" Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}" CornerRadius="5" Visibility="{Binding KindLabelVisibility, Mode=OneWay}">
                                                 <TextBlock Text="{Binding KindLabel, Mode=OneWay}" FontSize="12" />
                                             </Border>
+                                            <Border
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Bottom"
+                                                Margin="10"
+                                                Padding="10,5"
+                                                Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+                                                CornerRadius="12"
+                                                Visibility="{Binding ActorWorkCountVisibility, Mode=OneWay}">
+                                                <TextBlock Text="{Binding ActorWorkCountText, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" />
+                                            </Border>
+                                            <ItemsControl
+                                                Width="180"
+                                                MaxHeight="60"
+                                                Margin="8"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Bottom"
+                                                ItemsSource="{Binding PosterTags, Mode=OneWay}"
+                                                Visibility="{Binding PosterTagListVisibility, Mode=OneWay}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapGrid HorizontalAlignment="Right" MaximumRowsOrColumns="2" Orientation="Horizontal" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Margin="4,0,0,4" Padding="8,4" Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10">
+                                                            <TextBlock Text="{Binding}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
                                         </Grid>
                                     </Border>
-                                    <StackPanel Padding="12,10,12,12">
-                                        <TextBlock Text="{Binding Name, Mode=OneWay}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Margin="0,3,0,0" Text="{Binding Subtitle, Mode=OneWay}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                        <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding Tags, Mode=OneWay}" Visibility="{Binding TagListVisibility, Mode=OneWay}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <WrapGrid Orientation="Horizontal" MaximumRowsOrColumns="2" />
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border Margin="0,0,5,5" Padding="7,2" Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="5">
-                                                        <TextBlock Text="{Binding}" FontSize="11" TextTrimming="CharacterEllipsis" />
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
+                                    <StackPanel Padding="14,12,14,14">
+                                        <TextBlock Text="{Binding Name, Mode=OneWay}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Margin="0,4,0,0" Text="{Binding DescriptionText, Mode=OneWay}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" MaxLines="2" Visibility="{Binding DescriptionVisibility, Mode=OneWay}" />
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
                         </DataTemplate>
                     </GridView.ItemTemplate>
-                </GridView>
-                <TextBlock x:Name="EmptyText" HorizontalAlignment="Center" VerticalAlignment="Center" Text="当前层级没有可展示的资源" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed" />
+                    </GridView>
+                    <TextBlock x:Name="EmptyText" HorizontalAlignment="Center" VerticalAlignment="Center" Text="当前层级没有可展示的资源" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed" />
+                    </Grid>
+                </Grid>
             </Grid>
         </Border>
 
-        <TextBlock x:Name="StatusText" Grid.Row="2" Margin="0,10,0,0" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-
         <Border
             x:Name="AssistantFloatingPanel"
-            Grid.RowSpan="3"
             Width="420"
             Height="600"
             Margin="0,0,0,56"
             HorizontalAlignment="Right"
             VerticalAlignment="Bottom"
-            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
             CornerRadius="14"
-            Visibility="Collapsed" />
+            Translation="0,0,24"
+            Visibility="Collapsed">
+            <Border.Shadow>
+                <ThemeShadow />
+            </Border.Shadow>
+        </Border>
         <Button
-            Grid.RowSpan="3"
-            Margin="0,0,0,0"
-            Padding="14,10"
+            Width="48"
+            Height="48"
+            MinWidth="48"
+            Margin="0,0,12,12"
+            Padding="0"
             HorizontalAlignment="Right"
             VerticalAlignment="Bottom"
-            Background="{ThemeResource AccentFillColorDefaultBrush}"
+            Background="Transparent"
+            BorderThickness="0"
             Click="OnOpenVideoAssistant"
-            Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <FontIcon Glyph="&#xE8D4;" />
-                <TextBlock Text="视频助手" />
-            </StackPanel>
+            PointerEntered="AssistantButton_PointerEntered"
+            PointerExited="AssistantButton_PointerExited"
+            PointerPressed="AssistantButton_PointerPressed"
+            PointerReleased="AssistantButton_PointerReleased"
+            CornerRadius="24"
+            AutomationProperties.Name="小咪"
+            ToolTipService.ToolTip="小咪">
+            <Ellipse Width="48" Height="48">
+                <Ellipse.Fill>
+                    <ImageBrush
+                        ImageSource="ms-appx:///Assets/AppTiles/Dev/Square44x44Logo.scale-100.png"
+                        Stretch="UniformToFill" />
+                </Ellipse.Fill>
+                <Ellipse.RenderTransform>
+                    <ScaleTransform x:Name="AssistantButtonScaleTransform" CenterX="24" CenterY="24" />
+                </Ellipse.RenderTransform>
+            </Ellipse>
         </Button>
     </Grid>
 </Page>

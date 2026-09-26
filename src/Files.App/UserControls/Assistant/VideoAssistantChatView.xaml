@@ -14,10 +14,10 @@
 	mc:Ignorable="d">
 	<Grid
 		DataContext="{x:Bind ViewModel}"
+		Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
 		Padding="16"
 		RowSpacing="10">
 		<Grid.RowDefinitions>
-			<RowDefinition Height="Auto" />
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="*" />
 			<RowDefinition Height="Auto" />
@@ -28,64 +28,34 @@
 				<ColumnDefinition Width="Auto" />
 				<ColumnDefinition Width="*" />
 				<ColumnDefinition Width="Auto" />
-				<ColumnDefinition Width="Auto" />
 			</Grid.ColumnDefinitions>
-			<Border
+			<Image
 				Width="36"
 				Height="36"
 				VerticalAlignment="Center"
-				Background="{ThemeResource AccentFillColorDefaultBrush}"
-				CornerRadius="10">
-				<FontIcon
-					HorizontalAlignment="Center"
-					VerticalAlignment="Center"
-					Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
-					Glyph="&#xE8D4;" />
-			</Border>
-			<StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-				<TextBlock FontSize="16" FontWeight="SemiBold" Text="视频助手" />
-				<TextBlock FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="只在本机资源库中筛选，不上传文件信息" />
+				Source="ms-appx:///Assets/AppTiles/Dev/Square44x44Logo.scale-100.png"
+				Stretch="UniformToFill" />
+			<StackPanel Grid.Column="1" VerticalAlignment="Center">
+				<TextBlock FontSize="16" FontWeight="SemiBold" Text="小咪" />
 			</StackPanel>
 			<Button
 				Grid.Column="2"
-				Padding="8,4"
-				Click="NewConversationButton_Click"
-				Content="新对话"
-				ToolTipService.ToolTip="开始新的筛选对话" />
-			<Button
-				Grid.Column="3"
-				Width="36"
+				Width="32"
+				Height="32"
 				Padding="0"
+				Background="Transparent"
+				BorderThickness="0"
+				CornerRadius="16"
 				Click="CloseButton_Click"
 				Content="&#xE8BB;"
 				FontFamily="{StaticResource SymbolThemeFontFamily}"
-				ToolTipService.ToolTip="关闭助手" />		</Grid>
+				FontSize="12"
+				Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+				AutomationProperties.Name="关闭小咪"
+				ToolTipService.ToolTip="关闭小咪" />
+		</Grid>
 
-		<ScrollViewer
-			Grid.Row="1"
-			MaxHeight="105"
-			HorizontalScrollBarVisibility="Disabled"
-			VerticalScrollBarVisibility="Auto">
-			<ItemsControl ItemsSource="{x:Bind ViewModel.Suggestions, Mode=OneWay}">
-				<ItemsControl.ItemsPanel>
-					<ItemsPanelTemplate>
-						<WrapGrid Orientation="Horizontal" />
-					</ItemsPanelTemplate>
-				</ItemsControl.ItemsPanel>
-				<ItemsControl.ItemTemplate>
-					<DataTemplate x:DataType="vm:VideoAssistantChoice">
-						<Button
-							Margin="0,0,6,6"
-							Padding="10,5"
-							Click="SuggestionButton_Click"
-							Content="{x:Bind Label}"
-							Tag="{Binding}" />
-					</DataTemplate>
-				</ItemsControl.ItemTemplate>
-			</ItemsControl>
-		</ScrollViewer>
-
-		<Grid Grid.Row="2">
+		<Grid Grid.Row="1">
 			<ScrollViewer
 				x:Name="MessagesScrollViewer"
 				VerticalScrollBarVisibility="Auto">
@@ -93,6 +63,17 @@
 					<ItemsControl.ItemTemplate>
 						<DataTemplate x:DataType="vm:VideoAssistantMessage">
 							<StackPanel Margin="0,0,0,12" Spacing="4">
+								<Border
+									HorizontalAlignment="Center"
+									Padding="7,2"
+									Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+									CornerRadius="6"
+									Visibility="{x:Bind TimestampVisibility}">
+									<TextBlock
+										FontSize="10"
+										Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+										Text="{x:Bind TimeText}" />
+								</Border>
 								<TextBlock
 									HorizontalAlignment="{x:Bind Alignment}"
 									FontSize="11"
@@ -108,50 +89,58 @@
 									CornerRadius="12">
 									<TextBlock Text="{x:Bind Text}" TextWrapping="WrapWholeWords" />
 								</Border>
-								<ItemsControl ItemsSource="{x:Bind Results}">
-									<ItemsControl.ItemTemplate>
-										<DataTemplate x:DataType="vm:VideoAssistantCandidateViewModel">
-											<Border
-												Margin="0,4,0,4"
-												Padding="8"
-												Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-												BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-												BorderThickness="1"
-												CornerRadius="10">
-												<Grid ColumnSpacing="10">
-													<Grid.ColumnDefinitions>
-														<ColumnDefinition Width="64" />
-														<ColumnDefinition Width="*" />
-													</Grid.ColumnDefinitions>
-													<Border
-														Width="64"
-														Height="88"
-														Background="{ThemeResource SubtleFillColorSecondaryBrush}"
-														CornerRadius="5">
-														<Grid>
-															<Image Source="{x:Bind Poster, Mode=OneWay}" Stretch="UniformToFill" Visibility="{x:Bind PosterVisibility, Mode=OneWay}" />
-															<FontIcon Glyph="&#xE8B7;" FontSize="23" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{x:Bind FallbackVisibility, Mode=OneWay}" />
-														</Grid>
-													</Border>
-													<StackPanel Grid.Column="1" Spacing="3">
-														<TextBlock FontWeight="SemiBold" Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+								<Border
+									Margin="0,4,0,4"
+									Padding="8"
+									Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+									BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+									BorderThickness="1"
+									CornerRadius="12"
+									Visibility="{x:Bind ResultVisibility}">
+									<StackPanel Spacing="8">
+										<ContentControl Content="{x:Bind CurrentResult, Mode=OneWay}">
+											<ContentControl.ContentTemplate>
+												<DataTemplate x:DataType="vm:VideoAssistantCandidateViewModel">
+													<StackPanel Spacing="7">
+														<Border Height="190" Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="9">
+															<Grid>
+																<Image Source="{x:Bind Poster, Mode=OneWay}" Stretch="Uniform" Visibility="{x:Bind PosterVisibility, Mode=OneWay}" />
+																<FontIcon Glyph="&#xE8B7;" FontSize="30" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{x:Bind FallbackVisibility, Mode=OneWay}" />
+															</Grid>
+														</Border>
+														<TextBlock FontSize="16" FontWeight="SemiBold" Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Name}" />
+														<TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind Code}" />
 														<TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind ActorName}" />
-														<TextBlock FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind WatchStatusText, Mode=OneWay}" />
-														<TextBlock FontSize="11" Text="{x:Bind Reason}" TextWrapping="WrapWholeWords" />
-														<StackPanel Orientation="Horizontal" Spacing="5">
-															<Button Padding="8,4" Click="OpenVideoButton_Click" Content="打开/播放" />
-															<Button Padding="8,4" Click="OpenLocationButton_Click" Content="所在位置" />
-														</StackPanel>
-														<StackPanel Orientation="Horizontal" Spacing="5">
-															<Button Padding="8,4" Click="ToggleWatchedButton_Click" Content="{x:Bind WatchButtonText, Mode=OneWay}" />
-															<Button Padding="8,4" Click="ToggleWantToWatchButton_Click" Content="{x:Bind WantToWatchButtonText, Mode=OneWay}" />
+														<TextBlock FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" Text="{x:Bind LastWatchedAtText, Mode=OneWay}" />
+														<StackPanel Orientation="Horizontal" Spacing="7">
+															<Button Width="34" Height="32" MinWidth="34" Padding="0" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Click="OpenVideoButton_Click" CornerRadius="8" AutomationProperties.Name="打开或播放" ToolTipService.ToolTip="打开或播放">
+																<FontIcon Glyph="&#xE768;" FontSize="14" />
+															</Button>
+															<Button Width="34" Height="32" MinWidth="34" Padding="0" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Click="OpenLocationButton_Click" CornerRadius="8" AutomationProperties.Name="打开所在位置" ToolTipService.ToolTip="打开所在位置">
+																<FontIcon Glyph="&#xE838;" FontSize="14" />
+															</Button>
+															<Button Width="34" Height="32" MinWidth="34" Padding="0" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Click="ToggleWatchedButton_Click" CornerRadius="8" AutomationProperties.Name="{x:Bind WatchButtonText, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind WatchButtonText, Mode=OneWay}">
+																<FontIcon Glyph="&#xE73E;" FontSize="14" />
+															</Button>
+															<Button Width="34" Height="32" MinWidth="34" Padding="0" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Click="ToggleWantToWatchButton_Click" CornerRadius="8" AutomationProperties.Name="{x:Bind WantToWatchButtonText, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind WantToWatchButtonText, Mode=OneWay}">
+																<FontIcon Glyph="&#xE734;" FontSize="14" />
+															</Button>
 														</StackPanel>
 													</StackPanel>
-												</Grid>
-											</Border>
-										</DataTemplate>
-									</ItemsControl.ItemTemplate>
-								</ItemsControl>
+												</DataTemplate>
+											</ContentControl.ContentTemplate>
+										</ContentControl>
+									<StackPanel HorizontalAlignment="Center" Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ResultNavigationVisibility}">
+										<Button Width="34" Height="30" MinWidth="34" Padding="0" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Click="PreviousRecommendationButton_Click" CornerRadius="8" Tag="{Binding}" AutomationProperties.Name="上一个推荐" ToolTipService.ToolTip="上一个推荐">
+											<FontIcon Glyph="&#xE76B;" FontSize="12" />
+										</Button>
+										<TextBlock VerticalAlignment="Center" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind ResultCounter, Mode=OneWay}" />
+										<Button Width="34" Height="30" MinWidth="34" Padding="0" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Click="NextRecommendationButton_Click" CornerRadius="8" Tag="{Binding}" AutomationProperties.Name="下一个推荐" ToolTipService.ToolTip="下一个推荐">
+											<FontIcon Glyph="&#xE76C;" FontSize="12" />
+										</Button>
+									</StackPanel>
+								</StackPanel>
+								</Border>
 							</StackPanel>
 						</DataTemplate>
 					</ItemsControl.ItemTemplate>
@@ -165,7 +154,72 @@
 				IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
 		</Grid>
 
-		<StackPanel Grid.Row="3" Spacing="5">
+		<StackPanel Grid.Row="2" Spacing="8">
+			<Grid>
+				<Border Padding="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="12">
+				<StackPanel Spacing="8">
+					<TextBlock
+						HorizontalAlignment="Center"
+						FontSize="12"
+						FontWeight="SemiBold"
+						Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+						Text="猜你想看" />
+				<ItemsControl ItemsSource="{x:Bind ViewModel.Suggestions, Mode=OneWay}">
+					<ItemsControl.ItemsPanel>
+						<ItemsPanelTemplate>
+							<WrapGrid ItemWidth="120" MaximumRowsOrColumns="3" Orientation="Horizontal" />
+						</ItemsPanelTemplate>
+					</ItemsControl.ItemsPanel>
+					<ItemsControl.ItemTemplate>
+						<DataTemplate x:DataType="vm:VideoAssistantChoice">
+							<Button
+								Margin="0,0,6,6"
+								HorizontalAlignment="Stretch"
+								Padding="8,6"
+								Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+								BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+								BorderThickness="1"
+								Click="SuggestionButton_Click"
+								CornerRadius="9"
+								Tag="{Binding}">
+								<TextBlock Text="{x:Bind Label}" TextAlignment="Center" TextWrapping="WrapWholeWords" />
+							</Button>
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+				</StackPanel>
+				</Border>
+				<Rectangle
+					IsHitTestVisible="False"
+					RadiusX="12"
+					RadiusY="12"
+					Stroke="{ThemeResource AccentFillColorDefaultBrush}"
+					StrokeDashArray="9,4"
+					StrokeThickness="2" />
+			</Grid>
+			<StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+				<Button
+					Padding="10,6"
+					Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+					BorderBrush="{ThemeResource AccentFillColorSecondaryBrush}"
+					BorderThickness="1"
+					Click="BatchActionButton_Click"
+					CornerRadius="12"
+					Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+					Visibility="{x:Bind ViewModel.BatchActionVisibility, Mode=OneWay}">
+					<TextBlock Text="{x:Bind ViewModel.BatchActionLabel, Mode=OneWay}" />
+				</Button>
+				<Button
+					Padding="10,6"
+					Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+					BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+					BorderThickness="1"
+					Click="NewConversationButton_Click"
+					Content="重置提问"
+					CornerRadius="12"
+					Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+					ToolTipService.ToolTip="开启新一轮提问，保留之前的聊天记录" />
+			</StackPanel>
 			<Grid ColumnSpacing="8">
 				<Grid.ColumnDefinitions>
 					<ColumnDefinition Width="*" />
@@ -173,11 +227,11 @@
 				</Grid.ColumnDefinitions>
 				<TextBox
 					x:Name="MessageInput"
-					AcceptsReturn="True"
-					MaxHeight="84"
-					PlaceholderText="描述你想看的作品，或输入演员名……"
+					AcceptsReturn="False"
+					MinHeight="36"
+					PlaceholderText="输入演员或作品名"
 					Text="{x:Bind ViewModel.Draft, Mode=TwoWay}"
-					TextWrapping="Wrap"
+					TextWrapping="NoWrap"
 					KeyDown="MessageInput_KeyDown" />
 				<Button
 					Grid.Column="1"
@@ -187,7 +241,6 @@
 					Content="发送"
 					IsEnabled="{x:Bind ViewModel.CanSend, Mode=OneWay}" />
 			</Grid>
-			<TextBlock FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" Text="Enter 发送 · Shift+Enter 换行 · 观看状态由你手动标记" />
 		</StackPanel>
 	</Grid>
 </UserControl>

@@ -45,6 +45,11 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
 
     public IReadOnlyList<ResourceTagDefinition> ResourceTags => _state.ResourceTags;
 
+    public IReadOnlyList<ResourceToolSnapshot> ResourceToolSnapshots => _state.ResourceToolSnapshots
+        .OrderByDescending(snapshot => snapshot.CreatedAt)
+        .Select(snapshot => snapshot.Clone())
+        .ToArray();
+
     public ResourceVideoWatchStatus GetVideoWatchStatus(string videoPath)
     {
         try
@@ -60,6 +65,21 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
         }
     }
 
+    public DateTimeOffset? GetVideoLastWatchedAt(string videoPath)
+    {
+        try
+        {
+            var normalizedPath = NormalizePath(videoPath);
+            return _state.VideoLastWatchedAt.TryGetValue(normalizedPath, out var watchedAt)
+                ? watchedAt
+                : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public void SetVideoWatchStatus(string videoPath, ResourceVideoWatchStatus status)
     {
         if (string.IsNullOrWhiteSpace(videoPath))
@@ -72,6 +92,8 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
                 _state.VideoWatchStatuses.Remove(normalizedPath);
             else
                 _state.VideoWatchStatuses[normalizedPath] = status;
+            if (status == ResourceVideoWatchStatus.Watched)
+                _state.VideoLastWatchedAt[normalizedPath] = DateTimeOffset.Now;
             PersistState();
         }
         catch (Exception ex)
@@ -117,7 +139,11 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
             ? null
             : _state.ResourceTags.FirstOrDefault(tag => string.Equals(tag.Name, name.Trim(), StringComparison.OrdinalIgnoreCase))?.Clone();
 
-    public ResourceTagDefinition CreateResourceTag(string name, string color)
+    public bool IsResourceTagAssigned(string tagId)
+        => !string.IsNullOrWhiteSpace(tagId)
+            && _state.ResourceTagAssignments.Values.Any(tagIds => tagIds.Contains(tagId, StringComparer.OrdinalIgnoreCase));
+
+    public ResourceTagDefinition CreateResourceTag(string name, string color, string? uid = null)
     {
         var normalizedName = name.Trim();
         if (normalizedName.Length == 0)
@@ -128,12 +154,118 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
 
         var tag = new ResourceTagDefinition
         {
+            Uid = string.IsNullOrWhiteSpace(uid) ? Guid.NewGuid().ToString() : uid.Trim(),
             Name = normalizedName,
             Color = string.IsNullOrWhiteSpace(color) ? "#0072BD" : color,
         };
         _state.ResourceTags.Add(tag);
         PersistState();
         return tag.Clone();
+    }
+
+    public bool SaveResourceToolSnapshot(ResourceToolSnapshot snapshot)
+    {
+        if (snapshot is null || string.IsNullOrWhiteSpace(snapshot.Id))
+            return false;
+
+        var copy = snapshot.Clone();
+        var index = _state.ResourceToolSnapshots.FindIndex(item => string.Equals(item.Id, copy.Id, StringComparison.OrdinalIgnoreCase));
+        if (index >= 0)
+        {
+            var previous = _state.ResourceToolSnapshots[index];
+            _state.ResourceToolSnapshots[index] = copy;
+            if (PersistState())
+                return true;
+            _state.ResourceToolSnapshots[index] = previous;
+            return false;
+        }
+        else
+            _state.ResourceToolSnapshots.Add(copy);
+        if (PersistState())
+            return true;
+        _state.ResourceToolSnapshots.RemoveAll(item => string.Equals(item.Id, copy.Id, StringComparison.OrdinalIgnoreCase));
+        return false;
+    }
+
+    public bool DeleteResourceToolSnapshot(string snapshotId)
+    {
+        if (string.IsNullOrWhiteSpace(snapshotId))
+            return false;
+
+        var index = _state.ResourceToolSnapshots.FindIndex(snapshot => string.Equals(snapshot.Id, snapshotId, StringComparison.OrdinalIgnoreCase));
+        if (index < 0)
+            return false;
+
+        var removed = _state.ResourceToolSnapshots[index];
+        _state.ResourceToolSnapshots.RemoveAt(index);
+        if (PersistState())
+            return true;
+        _state.ResourceToolSnapshots.Insert(index, removed);
+        return false;
+    }
+
+    public void AddResourceTagToItems(IEnumerable<string> itemPaths, string tagId)
+    {
+        if (string.IsNullOrWhiteSpace(tagId) || !_state.ResourceTags.Any(tag => string.Equals(tag.Uid, tagId, StringComparison.OrdinalIgnoreCase)))
+            return;
+
+        var changed = false;
+        foreach (var itemPath in itemPaths ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(itemPath))
+                continue;
+
+            try
+            {
+                var normalizedPath = NormalizePath(itemPath);
+                if (!_state.ResourceTagAssignments.TryGetValue(normalizedPath, out var tagIds))
+                    _state.ResourceTagAssignments[normalizedPath] = tagIds = [];
+
+                if (!tagIds.Contains(tagId, StringComparer.OrdinalIgnoreCase))
+                {
+                    tagIds.Add(tagId);
+                    changed = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Unable to add resource tag {TagId} to {ItemPath}", tagId, itemPath);
+            }
+        }
+
+        if (changed)
+            PersistState();
+    }
+
+    public void RemoveResourceTagFromItems(IEnumerable<string> itemPaths, string tagId)
+    {
+        if (string.IsNullOrWhiteSpace(tagId))
+            return;
+
+        var changed = false;
+        foreach (var itemPath in itemPaths ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(itemPath))
+                continue;
+
+            try
+            {
+                var normalizedPath = NormalizePath(itemPath);
+                if (!_state.ResourceTagAssignments.TryGetValue(normalizedPath, out var tagIds))
+                    continue;
+
+                changed |= tagIds.RemoveAll(existingTagId => string.Equals(existingTagId, tagId, StringComparison.OrdinalIgnoreCase)) > 0;
+                if (tagIds.Count == 0)
+                    _state.ResourceTagAssignments.Remove(normalizedPath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Unable to remove resource tag {TagId} from {ItemPath}", tagId, itemPath);
+            }
+        }
+
+        if (changed)
+            PersistState();
     }
 
     public bool EditResourceTag(string uid, string name, string color)
@@ -203,6 +335,120 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
         }
     }
 
+    public void RemapItemPaths(string sourcePath, string targetPath)
+        => RemapItemPaths(new[] { (sourcePath, targetPath) });
+
+    public void RemapItemPaths(IEnumerable<(string SourcePath, string TargetPath)> pathMappings)
+    {
+        if (pathMappings is null)
+            return;
+
+        try
+        {
+            var mappings = pathMappings
+                .Where(mapping => !string.IsNullOrWhiteSpace(mapping.SourcePath) && !string.IsNullOrWhiteSpace(mapping.TargetPath))
+                .Select(mapping => (
+                    SourceRoot: Path.TrimEndingDirectorySeparator(Path.GetFullPath(mapping.SourcePath.Trim())),
+                    TargetRoot: Path.TrimEndingDirectorySeparator(Path.GetFullPath(mapping.TargetPath.Trim()))))
+                .Where(mapping => !string.Equals(mapping.SourceRoot, mapping.TargetRoot, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(mapping => mapping.SourceRoot.Length)
+                .ToList();
+            if (mappings.Count == 0)
+                return;
+
+            var changed = false;
+
+            var posterOverrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in _state.PosterOverrides)
+            {
+                var itemPath = RemapPath(pair.Key, mappings);
+                var posterPath = RemapPath(pair.Value, mappings);
+                changed |= !string.Equals(itemPath, pair.Key, StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(posterPath, pair.Value, StringComparison.OrdinalIgnoreCase);
+                posterOverrides[itemPath] = posterPath;
+            }
+
+            var tagAssignments = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in _state.ResourceTagAssignments)
+            {
+                var itemPath = RemapPath(pair.Key, mappings);
+                changed |= !string.Equals(itemPath, pair.Key, StringComparison.OrdinalIgnoreCase);
+                if (!tagAssignments.TryGetValue(itemPath, out var tagIds))
+                    tagAssignments[itemPath] = tagIds = [];
+                foreach (var tagId in pair.Value)
+                {
+                    if (!tagIds.Contains(tagId, StringComparer.OrdinalIgnoreCase))
+                        tagIds.Add(tagId);
+                }
+            }
+
+            var videoWatchStatuses = new Dictionary<string, ResourceVideoWatchStatus>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in _state.VideoWatchStatuses)
+            {
+                var itemPath = RemapPath(pair.Key, mappings);
+                changed |= !string.Equals(itemPath, pair.Key, StringComparison.OrdinalIgnoreCase);
+                videoWatchStatuses[itemPath] = pair.Value;
+            }
+
+            var videoLastWatchedAt = new Dictionary<string, DateTimeOffset>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in _state.VideoLastWatchedAt)
+            {
+                var itemPath = RemapPath(pair.Key, mappings);
+                changed |= !string.Equals(itemPath, pair.Key, StringComparison.OrdinalIgnoreCase);
+                videoLastWatchedAt[itemPath] = pair.Value;
+            }
+
+            var videoTitleTranslations = new Dictionary<string, ResourceVideoTitleTranslation>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in _state.VideoTitleTranslations)
+            {
+                var itemKey = RemapVideoTitleTranslationKey(pair.Key, mappings);
+                changed |= !string.Equals(itemKey, pair.Key, StringComparison.OrdinalIgnoreCase);
+                videoTitleTranslations[itemKey] = pair.Value.Clone();
+            }
+
+            var actorDetails = new Dictionary<string, ResourceActorDetails>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in _state.ActorDetails)
+            {
+                var itemPath = RemapPath(pair.Key, mappings);
+                var details = pair.Value.Clone();
+                details.PosterPaths = details.PosterPaths
+                    .Select(path => RemapPath(path, mappings))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                details.ExcludedPosterPaths = (details.ExcludedPosterPaths ?? [])
+                    .Select(path => RemapPath(path, mappings))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                changed |= !string.Equals(itemPath, pair.Key, StringComparison.OrdinalIgnoreCase)
+                    || !details.PosterPaths.SequenceEqual(pair.Value.PosterPaths, StringComparer.OrdinalIgnoreCase)
+                    || !details.ExcludedPosterPaths.SequenceEqual(pair.Value.ExcludedPosterPaths, StringComparer.OrdinalIgnoreCase);
+                actorDetails[itemPath] = details;
+            }
+
+            var hiddenActorFolders = _state.HiddenActorFolders
+                .Select(path => RemapPath(path, mappings))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            changed |= !_state.HiddenActorFolders.SequenceEqual(hiddenActorFolders, StringComparer.OrdinalIgnoreCase);
+
+            if (!changed)
+                return;
+
+            _state.PosterOverrides = posterOverrides;
+            _state.ResourceTagAssignments = tagAssignments;
+            _state.VideoWatchStatuses = videoWatchStatuses;
+            _state.VideoLastWatchedAt = videoLastWatchedAt;
+            _state.VideoTitleTranslations = videoTitleTranslations;
+            _state.ActorDetails = actorDetails;
+            _state.HiddenActorFolders = hiddenActorFolders;
+            PersistState();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Unable to update resource metadata paths for a batch of path mappings");
+        }
+    }
+
     public ResourceActorDetails GetActorDetails(string actorFolderPath)
     {
         try
@@ -218,6 +464,43 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
         }
     }
 
+    public ResourceVideoTitleTranslation? GetVideoTitleTranslation(string videoPath)
+    {
+        try
+        {
+            var normalizedKey = NormalizeVideoTitleTranslationKey(videoPath);
+            return _state.VideoTitleTranslations.TryGetValue(normalizedKey, out var translation)
+                ? translation.Clone()
+                : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public void SetVideoTitleTranslation(string videoPath, string sourceTitle, string translatedTitle)
+    {
+        if (string.IsNullOrWhiteSpace(videoPath) || string.IsNullOrWhiteSpace(sourceTitle) || string.IsNullOrWhiteSpace(translatedTitle))
+            return;
+
+        try
+        {
+            var normalizedKey = NormalizeVideoTitleTranslationKey(videoPath);
+            _state.VideoTitleTranslations[normalizedKey] = new ResourceVideoTitleTranslation
+            {
+                SourceTitle = sourceTitle.Trim(),
+                TranslatedTitle = translatedTitle.Trim(),
+                TranslatedAt = DateTimeOffset.Now,
+            };
+            PersistState();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Unable to save translated title for {VideoPath}", videoPath);
+        }
+    }
+
     public void SetActorDetails(string actorFolderPath, ResourceActorDetails details)
     {
         if (string.IsNullOrWhiteSpace(actorFolderPath) || details is null)
@@ -229,6 +512,7 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
             var normalizedDetails = details.Clone();
             normalizedDetails.Name = normalizedDetails.Name.Trim();
             normalizedDetails.Aliases = normalizedDetails.Aliases.Trim();
+            normalizedDetails.Biography = normalizedDetails.Biography.Trim();
             normalizedDetails.HeightCm = normalizedDetails.HeightCm.Trim();
             normalizedDetails.WeightKg = normalizedDetails.WeightKg.Trim();
             normalizedDetails.Bust = normalizedDetails.Bust.Trim();
@@ -236,6 +520,7 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
             normalizedDetails.Hip = normalizedDetails.Hip.Trim();
             normalizedDetails.CupSize = normalizedDetails.CupSize.Trim().ToUpperInvariant();
             normalizedDetails.PosterPaths = NormalizeActorPosterPaths(normalizedDetails.PosterPaths);
+            normalizedDetails.ExcludedPosterPaths = NormalizeActorPosterPaths(normalizedDetails.ExcludedPosterPaths);
             if (normalizedDetails.CareerRetirementDate is not null)
                 normalizedDetails.IsCurrentlyActive = false;
             _state.ActorDetails[normalizedPath] = normalizedDetails;
@@ -365,6 +650,7 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
                 var state = JsonSerializer.Deserialize(File.ReadAllText(_statePath), ResourceManagerJsonSerializerContext.Default.ResourceWorkspaceState);
                 if (state is not null)
                 {
+                    state.Version = 6;
                     state.LibraryPath ??= string.Empty;
                     state.Settings ??= new ResourceSettings();
                     state.Settings.Normalize();
@@ -377,6 +663,27 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
                     state.ResourceTags = NormalizeResourceTags(state.ResourceTags);
                     state.ResourceTagAssignments = NormalizeResourceTagAssignments(state.ResourceTagAssignments, state.ResourceTags);
                     state.VideoWatchStatuses = NormalizeVideoWatchStatuses(state.VideoWatchStatuses);
+                    state.VideoLastWatchedAt = NormalizeVideoLastWatchedAt(state.VideoLastWatchedAt);
+                    state.VideoTitleTranslations = NormalizeVideoTitleTranslations(state.VideoTitleTranslations);
+                    state.ResourceToolSnapshots ??= [];
+                    state.ResourceToolSnapshots = state.ResourceToolSnapshots
+                        .Where(snapshot => !string.IsNullOrWhiteSpace(snapshot.Id))
+                        .Select(snapshot =>
+                        {
+                            snapshot.LibraryPath ??= string.Empty;
+                            snapshot.ScopePath ??= snapshot.LibraryPath;
+                            snapshot.Action ??= string.Empty;
+                            snapshot.Summary ??= string.Empty;
+                            snapshot.Operations ??= [];
+                            snapshot.TagAssignments ??= [];
+                            foreach (var assignment in snapshot.TagAssignments)
+                            {
+                                assignment.ItemPath ??= string.Empty;
+                                assignment.TagIds ??= [];
+                            }
+                            return snapshot;
+                        })
+                        .ToList();
                     return state;
                 }
             }
@@ -510,8 +817,106 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
         return normalized;
     }
 
+    private static Dictionary<string, DateTimeOffset> NormalizeVideoLastWatchedAt(
+        IReadOnlyDictionary<string, DateTimeOffset>? timestamps)
+    {
+        var normalized = new Dictionary<string, DateTimeOffset>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in timestamps ?? new Dictionary<string, DateTimeOffset>())
+        {
+            if (string.IsNullOrWhiteSpace(pair.Key) || pair.Value == default)
+                continue;
+
+            try
+            {
+                normalized[NormalizePath(pair.Key)] = pair.Value;
+            }
+            catch
+            {
+                // Ignore one malformed video path and preserve the remaining dates.
+            }
+        }
+
+        return normalized;
+    }
+
+    private static Dictionary<string, ResourceVideoTitleTranslation> NormalizeVideoTitleTranslations(
+        IReadOnlyDictionary<string, ResourceVideoTitleTranslation>? translations)
+    {
+        var normalized = new Dictionary<string, ResourceVideoTitleTranslation>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in translations ?? new Dictionary<string, ResourceVideoTitleTranslation>())
+        {
+            if (string.IsNullOrWhiteSpace(pair.Key) || pair.Value is null ||
+                string.IsNullOrWhiteSpace(pair.Value.SourceTitle) || string.IsNullOrWhiteSpace(pair.Value.TranslatedTitle))
+                continue;
+
+            try
+            {
+                var translation = pair.Value.Clone();
+                translation.SourceTitle = translation.SourceTitle.Trim();
+                translation.TranslatedTitle = translation.TranslatedTitle.Trim();
+                var normalizedKey = NormalizeVideoTitleTranslationKey(pair.Key);
+                if (!normalizedKey.Contains("|provider:", StringComparison.OrdinalIgnoreCase))
+                    normalizedKey += "|provider:BailianQwenMt";
+                normalized[normalizedKey] = translation;
+            }
+            catch
+            {
+                // Ignore one malformed video path and preserve other translations.
+            }
+        }
+
+        return normalized;
+    }
+
     private static string NormalizePath(string path)
         => Path.GetFullPath(path.Trim());
+
+    private static string NormalizeVideoTitleTranslationKey(string key)
+    {
+        var providerMarkerIndex = key.IndexOf("|provider:", StringComparison.OrdinalIgnoreCase);
+        var itemKey = providerMarkerIndex >= 0 ? key[..providerMarkerIndex] : key;
+        var providerSuffix = providerMarkerIndex >= 0 ? key[providerMarkerIndex..] : string.Empty;
+        var normalizedItemKey = IsVideoTitleCodeKey(itemKey)
+            ? $"code:{itemKey[5..].Trim().ToUpperInvariant()}"
+            : NormalizePath(itemKey);
+
+        return normalizedItemKey + providerSuffix;
+    }
+
+    private static string RemapVideoTitleTranslationKey(string key, IReadOnlyList<(string SourceRoot, string TargetRoot)> mappings)
+    {
+        var providerMarkerIndex = key.IndexOf("|provider:", StringComparison.OrdinalIgnoreCase);
+        var itemKey = providerMarkerIndex >= 0 ? key[..providerMarkerIndex] : key;
+        var providerSuffix = providerMarkerIndex >= 0 ? key[providerMarkerIndex..] : string.Empty;
+        var remappedItemKey = IsVideoTitleCodeKey(itemKey) ? itemKey : RemapPath(itemKey, mappings);
+        return remappedItemKey + providerSuffix;
+    }
+
+    private static bool IsVideoTitleCodeKey(string key)
+        => key.StartsWith("code:", StringComparison.OrdinalIgnoreCase);
+
+    private static string RemapPath(string path, IReadOnlyList<(string SourceRoot, string TargetRoot)> mappings)
+    {
+        try
+        {
+            var normalizedPath = Path.GetFullPath(path.Trim());
+            foreach (var (sourceRoot, targetRoot) in mappings)
+            {
+                if (string.Equals(normalizedPath, sourceRoot, StringComparison.OrdinalIgnoreCase))
+                    return targetRoot;
+
+                var sourcePrefix = sourceRoot + Path.DirectorySeparatorChar;
+                if (normalizedPath.StartsWith(sourcePrefix, StringComparison.OrdinalIgnoreCase))
+                    return Path.Combine(targetRoot, normalizedPath[sourcePrefix.Length..]);
+            }
+        }
+        catch
+        {
+            // Preserve metadata entries with paths that cannot be normalized.
+        }
+
+        return path;
+    }
 
     private static List<string> NormalizeHiddenActorFolders(IEnumerable<string>? paths)
     {
@@ -548,6 +953,7 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
             {
                 var details = pair.Value.Clone();
                 details.PosterPaths = NormalizeActorPosterPaths(details.PosterPaths);
+                details.ExcludedPosterPaths = NormalizeActorPosterPaths(details.ExcludedPosterPaths);
                 if (details.CareerRetirementDate is not null)
                     details.IsCurrentlyActive = false;
                 normalized[Path.GetFullPath(pair.Key.Trim())] = details;
@@ -584,7 +990,7 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
         return normalized;
     }
 
-    private void PersistState()
+    private bool PersistState()
     {
         var temporaryPath = $"{_statePath}.{Guid.NewGuid():N}.tmp";
         try
@@ -597,6 +1003,7 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
                 temporaryPath,
                 JsonSerializer.Serialize(_state, ResourceManagerJsonSerializerContext.Default.ResourceWorkspaceState));
             File.Move(temporaryPath, _statePath, true);
+            return true;
         }
         catch (Exception ex)
         {
@@ -610,6 +1017,7 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
             {
                 // The original state is still intact; nothing else is needed.
             }
+            return false;
         }
     }
 }

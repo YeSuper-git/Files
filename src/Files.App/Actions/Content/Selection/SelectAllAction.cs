@@ -1,6 +1,10 @@
 ﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
+#if FILES_RESOURCE_MANAGER
+using Files.App.Views.Shells;
+#endif
+
 namespace Files.App.Actions
 {
 	[GeneratedRichCommand]
@@ -34,6 +38,11 @@ namespace Files.App.Actions
 				if (page is null)
 					return false;
 
+#if FILES_RESOURCE_MANAGER
+				if (page is ModernShellPage { CurrentResourceLibraryPage: { } resourceLibraryPage })
+					return resourceLibraryPage.BrowserItems.Count > context.SelectedItems.Count;
+#endif
+
 				var shellViewModel = page.GetRequiredShellViewModel();
 				int itemCount = shellViewModel.FilesAndFolders.Count;
 				int selectedItemCount = context.SelectedItems.Count;
@@ -53,6 +62,13 @@ namespace Files.App.Actions
 
 		public Task ExecuteAsync(object? parameter = null)
 		{
+#if FILES_RESOURCE_MANAGER
+			if (context.ShellPage is ModernShellPage { CurrentResourceLibraryPage: { } resourceLibraryPage })
+			{
+				resourceLibraryPage.SelectAllItems();
+				return Task.CompletedTask;
+			}
+#endif
 			context.ShellPage?.SlimContentPage?.ItemManipulationModel?.SelectAllItems();
 
 			return Task.CompletedTask;

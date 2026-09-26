@@ -75,6 +75,7 @@ namespace Files.App.Views
 				var dialog = new ContentDialog
 				{
 					Content = assistantView,
+					Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SolidBackgroundFillColorBaseBrush"],
 					CloseButtonText = "关闭",
 					DefaultButton = ContentDialogButton.Close,
 					MaxWidth = 860,
@@ -87,7 +88,7 @@ namespace Files.App.Views
 			catch (Exception ex)
 			{
 				App.Logger.LogError(ex, "Unable to open the video assistant from the home page");
-				HomeAssistantStatusText.Text = $"视频助手打开失败：{ex.Message}";
+				HomeAssistantStatusText.Text = $"小咪打开失败：{ex.Message}";
 				HomeAssistantStatusText.Visibility = Visibility.Visible;
 			}
 			finally
@@ -137,7 +138,7 @@ namespace Files.App.Views
 			catch (Exception ex)
 			{
 				App.Logger.LogError(ex, "Unable to initialize the video assistant conversation");
-				assistantView.ViewModel.ShowNotice($"视频助手初始化失败：{ex.Message}");
+				assistantView.ViewModel.ShowNotice($"小咪初始化失败：{ex.Message}");
 			}
 		}
 

@@ -573,7 +573,6 @@
 						<Button Click="AssistantPromptButton_Click" Tag="今天想看哪位演员的作品？" Content="今天想看哪位演员？" />
 						<Button Click="AssistantPromptButton_Click" Tag="推荐没看过的作品" Content="推荐没看过的" />
 						<Button Click="AssistantPromptButton_Click" Tag="想二刷已看过的作品" Content="想二刷已看过的" />
-						<Button Click="AssistantPromptButton_Click" Tag="直接随机推荐几部作品" Content="直接随机推荐" />
 					</StackPanel>
 				</ScrollViewer>
 				<Grid ColumnSpacing="8">

@@ -2,21 +2,30 @@
 // Licensed under the MIT License.
 
 using CommunityToolkit.Mvvm.DependencyInjection;
+using Files.App.Data.Contracts;
+using Files.App.Data.Enums;
 using Files.App.Data.EventArguments;
 using Files.App.Data.Items.ResourceManager;
 using Files.App.Data.Models;
 using Files.App.Data.Models.ResourceManager;
 using Files.App.Helpers;
 using Files.App.Services.ResourceManager;
+using Files.App.Services.Settings;
 using Files.App.Utils;
 using Files.App.Utils.FileTags;
 using Files.App.UserControls.Assistant;
+using Files.App.UserControls.ResourceManager;
 using Files.App.ViewModels.Assistant;
 using Files.App.ViewModels.ResourceManager;
+using Files.App.ViewModels.UserControls;
+using Files.App.Views.Shells;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Navigation;
 using System.Diagnostics;
@@ -31,14 +40,27 @@ public sealed partial class ResourceLibraryPage : Page
 {
     private readonly IResourceBrowserService _browser = Ioc.Default.GetRequiredService<IResourceBrowserService>();
     private readonly IResourceWorkspaceService _workspace = Ioc.Default.GetRequiredService<IResourceWorkspaceService>();
+    private readonly IResourceTitleTranslationService _machineTranslation = Ioc.Default.GetRequiredService<IResourceTitleTranslationService>();
+    private readonly IBailianQwenMtTitleTranslationService _bailianTranslation = Ioc.Default.GetRequiredService<IBailianQwenMtTitleTranslationService>();
+    private readonly IAppSettingsService _appSettings = Ioc.Default.GetRequiredService<IAppSettingsService>();
+    private readonly VideoAssistantSearchService _videoAssistantSearch = Ioc.Default.GetRequiredService<VideoAssistantSearchService>();
     private readonly IContentPageContext _contentPageContext = Ioc.Default.GetRequiredService<IContentPageContext>();
     private readonly List<ResourceBrowserLocation> _locations = [];
+    private readonly List<ActorVideoGroup> _actorVideoGroups = [];
     private readonly Dictionary<string, (ListedItem Item, ResourceBrowserItemViewModel ViewModel)> _selectedResourceItems = new(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource? _loadCancellation;
     private VideoAssistantChatView? _assistantChatView;
+    private Storyboard? _assistantButtonScaleAnimation;
     private string _libraryPath = string.Empty;
+    private int _selectedActorGroupIndex;
+    private string? _selectedActorGroupName;
+    private string? _selectedActorGroupActorPath;
+    private readonly HashSet<string> _titleTranslationsInProgress = new(StringComparer.OrdinalIgnoreCase);
 
     public System.Collections.ObjectModel.ObservableCollection<ResourceBrowserItemViewModel> BrowserItems { get; } = [];
+    public string CurrentPath => _locations.Count > 0 ? _locations[^1].Path : _libraryPath;
+
+    private sealed record ActorVideoGroup(string Name, IReadOnlyList<ResourceBrowserItem> Items);
 
     public ResourceLibraryPage()
     {
@@ -62,11 +84,9 @@ public sealed partial class ResourceLibraryPage : Page
             }
 
             AssistantFloatingPanel.Visibility = Visibility.Visible;
-            var actorPath = _locations.FirstOrDefault(location => location.Kind == ResourceBrowserLocationKind.ActorFolder)?.Path;
             await _assistantChatView.ConfigureAsync(new VideoAssistantContext
             {
                 LibraryPath = _libraryPath,
-                CurrentActorPath = actorPath,
                 OpenResourceManagerAsync = () =>
                 {
                     AssistantFloatingPanel.Visibility = Visibility.Collapsed;
@@ -83,8 +103,49 @@ public sealed partial class ResourceLibraryPage : Page
         catch (Exception ex)
         {
             AssistantFloatingPanel.Visibility = Visibility.Collapsed;
-            StatusText.Text = $"视频助手打开失败：{ex.Message}";
+            SetResourceStatusMessage($"小咪打开失败：{ex.Message}");
         }
+    }
+
+    private void AssistantButton_PointerEntered(object sender, PointerRoutedEventArgs e)
+        => AnimateAssistantButtonScale(1.12);
+
+    private void AssistantButton_PointerExited(object sender, PointerRoutedEventArgs e)
+        => AnimateAssistantButtonScale(1);
+
+    private void AssistantButton_PointerPressed(object sender, PointerRoutedEventArgs e)
+        => AnimateAssistantButtonScale(0.94);
+
+    private void AssistantButton_PointerReleased(object sender, PointerRoutedEventArgs e)
+        => AnimateAssistantButtonScale(1.12);
+
+    private void AnimateAssistantButtonScale(double scale)
+    {
+        _assistantButtonScaleAnimation?.Stop();
+
+        var animation = new DoubleAnimation
+        {
+            To = scale,
+            Duration = new Duration(TimeSpan.FromMilliseconds(160)),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+        };
+        var storyboard = new Storyboard();
+        Storyboard.SetTarget(animation, AssistantButtonScaleTransform);
+        Storyboard.SetTargetProperty(animation, nameof(ScaleTransform.ScaleX));
+        storyboard.Children.Add(animation);
+
+        var verticalAnimation = new DoubleAnimation
+        {
+            To = scale,
+            Duration = new Duration(TimeSpan.FromMilliseconds(160)),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+        };
+        Storyboard.SetTarget(verticalAnimation, AssistantButtonScaleTransform);
+        Storyboard.SetTargetProperty(verticalAnimation, nameof(ScaleTransform.ScaleY));
+        storyboard.Children.Add(verticalAnimation);
+
+        _assistantButtonScaleAnimation = storyboard;
+        storyboard.Begin();
     }
 
     protected override async void OnNavigatedTo(NavigationEventArgs e)
@@ -97,7 +158,7 @@ public sealed partial class ResourceLibraryPage : Page
 
             if (string.IsNullOrWhiteSpace(_libraryPath) || !Directory.Exists(_libraryPath))
             {
-                StatusText.Text = "资源库路径不可用，请重新选择路径。";
+                SetResourceStatusMessage("资源库路径不可用，请重新选择路径。");
                 return;
             }
 
@@ -117,7 +178,7 @@ public sealed partial class ResourceLibraryPage : Page
         catch (Exception ex)
         {
             App.Logger.LogError(ex, "Unable to initialize the resource library page for {LibraryPath}", _libraryPath);
-            StatusText.Text = $"资源管理初始化失败：{ex.Message}";
+            SetResourceStatusMessage($"资源管理初始化失败：{ex.Message}");
             EmptyText.Visibility = Visibility.Visible;
             LoadingRing.IsActive = false;
         }
@@ -166,12 +227,149 @@ public sealed partial class ResourceLibraryPage : Page
         _loadCancellation?.Cancel();
         AssistantFloatingPanel.Visibility = Visibility.Collapsed;
         ClearSelectedResourceItems();
+        if (GetNativeResourceStatusBarViewModel() is { } statusBarViewModel)
+            statusBarViewModel.DirectoryItemCount = null;
     }
 
     public async Task RefreshAsync()
     {
         if (_locations.Count > 0)
             await LoadLocationAsync(_locations[^1]);
+    }
+
+    public void SelectAllItems()
+        => BrowserGrid.SelectAll();
+
+    public async Task<bool> TryDeleteSelectedActorFoldersAsync(IReadOnlyList<ListedItem> selectedItems)
+    {
+        if (selectedItems.Count == 0 || selectedItems.Any(item => item is not ResourceActorListedItem))
+            return false;
+
+        var actorFolders = selectedItems
+            .Cast<ResourceActorListedItem>()
+            .Select(item => (Path: item.GetRequiredPath(), Name: item.Name ?? Path.GetFileName(item.GetRequiredPath())))
+            .ToArray();
+        await DeleteActorFoldersAsync(actorFolders);
+        return true;
+    }
+
+    public bool CanDeleteSelectedActorFolders(IReadOnlyList<ListedItem> selectedItems)
+    {
+        if (selectedItems.Count == 0 ||
+            selectedItems.Any(item => item is not ResourceActorListedItem) ||
+            _locations.Count == 0 ||
+            _locations[^1].Kind != ResourceBrowserLocationKind.LibraryRoot)
+            return false;
+
+        return selectedItems
+            .Cast<ResourceActorListedItem>()
+            .All(selected => BrowserItems.FirstOrDefault(item =>
+                item.Kind == ResourceBrowserItemKind.ActorFolder && PathEquals(item.Path, selected.GetRequiredPath()))?.ActorWorkCount == 0);
+    }
+
+    private async Task DeleteActorFoldersAsync(IReadOnlyList<(string Path, string Name)> actorFolders)
+    {
+        if (_locations.Count == 0 || _locations[^1].Kind != ResourceBrowserLocationKind.LibraryRoot)
+        {
+            SetResourceStatusMessage("只能在演员列表中删除演员文件夹。");
+            return;
+        }
+
+        foreach (var (path, name) in actorFolders)
+        {
+            if (!ResourceManagerPathScope.IsWithinLibrary(path, _libraryPath) ||
+                !PathEquals(Path.GetDirectoryName(Path.GetFullPath(path)) ?? string.Empty, _libraryPath) ||
+                !Directory.Exists(path))
+            {
+                SetResourceStatusMessage($"无法确认“{name}”是当前资源库中的演员文件夹，未执行删除。");
+                return;
+            }
+
+            var workCount = await CountActorVideosAsync(path);
+            if (workCount != 0)
+            {
+                SetResourceStatusMessage($"“{name}”仍包含 {workCount} 部作品，仅支持删除无作品的演员文件夹。");
+                return;
+            }
+        }
+
+        var confirmation = new ContentDialog
+        {
+            Title = "删除无作品的演员文件夹",
+            Content = actorFolders.Count == 1
+                ? $"确认将“{actorFolders[0].Name}”移至回收站？该文件夹中没有视频作品。"
+                : $"确认将这 {actorFolders.Count} 个无视频作品的演员文件夹移至回收站？",
+            PrimaryButtonText = "移至回收站",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = XamlRoot,
+        };
+
+        if (await confirmation.TryShowAsync() != ContentDialogResult.Primary)
+            return;
+
+        // Recheck after confirmation so newly added videos cannot be deleted by a stale selection.
+        foreach (var (path, name) in actorFolders)
+        {
+            if (!Directory.Exists(path) || await CountActorVideosAsync(path) != 0)
+            {
+                SetResourceStatusMessage($"“{name}”已包含作品或文件夹已不存在，已取消删除。");
+                return;
+            }
+        }
+
+        if (_contentPageContext.ShellPage is not { } shellPage)
+            return;
+
+        var storageItems = actorFolders.Select(folder =>
+            StorageHelpers.FromPathAndType(folder.Path, FilesystemItemType.Directory));
+        await shellPage.FilesystemHelpers.DeleteItemsAsync(storageItems, DeleteConfirmationPolicies.Never, permanently: false, registerHistory: true);
+        await RefreshAsync();
+        SetResourceStatusMessage(actorFolders.Count == 1
+            ? $"已将“{actorFolders[0].Name}”移至回收站。"
+            : $"已将 {actorFolders.Count} 个演员文件夹移至回收站。");
+    }
+
+    public async Task RenameSelectedItemAsync()
+    {
+        if (BrowserGrid.SelectedItems.Count != 1 ||
+            BrowserGrid.SelectedItems.OfType<ResourceBrowserItemViewModel>().FirstOrDefault() is not { } viewModel)
+            return;
+
+        await RenameResourceItemAsync(viewModel);
+    }
+
+    private async Task RenameResourceItemAsync(ResourceBrowserItemViewModel viewModel)
+    {
+        if (_contentPageContext.ShellPage is not { } shellPage)
+            return;
+
+        var item = CreateListedItem(viewModel);
+        var nameBox = new TextBox { Text = item.Name ?? string.Empty, MinWidth = 320 };
+        var dialog = new ContentDialog
+        {
+            Title = "重命名",
+            Content = nameBox,
+            PrimaryButtonText = "重命名",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = XamlRoot,
+        };
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary || string.IsNullOrWhiteSpace(nameBox.Text))
+            return;
+
+        var oldPath = item.GetRequiredPath();
+        var oldRawName = item.ItemNameRaw ?? Path.GetFileName(oldPath);
+        var newRawName = string.IsNullOrEmpty(item.Name)
+            ? string.Concat(nameBox.Text.Trim(), item.FileExtension)
+            : oldRawName.Replace(item.Name, nameBox.Text.Trim(), StringComparison.Ordinal);
+        if (!await UIFilesystemHelpers.RenameFileItemAsync(item, nameBox.Text.Trim(), shellPage, showExtensionDialog: false))
+            return;
+
+        var newPath = Path.Combine(Path.GetDirectoryName(oldPath) ?? string.Empty, newRawName);
+        _workspace.RemapItemPaths(oldPath, newPath);
+        await RefreshAsync();
     }
 
     public void NavigateToParentLocation()
@@ -182,6 +380,10 @@ public sealed partial class ResourceLibraryPage : Page
 
     private async Task LoadLocationAsync(ResourceBrowserLocation location)
     {
+        var preferredActorGroupName = location.Kind == ResourceBrowserLocationKind.ActorFolder &&
+            _selectedActorGroupActorPath is not null && PathEquals(_selectedActorGroupActorPath, location.Path)
+            ? _selectedActorGroupName
+            : null;
         CancellationTokenSource? currentLoad = null;
         CancellationToken cancellationToken = default;
         try
@@ -197,39 +399,127 @@ public sealed partial class ResourceLibraryPage : Page
             LoadingRing.IsActive = true;
             BrowserItems.Clear();
             EmptyText.Visibility = Visibility.Collapsed;
-            LibraryPathText.Text = _libraryPath;
-            StatusText.Text = "正在加载资源……";
+            ActorGroupButtons.Children.Clear();
+            ActorGroupSelector.Visibility = Visibility.Collapsed;
+            _actorVideoGroups.Clear();
+            SetResourceStatusMessage("正在加载资源……");
 
             var items = await _browser.GetChildrenAsync(location.Path, location.Kind, _workspace.Settings, cancellationToken);
+            if (location.Kind == ResourceBrowserLocationKind.ActorFolder)
+            {
+                _selectedActorGroupActorPath = location.Path;
+                await BuildActorVideoGroupsAsync(location, items, cancellationToken);
+                if (_actorVideoGroups.Count > 0)
+                {
+                    _selectedActorGroupIndex = preferredActorGroupName is null
+                        ? 0
+                        : Math.Max(0, _actorVideoGroups.FindIndex(group => string.Equals(group.Name, preferredActorGroupName, StringComparison.OrdinalIgnoreCase)));
+                    _selectedActorGroupName = _actorVideoGroups[_selectedActorGroupIndex].Name;
+                    ActorGroupSelector.Visibility = Visibility.Visible;
+                    BuildActorGroupButtons();
+                    items = _actorVideoGroups[_selectedActorGroupIndex].Items;
+                }
+            }
+
+            var initialGridLayout = items.Any(item => item.Kind is ResourceBrowserItemKind.ActorFolder or ResourceBrowserItemKind.VideoFolder)
+                ? CalculateActorGridLayout()
+                : null;
+            if (initialGridLayout is { } layout && BrowserGrid.ItemsPanelRoot is ItemsWrapGrid initialItemsPanel)
+                initialItemsPanel.ItemWidth = layout.ItemWidth;
+
             foreach (var item in items)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var viewModel = new ResourceBrowserItemViewModel(item)
+                var viewModel = new ResourceBrowserItemViewModel(item);
+                if (initialGridLayout is { } initialLayout &&
+                    item.Kind is ResourceBrowserItemKind.ActorFolder or ResourceBrowserItemKind.VideoFolder)
+                    viewModel.SetAdaptiveCardWidth(initialLayout.CardWidth);
+
+                viewModel.Poster = await LoadPosterAsync(item.PosterPath, cancellationToken);
+                if (item.Kind == ResourceBrowserItemKind.VideoFolder)
                 {
-                    Poster = await LoadPosterAsync(item.PosterPath, cancellationToken),
-                };
+                    try
+                    {
+                        viewModel.UpdateFileTags(FileTagsHelper.ReadFileTag(item.Path));
+                    }
+                    catch
+                    {
+                        viewModel.UpdateFileTags([]);
+                    }
+                }
                 BrowserItems.Add(viewModel);
             }
 
             EmptyText.Visibility = BrowserItems.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            StatusText.Text = $"当前显示 {BrowserItems.Count} 项；仅展示资源目录和视频文件。";
+            SetResourceStatusMessage(string.Empty);
+            UpdateActorGridLayout();
+            UpdateNativeResourceStatus();
+
+            if (location.Kind == ResourceBrowserLocationKind.LibraryRoot && BrowserItems.Count > 0)
+                _ = LoadActorWorkCountsAsync(BrowserItems.ToArray(), cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             if (ReferenceEquals(currentLoad, _loadCancellation))
-                StatusText.Text = "已停止加载。";
+                SetResourceStatusMessage("已停止加载。");
         }
         catch (Exception ex)
         {
             App.Logger.LogError(ex, "Unable to load resource library location {LocationPath}", location.Path);
             EmptyText.Visibility = Visibility.Visible;
-            StatusText.Text = $"资源加载失败：{ex.Message}";
+            UpdateNativeResourceStatus($"资源加载失败：{ex.Message}");
         }
         finally
         {
             if (currentLoad is null || ReferenceEquals(currentLoad, _loadCancellation))
                 LoadingRing.IsActive = false;
         }
+    }
+
+    private void BrowserGrid_SizeChanged(object sender, SizeChangedEventArgs e)
+        => UpdateActorGridLayout();
+
+    private void UpdateActorGridLayout()
+    {
+        if (BrowserGrid.ItemsPanelRoot is not ItemsWrapGrid itemsPanel)
+            return;
+
+        const double defaultItemWidth = 276;
+        var hasAdaptiveCards = BrowserItems.Any(item => item.Kind is ResourceBrowserItemKind.ActorFolder or ResourceBrowserItemKind.VideoFolder);
+        if (!hasAdaptiveCards)
+        {
+            itemsPanel.ItemWidth = defaultItemWidth;
+            return;
+        }
+
+        if (CalculateActorGridLayout() is not { } layout)
+            return;
+
+        itemsPanel.ItemWidth = layout.ItemWidth;
+        foreach (var item in BrowserItems.Where(item => item.Kind is ResourceBrowserItemKind.ActorFolder or ResourceBrowserItemKind.VideoFolder))
+            item.SetAdaptiveCardWidth(layout.CardWidth);
+    }
+
+    private (double ItemWidth, double CardWidth)? CalculateActorGridLayout()
+    {
+        // Use the outer viewport's stable width. The GridView's own width can change
+        // when its vertical scrollbar appears, which used to resize every poster a
+        // moment after the initial layout.
+        var viewportWidth = BrowserGrid.Parent is FrameworkElement viewport && viewport.ActualWidth > 0
+            ? viewport.ActualWidth
+            : BrowserGrid.ActualWidth;
+        var availableWidth = viewportWidth - BrowserGrid.Padding.Left - BrowserGrid.Padding.Right;
+        if (availableWidth <= 0)
+            return null;
+
+        const double minimumCardWidth = 250;
+        const double itemHorizontalChrome = 26;
+        const double maximumCardWidth = 340;
+        var minimumItemWidth = minimumCardWidth + itemHorizontalChrome;
+        var columnCount = Math.Max(1, (int)Math.Floor(availableWidth / minimumItemWidth));
+        var itemWidth = availableWidth / columnCount;
+        var cardWidth = Math.Clamp(itemWidth - itemHorizontalChrome, 180, maximumCardWidth);
+        return (itemWidth, cardWidth);
     }
 
     private static async Task<BitmapImage?> LoadPosterAsync(string? path, CancellationToken cancellationToken)
@@ -295,9 +585,26 @@ public sealed partial class ResourceLibraryPage : Page
         }
 
         ResourceActorListedItem? actorListedItem = null;
-        ListedItem listedItem = item.Kind == ResourceBrowserItemKind.ActorFolder
-            ? actorListedItem = new ResourceActorListedItem()
-            : new ListedItem();
+        ResourceVideoFolderListedItem? videoFolderListedItem = null;
+        ListedItem listedItem;
+        if (item.Kind == ResourceBrowserItemKind.ActorFolder)
+        {
+            actorListedItem = new ResourceActorListedItem();
+            listedItem = actorListedItem;
+        }
+        else if (item.Kind == ResourceBrowserItemKind.VideoFolder)
+        {
+            videoFolderListedItem = new ResourceVideoFolderListedItem
+            {
+                PosterPath = item.Model.PosterPath,
+                DisplayTitle = item.Model.Name,
+            };
+            listedItem = videoFolderListedItem;
+        }
+        else
+        {
+            listedItem = new ListedItem();
+        }
 
         if (actorListedItem is not null)
         {
@@ -318,11 +625,16 @@ public sealed partial class ResourceLibraryPage : Page
                     return null;
 
                 var updatedDetails = _workspace.GetActorDetails(item.Path);
+                updatedDetails.ExcludedPosterPaths.RemoveAll(path =>
+                    string.Equals(path, posterPath, StringComparison.OrdinalIgnoreCase));
                 if (!updatedDetails.PosterPaths.Contains(posterPath, StringComparer.OrdinalIgnoreCase))
                     updatedDetails.PosterPaths.Add(posterPath);
                 _workspace.SetActorDetails(item.Path, updatedDetails);
+                _workspace.SetPosterOverride(item.Path, posterPath);
                 actor.ActorDetails = _workspace.GetActorDetails(item.Path);
                 actor.ActorPosterPaths = GetActorPosterPaths(item, actor.ActorDetails);
+                actor.MainPosterPath = posterPath;
+                item.Poster = await LoadPosterAsync(posterPath, CancellationToken.None);
                 return posterPath;
             };
             actor.SetActorMainPosterAsync = async posterPath =>
@@ -330,6 +642,37 @@ public sealed partial class ResourceLibraryPage : Page
                 _workspace.SetPosterOverride(item.Path, posterPath);
                 actor.MainPosterPath = posterPath;
                 item.Poster = await LoadPosterAsync(posterPath, CancellationToken.None);
+            };
+            actor.DeleteActorPosterAsync = async posterPath =>
+            {
+                var updatedDetails = _workspace.GetActorDetails(item.Path);
+                updatedDetails.PosterPaths.RemoveAll(path =>
+                    string.Equals(path, posterPath, StringComparison.OrdinalIgnoreCase));
+                if (!updatedDetails.ExcludedPosterPaths.Contains(posterPath, StringComparer.OrdinalIgnoreCase))
+                    updatedDetails.ExcludedPosterPaths.Add(posterPath);
+
+                _workspace.SetActorDetails(item.Path, updatedDetails);
+                var remainingPosters = GetActorPosterPaths(item, updatedDetails);
+                var wasMainPoster = string.Equals(actor.MainPosterPath, posterPath, StringComparison.OrdinalIgnoreCase);
+                if (wasMainPoster)
+                {
+                    if (remainingPosters.Count > 0)
+                    {
+                        actor.MainPosterPath = remainingPosters[0];
+                        _workspace.SetPosterOverride(item.Path, actor.MainPosterPath);
+                    }
+                    else
+                    {
+                        actor.MainPosterPath = null;
+                        _workspace.ClearPosterOverride(item.Path);
+                    }
+                }
+
+                actor.ActorDetails = _workspace.GetActorDetails(item.Path);
+                actor.ActorPosterPaths = remainingPosters;
+                item.Poster = actor.MainPosterPath is { } mainPosterPath
+                    ? await LoadPosterAsync(mainPosterPath, CancellationToken.None)
+                    : null;
             };
         }
 
@@ -343,6 +686,19 @@ public sealed partial class ResourceLibraryPage : Page
         listedItem.ItemDateAccessedReal = new DateTimeOffset(info.LastAccessTimeUtc, TimeSpan.Zero);
         listedItem.FileTags = fileTags;
         listedItem.FileFRN = fileReference;
+
+        if (videoFolderListedItem is not null)
+        {
+            var savedTranslation = _workspace.GetVideoTitleTranslation(GetVideoTitleTranslationKey(item, GetTranslationProvider()));
+            if (savedTranslation is not null &&
+                string.Equals(savedTranslation.SourceTitle, GetVideoTitleForTranslation(item), StringComparison.Ordinal))
+            {
+                videoFolderListedItem.HasTranslatedTitle = true;
+                item.SetTranslatedTitle(savedTranslation.TranslatedTitle, showTranslatedTitle: false);
+            }
+
+            videoFolderListedItem.ToggleTitleAsync = () => ToggleVideoFolderTitleAsync(item, videoFolderListedItem);
+        }
 
         if (info is FileInfo fileInfo)
         {
@@ -365,7 +721,7 @@ public sealed partial class ResourceLibraryPage : Page
     }
 
     [DynamicWindowsRuntimeCast(typeof(FrameworkElement))]
-    private void OnBrowserItemDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+    private async void OnBrowserItemDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
         if (sender is not FrameworkElement element || element.DataContext is not ResourceBrowserItemViewModel item)
             return;
@@ -379,7 +735,7 @@ public sealed partial class ResourceLibraryPage : Page
             }
             catch (Exception ex)
             {
-                StatusText.Text = $"无法打开视频：{ex.Message}";
+                SetResourceStatusMessage($"无法打开视频：{ex.Message}");
             }
 
             return;
@@ -391,6 +747,14 @@ public sealed partial class ResourceLibraryPage : Page
             ResourceBrowserItemKind.VideoFolder => ResourceBrowserLocationKind.VideoFolder,
             _ => ResourceBrowserLocationKind.CategoryFolder,
         };
+
+        if (_locations.Count > 0 &&
+            !PathEquals(Path.GetDirectoryName(item.Path) ?? string.Empty, _locations[^1].Path))
+        {
+            await TryNavigateToResourcePathAsync(item.Path);
+            return;
+        }
+
         NavigateToLocation(_locations.Append(new ResourceBrowserLocation(item.Path, locationKind, item.Name)).ToArray());
     }
 
@@ -457,13 +821,13 @@ public sealed partial class ResourceLibraryPage : Page
                             }
                             catch (Exception ex)
                             {
-                                StatusText.Text = $"无法打开视频：{ex.Message}";
+                                SetResourceStatusMessage($"无法打开视频：{ex.Message}");
                             }
                             return true;
                         }
                     }
 
-                    StatusText.Text = "该路径不属于资源管理可展示的演员、分类或视频内容。";
+                    SetResourceStatusMessage("该路径不属于资源管理可展示的演员、分类或视频内容。");
                     return true;
                 }
 
@@ -471,7 +835,7 @@ public sealed partial class ResourceLibraryPage : Page
                 {
                     if (index != targetSegments.Length - 1)
                     {
-                        StatusText.Text = "视频文件不能作为路径层级继续展开。";
+                        SetResourceStatusMessage("视频文件不能作为路径层级继续展开。");
                         return true;
                     }
 
@@ -481,7 +845,7 @@ public sealed partial class ResourceLibraryPage : Page
                     }
                     catch (Exception ex)
                     {
-                        StatusText.Text = $"无法打开视频：{ex.Message}";
+                        SetResourceStatusMessage($"无法打开视频：{ex.Message}");
                     }
                     return true;
                 }
@@ -501,7 +865,7 @@ public sealed partial class ResourceLibraryPage : Page
         }
         catch (Exception ex)
         {
-            StatusText.Text = $"无法打开资源路径：{ex.Message}";
+            SetResourceStatusMessage($"无法打开资源路径：{ex.Message}");
             return true;
         }
 
@@ -558,7 +922,7 @@ public sealed partial class ResourceLibraryPage : Page
         }
     }
 
-    private async void OnChooseLibrary(object sender, RoutedEventArgs e)
+    public async Task ChooseLibraryAsync()
     {
         var picker = new Windows.Storage.Pickers.FolderPicker();
         WinRT.Interop.InitializeWithWindow.Initialize(picker, MainWindow.Instance.WindowHandle);
@@ -572,8 +936,45 @@ public sealed partial class ResourceLibraryPage : Page
         _contentPageContext.ShellPage?.NavigateToResourceManager();
     }
 
-    private void OnOpenTools(object sender, RoutedEventArgs e)
-        => _contentPageContext.ShellPage?.NavigateToResourceManagerTools();
+    public void ShowFormatOptimization(FrameworkElement anchor)
+    {
+        if (_locations.Count == 0 || LoadingRing.IsActive)
+        {
+            SetResourceStatusMessage("请等待当前资源窗口加载完成后再进行格式优化。");
+            return;
+        }
+
+        var currentLocation = _locations[^1];
+        var toolsDialog = new ResourceToolsDialog(
+            _libraryPath,
+            currentLocation.Path,
+            currentLocation.Kind,
+            BrowserItems.Select(item => item.Model).ToArray());
+        var allowFlyoutClose = false;
+        var flyout = new Flyout
+        {
+            Content = toolsDialog,
+            Placement = FlyoutPlacementMode.Bottom,
+        };
+        toolsDialog.RequestClose += (_, _) =>
+        {
+            allowFlyoutClose = true;
+            flyout.Hide();
+        };
+        flyout.Closing += (_, args) =>
+        {
+            if (toolsDialog.HasChanges && !allowFlyoutClose)
+                args.Cancel = true;
+        };
+        flyout.Closed += async (_, _) =>
+        {
+            if (toolsDialog.HasChanges && _locations.Count > 0)
+                await LoadLocationAsync(_locations[^1]);
+        };
+
+        flyout.ShowAt(anchor);
+        toolsDialog.StartFormatOptimizationPreview();
+    }
 
     [DynamicWindowsRuntimeCast(typeof(FrameworkElement))]
     private void OnBrowserItemRightTapped(object sender, RightTappedRoutedEventArgs e)
@@ -581,6 +982,8 @@ public sealed partial class ResourceLibraryPage : Page
         if (sender is not FrameworkElement element || element.DataContext is not ResourceBrowserItemViewModel item)
             return;
 
+        var pointerPosition = e.GetPosition(element);
+        e.Handled = true;
         var flyout = new MenuFlyout();
         if (item.Kind == ResourceBrowserItemKind.ActorFolder)
         {
@@ -589,16 +992,36 @@ public sealed partial class ResourceLibraryPage : Page
             {
                 _workspace.SetActorFolderHidden(item.Path, true);
                 await RefreshAsync();
-                StatusText.Text = $"已在资源管理中隐藏“{item.Name}”；本地文件夹属性未更改。";
+                SetResourceStatusMessage($"已在资源管理中隐藏“{item.Name}”；本地文件夹属性未更改。");
             };
             flyout.Items.Add(hide);
         }
 
         if (item.Kind == ResourceBrowserItemKind.ActorFolder)
         {
+            flyout.Items.Add(new MenuFlyoutSeparator());
             var editDetails = new MenuFlyoutItem { Text = "编辑演员信息" };
             editDetails.Click += async (_, _) => await EditActorDetailsAsync(item);
             flyout.Items.Add(editDetails);
+
+            var renameActor = new MenuFlyoutItem { Text = "重命名" };
+            renameActor.Click += async (_, _) => await RenameResourceItemAsync(item);
+            flyout.Items.Add(renameActor);
+
+            var deleteActor = new MenuFlyoutItem
+            {
+                Text = "删除演员文件夹",
+                IsEnabled = item.ActorWorkCount == 0,
+            };
+            ToolTipService.SetToolTip(deleteActor, item.ActorWorkCount switch
+            {
+                null => "正在统计作品数量，统计完成后才能删除空文件夹。",
+                > 0 => "该演员文件夹包含作品，不能删除。",
+                _ => null,
+            });
+            deleteActor.Click += async (_, _) =>
+                await DeleteActorFoldersAsync([(item.Path, item.Name)]);
+            flyout.Items.Add(deleteActor);
         }
 
         if (item.Kind != ResourceBrowserItemKind.ActorFolder)
@@ -621,7 +1044,7 @@ public sealed partial class ResourceLibraryPage : Page
                 {
                     _workspace.ClearPosterOverride(item.Path);
                     await RefreshAsync();
-                    StatusText.Text = $"已恢复“{item.Name}”的自动匹配海报。";
+                    SetResourceStatusMessage($"已恢复“{item.Name}”的自动匹配海报。");
                 };
                 flyout.Items.Add(restorePoster);
             }
@@ -630,9 +1053,264 @@ public sealed partial class ResourceLibraryPage : Page
         var openFolder = new MenuFlyoutItem { Text = "在文件夹中打开" };
         openFolder.Click += (_, _) => OpenContainingFolder(item.Path);
         flyout.Items.Add(openFolder);
-        flyout.ShowAt(element);
-        e.Handled = true;
+        flyout.ShowAt(element, new FlyoutShowOptions { Position = pointerPosition });
     }
+
+    private void OnOpenTranslationSettings(object sender, RoutedEventArgs e)
+        => _contentPageContext.ShellPage?.NavigateToSettings("ResourceManagerPage");
+
+    private async Task ToggleVideoFolderTitleAsync(ResourceBrowserItemViewModel item, ResourceVideoFolderListedItem listedItem)
+    {
+        if (listedItem.IsTranslatedTitleShown)
+        {
+            listedItem.IsTranslatedTitleShown = false;
+            listedItem.DisplayTitle = item.Model.Name;
+            item.SetTranslatedTitle(listedItem.HasTranslatedTitle ? item.TranslatedTitle : null, showTranslatedTitle: false);
+            return;
+        }
+
+        if (!_titleTranslationsInProgress.Add(item.Path))
+            return;
+
+        try
+        {
+            var sourceTitle = GetVideoTitleForTranslation(item);
+            if (string.IsNullOrWhiteSpace(sourceTitle))
+            {
+                SetResourceStatusMessage("没有可翻译的视频标题。");
+                return;
+            }
+
+            var provider = GetTranslationProvider();
+            var translationKey = GetVideoTitleTranslationKey(item, provider);
+            var savedTranslation = _workspace.GetVideoTitleTranslation(translationKey);
+            string translatedTitle;
+            if (savedTranslation is not null && string.Equals(savedTranslation.SourceTitle, sourceTitle, StringComparison.Ordinal))
+            {
+                translatedTitle = savedTranslation.TranslatedTitle;
+            }
+            else
+            {
+                var accessKeyId = ResourceTitleTranslationCredentialStore.GetMachineAccessKeyId();
+                var accessKeySecret = ResourceTitleTranslationCredentialStore.GetMachineAccessKeySecret();
+                var bailianApiKey = ResourceTitleTranslationCredentialStore.GetBailianApiKey();
+                if ((provider == ResourceManagerTranslationProvider.AliyunMachineTranslation &&
+                     (string.IsNullOrWhiteSpace(accessKeyId) || string.IsNullOrWhiteSpace(accessKeySecret))) ||
+                    (provider == ResourceManagerTranslationProvider.BailianQwenMt && string.IsNullOrWhiteSpace(bailianApiKey)))
+                {
+                    SetResourceStatusMessage("请先在设置 > 资源管理中配置当前翻译模型的凭证。");
+                    return;
+                }
+
+                SetResourceStatusMessage($"正在翻译“{sourceTitle}”…");
+                translatedTitle = provider switch
+                {
+                    ResourceManagerTranslationProvider.BailianQwenMt => await _bailianTranslation.TranslateJapaneseTitleAsync(sourceTitle, bailianApiKey),
+                    _ => await _machineTranslation.TranslateJapaneseTitleAsync(sourceTitle, accessKeyId, accessKeySecret),
+                };
+                _workspace.SetVideoTitleTranslation(translationKey, sourceTitle, translatedTitle);
+            }
+
+            listedItem.HasTranslatedTitle = true;
+            listedItem.IsTranslatedTitleShown = true;
+            listedItem.DisplayTitle = translatedTitle;
+            item.SetTranslatedTitle(translatedTitle, showTranslatedTitle: true);
+            SetResourceStatusMessage(string.Empty);
+        }
+        catch (Exception ex)
+        {
+            SetResourceStatusMessage($"标题翻译失败：{ex.Message}");
+        }
+        finally
+        {
+            _titleTranslationsInProgress.Remove(item.Path);
+        }
+    }
+
+    private async Task BuildActorVideoGroupsAsync(
+        ResourceBrowserLocation actorLocation,
+        IReadOnlyList<ResourceBrowserItem> actorItems,
+        CancellationToken cancellationToken)
+    {
+        var directVideoFolders = actorItems
+            .Where(item => item.Kind == ResourceBrowserItemKind.VideoFolder)
+            .ToList();
+        var categoryGroups = new List<ActorVideoGroup>();
+        var categoriesWithVideos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        async Task<bool> CollectCategoryGroupsAsync(ResourceBrowserItem category, int depth)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (depth > 8)
+                return false;
+
+            var children = await _browser.GetChildrenAsync(category.Path, ResourceBrowserLocationKind.CategoryFolder, _workspace.Settings, cancellationToken);
+            var directVideos = children
+                .Where(child => child.Kind == ResourceBrowserItemKind.VideoFolder)
+                .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+            var hasVideos = directVideos.Count > 0;
+
+            if (hasVideos)
+            {
+                var relativeName = string.Join(" / ", Path.GetRelativePath(actorLocation.Path, category.Path)
+                    .Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries));
+                categoryGroups.Add(new ActorVideoGroup(relativeName, directVideos));
+            }
+
+            foreach (var childCategory in children.Where(child => child.Kind == ResourceBrowserItemKind.CategoryFolder))
+                hasVideos |= await CollectCategoryGroupsAsync(childCategory, depth + 1);
+
+            if (hasVideos)
+                categoriesWithVideos.Add(category.Path);
+
+            return hasVideos;
+        }
+
+        foreach (var category in actorItems.Where(item => item.Kind == ResourceBrowserItemKind.CategoryFolder))
+            await CollectCategoryGroupsAsync(category, 1);
+
+        var defaultItems = directVideoFolders
+            .Concat(actorItems.Where(item => item.Kind == ResourceBrowserItemKind.CategoryFolder && !categoriesWithVideos.Contains(item.Path)))
+            .ToList();
+        if (defaultItems.Count > 0 || categoryGroups.Count == 0)
+            _actorVideoGroups.Add(new ActorVideoGroup("作品", defaultItems));
+
+        _actorVideoGroups.AddRange(categoryGroups
+            .OrderBy(group => group.Name, StringComparer.CurrentCultureIgnoreCase));
+        _selectedActorGroupIndex = 0;
+    }
+
+    private void BuildActorGroupButtons()
+    {
+        ActorGroupButtons.Children.Clear();
+        for (var index = 0; index < _actorVideoGroups.Count; index++)
+        {
+            var capturedIndex = index;
+            var button = new Button
+            {
+                Content = _actorVideoGroups[index].Name,
+                Padding = new Thickness(12, 6, 12, 6),
+                MinWidth = 0,
+                Tag = index,
+            };
+            if (index == _selectedActorGroupIndex && Resources.TryGetValue("ActorGroupSelectedButtonStyle", out var style))
+                button.Style = style as Style;
+            button.Click += async (_, _) => await SelectActorGroupAsync(capturedIndex);
+            ActorGroupButtons.Children.Add(button);
+        }
+    }
+
+    private async Task SelectActorGroupAsync(int index)
+    {
+        if (index < 0 || index >= _actorVideoGroups.Count || index == _selectedActorGroupIndex)
+            return;
+
+        _selectedActorGroupIndex = index;
+        _selectedActorGroupName = _actorVideoGroups[index].Name;
+        BuildActorGroupButtons();
+        _loadCancellation?.Cancel();
+        _loadCancellation?.Dispose();
+        var currentLoad = _loadCancellation = new CancellationTokenSource();
+        var cancellationToken = currentLoad.Token;
+        ClearSelectedResourceItems();
+        SetNativeSelection(null);
+        BrowserGrid.SelectedItems.Clear();
+        BrowserItems.Clear();
+        EmptyText.Visibility = Visibility.Collapsed;
+        LoadingRing.IsActive = true;
+        try
+        {
+            await DisplayResourceItemsAsync(_actorVideoGroups[index].Items, cancellationToken);
+            EmptyText.Visibility = BrowserItems.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            UpdateActorGridLayout();
+            UpdateNativeResourceStatus();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        finally
+        {
+            if (ReferenceEquals(currentLoad, _loadCancellation))
+                LoadingRing.IsActive = false;
+        }
+    }
+
+    private async Task DisplayResourceItemsAsync(IReadOnlyList<ResourceBrowserItem> items, CancellationToken cancellationToken)
+    {
+        var initialGridLayout = items.Any(item => item.Kind is ResourceBrowserItemKind.ActorFolder or ResourceBrowserItemKind.VideoFolder)
+            ? CalculateActorGridLayout()
+            : null;
+        if (initialGridLayout is { } layout && BrowserGrid.ItemsPanelRoot is ItemsWrapGrid initialItemsPanel)
+            initialItemsPanel.ItemWidth = layout.ItemWidth;
+
+        foreach (var item in items)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var viewModel = new ResourceBrowserItemViewModel(item);
+            if (initialGridLayout is { } initialLayout &&
+                item.Kind is ResourceBrowserItemKind.ActorFolder or ResourceBrowserItemKind.VideoFolder)
+                viewModel.SetAdaptiveCardWidth(initialLayout.CardWidth);
+
+            viewModel.Poster = await LoadPosterAsync(item.PosterPath, cancellationToken);
+            if (item.Kind == ResourceBrowserItemKind.VideoFolder)
+            {
+                try { viewModel.UpdateFileTags(FileTagsHelper.ReadFileTag(item.Path)); }
+                catch { viewModel.UpdateFileTags([]); }
+            }
+            BrowserItems.Add(viewModel);
+        }
+    }
+
+    private StatusBarViewModel? GetNativeResourceStatusBarViewModel()
+    {
+        if (_contentPageContext.ShellPage is ModernShellPage shellPage &&
+            ReferenceEquals(shellPage.CurrentResourceLibraryPage, this))
+            return shellPage.ResourceLibraryStatusBarViewModel;
+
+        return null;
+    }
+
+    private void SetResourceStatusMessage(string? message)
+    {
+        if (GetNativeResourceStatusBarViewModel() is not { } statusBarViewModel)
+            return;
+
+        var count = BrowserItems.Count;
+        statusBarViewModel.DirectoryItemCount = string.IsNullOrWhiteSpace(message)
+            ? $"{count} {Strings.Items.GetLocalizedFormatResource(count)}"
+            : message;
+    }
+
+    public void UpdateNativeResourceStatus(string? description = null)
+    {
+        if (GetNativeResourceStatusBarViewModel() is not { } statusBarViewModel)
+            return;
+
+        var count = BrowserItems.Count;
+        statusBarViewModel.DirectoryItemCount = string.IsNullOrWhiteSpace(description)
+            ? $"{count} {Strings.Items.GetLocalizedFormatResource(count)}"
+            : description;
+    }
+
+    private string GetVideoTitleForTranslation(ResourceBrowserItemViewModel item)
+    {
+        var itemName = item.Kind == ResourceBrowserItemKind.VideoFile
+            ? Path.GetFileNameWithoutExtension(item.Model.Name)
+            : item.Model.Name;
+        return _videoAssistantSearch.GetVideoTitle(itemName).Trim();
+    }
+
+    private string GetVideoTitleTranslationKey(ResourceBrowserItemViewModel item, ResourceManagerTranslationProvider provider)
+    {
+        var itemName = item.Kind == ResourceBrowserItemKind.VideoFile
+            ? Path.GetFileNameWithoutExtension(item.Model.Name)
+            : item.Model.Name;
+        return _videoAssistantSearch.GetVideoTitleTranslationKey(itemName, item.Path, provider.ToString());
+    }
+
+    private ResourceManagerTranslationProvider GetTranslationProvider()
+        => Enum.TryParse<ResourceManagerTranslationProvider>(_appSettings.ResourceManagerTranslationProvider, true, out var provider)
+            ? provider
+            : ResourceManagerTranslationProvider.AliyunMachineTranslation;
 
     private async Task EditResourceTagsAsync(ResourceBrowserItemViewModel item)
     {
@@ -659,7 +1337,7 @@ public sealed partial class ResourceLibraryPage : Page
 
         await SaveTagsAsync(item.Path, selectedTagIds);
         await RefreshAsync();
-        StatusText.Text = $"已保存“{item.Name}”的资源管理标签。";
+        SetResourceStatusMessage($"已保存“{item.Name}”的资源管理标签。");
     }
 
     [DynamicWindowsRuntimeCast(typeof(Microsoft.UI.Xaml.Media.Brush))]
@@ -670,6 +1348,15 @@ public sealed partial class ResourceLibraryPage : Page
 
         var nameBox = new TextBox { Header = "姓名", Text = string.IsNullOrWhiteSpace(details.Name) ? item.Model.Name : details.Name };
         var aliasesBox = new TextBox { Header = "别名", Text = details.Aliases, PlaceholderText = "可填写多个别名" };
+        var biographyBox = new TextBox
+        {
+            Header = "简介",
+            Text = details.Biography,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            MinHeight = 88,
+            MaxLength = 4000,
+        };
         var heightBox = new TextBox { Text = details.HeightCm, PlaceholderText = "身高" };
         var weightBox = new TextBox { Text = details.WeightKg, PlaceholderText = "体重" };
         heightBox.BeforeTextChanging += (_, args) => args.Cancel = !IsValidNumberInput(args.NewText, allowDecimal: false);
@@ -797,6 +1484,7 @@ public sealed partial class ResourceLibraryPage : Page
         fields.Children.Add(validationText);
 
         content.Children.Add(nameGrid);
+        content.Children.Add(biographyBox);
         content.Children.Add(fields);
 
         var actorDialog = new ContentDialog
@@ -818,12 +1506,13 @@ public sealed partial class ResourceLibraryPage : Page
                 validationText.Text = "出生日期请输入有效日期，例如 1990-01-01。";
                 validationText.Visibility = Visibility.Visible;
             }
-            else if (careerStatusBox.SelectedIndex == 1 &&
-                !TryParseRetirementDate(retirementBox.Text, out _))
-            {
-                args.Cancel = true;
-                retirementBox.Focus(FocusState.Programmatic);
-                validationText.Text = "选择退役后，请输入有效的退役日期。";
+			else if (!string.IsNullOrWhiteSpace(retirementBox.Text) &&
+				careerStatusBox.SelectedIndex == 1 &&
+				!TryParseRetirementDate(retirementBox.Text, out _))
+			{
+				args.Cancel = true;
+				retirementBox.Focus(FocusState.Programmatic);
+				validationText.Text = "退役日期请输入有效日期，例如 2020-01-01；留空则只显示退役。";
                 validationText.Visibility = Visibility.Visible;
             }
             else if (string.IsNullOrWhiteSpace(nameBox.Text))
@@ -880,6 +1569,7 @@ public sealed partial class ResourceLibraryPage : Page
         {
             Name = nameBox.Text.Trim(),
             Aliases = aliasesBox.Text.Trim(),
+            Biography = biographyBox.Text.Trim(),
             HeightCm = heightBox.Text.Trim(),
             WeightKg = weightBox.Text.Trim(),
             Bust = bustBox.Text,
@@ -895,13 +1585,14 @@ public sealed partial class ResourceLibraryPage : Page
             },
             CareerRetirementDate = retirementDate,
             PosterPaths = details.PosterPaths,
+            ExcludedPosterPaths = details.ExcludedPosterPaths,
         });
 
         await RefreshAsync();
         var refreshedActor = BrowserItems.FirstOrDefault(candidate => string.Equals(candidate.Path, item.Path, StringComparison.OrdinalIgnoreCase));
         if (refreshedActor is not null)
             BrowserGrid.SelectedItems.Add(refreshedActor);
-        StatusText.Text = $"已保存“{nameBox.Text.Trim()}”的演员信息。";
+        SetResourceStatusMessage($"已保存“{nameBox.Text.Trim()}”的演员信息。");
     }
 
     private (StackPanel Panel, HashSet<string> TagIds) CreateTagEditor(HashSet<string> selectedTagIds, Action manageResourceTags)
@@ -939,7 +1630,7 @@ public sealed partial class ResourceLibraryPage : Page
             }
             catch (InvalidOperationException)
             {
-                StatusText.Text = $"资源标签“{name}”已存在。";
+                SetResourceStatusMessage($"资源标签“{name}”已存在。");
             }
 
             if (tag is not null)
@@ -1012,11 +1703,11 @@ public sealed partial class ResourceLibraryPage : Page
                 var color = CommunityToolkit.WinUI.Helpers.ColorHelper.ToHex(colorPicker.Color);
                 if (!_workspace.EditResourceTag(tag.Uid, nameBox.Text, color))
                 {
-                    StatusText.Text = "资源标签名称不能为空或已存在。";
+                    SetResourceStatusMessage("资源标签名称不能为空或已存在。");
                     return;
                 }
 
-                StatusText.Text = $"已更新资源标签“{nameBox.Text.Trim()}”。";
+                SetResourceStatusMessage($"已更新资源标签“{nameBox.Text.Trim()}”。");
                 _ = RefreshAsync();
             };
             deleteButton.Click += (_, _) =>
@@ -1024,7 +1715,7 @@ public sealed partial class ResourceLibraryPage : Page
                 if (_workspace.DeleteResourceTag(tag.Uid))
                 {
                     tagList.Children.Remove(row);
-                    StatusText.Text = $"已删除资源标签“{tag.Name}”。";
+                    SetResourceStatusMessage($"已删除资源标签“{tag.Name}”。");
                     _ = RefreshAsync();
                 }
             };
@@ -1045,11 +1736,11 @@ public sealed partial class ResourceLibraryPage : Page
                 var tag = _workspace.CreateResourceTag(name, ColorHelpers.RandomColor());
                 AddTagRow(tag);
                 newTagName.Text = string.Empty;
-                StatusText.Text = $"已创建资源标签“{name}”。";
+                SetResourceStatusMessage($"已创建资源标签“{name}”。");
             }
             catch (InvalidOperationException)
             {
-                StatusText.Text = $"资源标签“{name}”已存在。";
+                SetResourceStatusMessage($"资源标签“{name}”已存在。");
             }
         };
 
@@ -1069,12 +1760,16 @@ public sealed partial class ResourceLibraryPage : Page
 
     private static IReadOnlyList<string> GetActorPosterPaths(ResourceBrowserItemViewModel item, ResourceActorDetails details)
     {
+        var excludedPosterPaths = details.ExcludedPosterPaths ?? [];
         var paths = new List<string>();
         var mainPosterPath = item.Model.PosterPath;
-        if (!string.IsNullOrWhiteSpace(mainPosterPath) && File.Exists(mainPosterPath))
+        if (!string.IsNullOrWhiteSpace(mainPosterPath) &&
+            File.Exists(mainPosterPath) &&
+            !excludedPosterPaths.Contains(mainPosterPath, StringComparer.OrdinalIgnoreCase))
             paths.Add(mainPosterPath);
 
-        paths.AddRange(details.PosterPaths ?? []);
+        paths.AddRange((details.PosterPaths ?? []).Where(path =>
+            !excludedPosterPaths.Contains(path, StringComparer.OrdinalIgnoreCase)));
         return paths
             .Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path))
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -1116,7 +1811,46 @@ public sealed partial class ResourceLibraryPage : Page
         return field;
     }
 
-    private async Task<int> CountActorVideosAsync(string actorFolderPath)
+    private async Task LoadActorWorkCountsAsync(IReadOnlyList<ResourceBrowserItemViewModel> actors, CancellationToken cancellationToken)
+    {
+        using var concurrencyLimit = new SemaphoreSlim(3);
+        var tasks = actors.Select(async actor =>
+        {
+            try
+            {
+                await concurrencyLimit.WaitAsync(cancellationToken);
+                try
+                {
+                    var workCount = await CountActorVideosAsync(actor.Path, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() => actor.ActorWorkCount = workCount);
+                }
+                finally
+                {
+                    concurrencyLimit.Release();
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // The actor list changed before its background work-count scan completed.
+            }
+        });
+
+        await Task.WhenAll(tasks);
+        if (!cancellationToken.IsCancellationRequested)
+            await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(RefreshNativeSelectionAvailability);
+    }
+
+    private void RefreshNativeSelectionAvailability()
+    {
+        var selectedItems = BrowserGrid.SelectedItems
+            .OfType<ResourceBrowserItemViewModel>()
+            .Select(CreateListedItem)
+            .ToList();
+        SetNativeSelection(selectedItems.Count == 0 ? null : selectedItems);
+    }
+
+    private async Task<int> CountActorVideosAsync(string actorFolderPath, CancellationToken cancellationToken = default)
     {
         var videoExtensions = _workspace.Settings.VideoExtensions.ToHashSet(StringComparer.OrdinalIgnoreCase);
         return await Task.Run(() =>
@@ -1129,14 +1863,25 @@ public sealed partial class ResourceLibraryPage : Page
                     IgnoreInaccessible = true,
                     AttributesToSkip = System.IO.FileAttributes.ReparsePoint,
                 };
-                return Directory.EnumerateFiles(actorFolderPath, "*", options)
-                    .Count(path => videoExtensions.Contains(Path.GetExtension(path).TrimStart('.')));
+                var count = 0;
+                foreach (var path in Directory.EnumerateFiles(actorFolderPath, "*", options))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (videoExtensions.Contains(Path.GetExtension(path).TrimStart('.')))
+                        count++;
+                }
+
+                return count;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch
             {
                 return 0;
             }
-        });
+        }, cancellationToken);
     }
 
     private static bool TryParseRetirementDate(string value, out DateTime date)
@@ -1154,12 +1899,12 @@ public sealed partial class ResourceLibraryPage : Page
     private string[] ReadTagIds(string path)
         => _workspace.GetResourceTagIds(path).ToArray();
 
-    private async void OnManageHiddenActors(object sender, RoutedEventArgs e)
+    public async Task ManageHiddenActorsAsync()
     {
         var hiddenPaths = _workspace.HiddenActorFolders;
         if (hiddenPaths.Count == 0)
         {
-            StatusText.Text = "目前没有隐藏的演员文件夹。";
+            SetResourceStatusMessage("目前没有隐藏的演员文件夹。");
             return;
         }
 
@@ -1186,7 +1931,98 @@ public sealed partial class ResourceLibraryPage : Page
             _workspace.SetActorFolderHidden(path, false);
 
         await RefreshAsync();
-        StatusText.Text = $"已恢复显示 {list.SelectedItems.Count} 个演员文件夹。";
+        SetResourceStatusMessage($"已恢复显示 {list.SelectedItems.Count} 个演员文件夹。");
+    }
+
+    public async Task ImportActorsAsync()
+    {
+        var picker = new Windows.Storage.Pickers.FileOpenPicker
+        {
+            SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Downloads,
+        };
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, MainWindow.Instance.WindowHandle);
+        picker.FileTypeFilter.Add(".json");
+        var file = await picker.PickSingleFileAsync();
+        if (file is null)
+            return;
+
+        LoadingRing.IsActive = true;
+        SetResourceStatusMessage("正在读取演员资料包并匹配文件夹……");
+        try
+        {
+            var targets = Directory.EnumerateDirectories(_libraryPath, "*", SearchOption.TopDirectoryOnly)
+                .Select(path => new DirectoryInfo(path))
+                .Where(ChangLiActorImportService.IsImportActorFolder)
+                .Select(directory =>
+                {
+                    var details = _workspace.GetActorDetails(directory.FullName);
+                    return new ChangLiActorImportTarget(
+                        directory.FullName,
+                        directory.Name,
+                        details.Name,
+                        details.Aliases);
+                })
+                .ToArray();
+            var plan = await ChangLiActorImportService.CreatePlanAsync(file.Path, targets);
+            LoadingRing.IsActive = false;
+
+            if (plan.Matches.Count == 0)
+            {
+                SetResourceStatusMessage($"没有找到可导入的匹配演员。未匹配 {plan.UnmatchedCount} 位，重名冲突 {plan.AmbiguousCount} 位。");
+                return;
+            }
+
+            var overwriteCheckBox = new CheckBox
+            {
+                Content = "覆盖 Files 中已有资料和主海报；不勾选时只补空字段",
+                IsChecked = false,
+            };
+            var summary = new StackPanel { Spacing = 10 };
+            summary.Children.Add(new TextBlock
+            {
+                Text = $"导出文件包含 {plan.SourceActorCount} 位演员；按姓名、别名或日文名精确匹配到 {plan.Matches.Count} 个文件夹。未匹配 {plan.UnmatchedCount} 位，重名冲突 {plan.AmbiguousCount} 位。",
+                TextWrapping = TextWrapping.Wrap,
+            });
+            summary.Children.Add(new TextBlock
+            {
+                Text = "导入会合并演员海报，并写入简介、生日、身高、体重、数值和罩杯。",
+                TextWrapping = TextWrapping.Wrap,
+            });
+            summary.Children.Add(overwriteCheckBox);
+
+            var dialog = new ContentDialog
+            {
+                Title = "导入演员资料",
+                Content = summary,
+                PrimaryButtonText = $"导入 {plan.Matches.Count} 位演员",
+                CloseButtonText = "取消",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = XamlRoot,
+            };
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+            {
+                SetResourceStatusMessage("已取消导入。");
+                return;
+            }
+
+            LoadingRing.IsActive = true;
+            SetResourceStatusMessage("正在导入演员资料和海报……");
+            var result = await ChangLiActorImportService.ApplyAsync(
+                plan,
+                _workspace,
+                overwriteCheckBox.IsChecked == true);
+            await RefreshAsync();
+            SetResourceStatusMessage($"已导入 {result.ImportedActors} 位演员，登记 {result.ImportedPhotos} 张海报；无法读取 {result.SkippedPhotos} 张。未匹配 {plan.UnmatchedCount} 位，重名冲突 {plan.AmbiguousCount} 位。");
+        }
+        catch (Exception ex)
+        {
+            App.Logger.LogError(ex, "Unable to import ChangLi actor data from {PackagePath}", file.Path);
+            SetResourceStatusMessage($"导入演员失败：{ex.Message}");
+        }
+        finally
+        {
+            LoadingRing.IsActive = false;
+        }
     }
 
     private async Task ChoosePosterAsync(ResourceBrowserItemViewModel item)
@@ -1197,7 +2033,7 @@ public sealed partial class ResourceLibraryPage : Page
 
         _workspace.SetPosterOverride(item.Path, posterPath);
         await RefreshAsync();
-        StatusText.Text = $"已设置海报：{item.Name}";
+        SetResourceStatusMessage($"已设置海报：{item.Name}");
     }
 
     private async Task<string?> PickPosterPathAsync()

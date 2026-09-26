@@ -1,6 +1,10 @@
 ﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
+#if FILES_RESOURCE_MANAGER
+using Files.App.Views.Shells;
+#endif
+
 namespace Files.App.Actions
 {
 	[GeneratedRichCommand]
@@ -32,8 +36,21 @@ namespace Files.App.Actions
 		public bool IsExecutable =>
 			context.ShellPage is not null &&
 			IsPageTypeValid() &&
-			context.ShellPage.SlimContentPage is not null &&
+			(context.ShellPage.SlimContentPage is not null || IsSingleResourceSelection) &&
 			context.HasSelection;
+
+		private bool IsSingleResourceSelection
+		{
+			get
+			{
+#if FILES_RESOURCE_MANAGER
+				return context.SelectedItems.Count == 1 &&
+					context.ShellPage is ModernShellPage { CurrentResourceLibraryPage: not null };
+#else
+				return false;
+#endif
+			}
+		}
 
 		public RenameAction()
 		{
@@ -44,6 +61,14 @@ namespace Files.App.Actions
 
 		public async Task ExecuteAsync(object? parameter = null)
 		{
+#if FILES_RESOURCE_MANAGER
+			if (context.ShellPage is ModernShellPage { CurrentResourceLibraryPage: { } resourceLibraryPage })
+			{
+				await resourceLibraryPage.RenameSelectedItemAsync();
+				return;
+			}
+#endif
+
 			if (context.SelectedItems.Count > 1)
 			{
 				var viewModel = new BulkRenameDialogViewModel();

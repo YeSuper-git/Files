@@ -18,4 +18,5 @@ public sealed partial class ResourceActorListedItem : ListedItem
     public Func<Task<int>>? CountActorVideosAsync { get; set; }
     public Func<Task<string?>>? AddActorPosterAsync { get; set; }
     public Func<string, Task>? SetActorMainPosterAsync { get; set; }
+    public Func<string, Task>? DeleteActorPosterAsync { get; set; }
 }

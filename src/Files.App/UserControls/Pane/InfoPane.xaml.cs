@@ -66,8 +66,14 @@ namespace Files.App.UserControls
 		private void MenuFlyoutItem_Tapped(object sender, TappedRoutedEventArgs e)
 			=> ViewModel?.UpdateSelectedItemPreviewAsync(true);
 
+		private void PreviewContextFlyout_Opening(object sender, object e)
+			=> LoadCloudItemMenuItem.Visibility = ViewModel.ShowCloudItemButton ? Visibility.Visible : Visibility.Collapsed;
+
 		private async void EditActorDetails_Click(object sender, RoutedEventArgs e)
 			=> await ViewModel.EditSelectedResourceActorAsync();
+
+		private async void ToggleResourceVideoFolderTitle_Click(object sender, RoutedEventArgs e)
+			=> await ViewModel.ToggleResourceVideoFolderTitleAsync();
 
 		[DynamicWindowsRuntimeCast(typeof(UserControl))]
 		private void FileTag_PointerEntered(object sender, PointerRoutedEventArgs e)

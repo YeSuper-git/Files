@@ -3,12 +3,10 @@
 
 using CommunityToolkit.Mvvm.DependencyInjection;
 using Files.App.ViewModels.Assistant;
-using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Windows.System;
-using Windows.UI.Core;
 
 namespace Files.App.UserControls.Assistant;
 
@@ -63,12 +61,18 @@ public sealed partial class VideoAssistantChatView : UserControl
             await ViewModel.ChooseAsync(choice);
     }
 
+    private async void BatchActionButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.BatchAction is { } choice)
+            await ViewModel.ChooseAsync(choice);
+    }
+
     private async void SendButton_Click(object sender, RoutedEventArgs e)
         => await ViewModel.SubmitAsync();
 
     private async void MessageInput_KeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (e.Key != VirtualKey.Enter || InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down))
+        if (e.Key != VirtualKey.Enter)
             return;
 
         e.Handled = true;
@@ -103,5 +107,17 @@ public sealed partial class VideoAssistantChatView : UserControl
     {
         if (sender is Button { DataContext: VideoAssistantCandidateViewModel candidate })
             ViewModel.ToggleWantToWatch(candidate);
+    }
+
+    private void PreviousRecommendationButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: VideoAssistantMessage message })
+            message.MoveResult(-1);
+    }
+
+    private void NextRecommendationButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: VideoAssistantMessage message })
+            message.MoveResult(1);
     }
 }

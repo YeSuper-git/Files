@@ -1,6 +1,10 @@
 ﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
+#if FILES_RESOURCE_MANAGER
+using Files.App.Views.Shells;
+#endif
+
 namespace Files.App.Actions
 {
 	[GeneratedRichCommand]
@@ -27,7 +31,16 @@ namespace Files.App.Actions
 			=> new(Keys.F5);
 
 		public bool IsExecutable
-			=> context.CanRefresh;
+		{
+			get
+			{
+#if FILES_RESOURCE_MANAGER
+				if (context.ShellPage is ModernShellPage { CurrentResourceLibraryPage: not null })
+					return true;
+#endif
+				return context.CanRefresh;
+			}
+		}
 
 		public RefreshItemsAction()
 		{
@@ -38,6 +51,13 @@ namespace Files.App.Actions
 
 		public async Task ExecuteAsync(object? parameter = null)
 		{
+#if FILES_RESOURCE_MANAGER
+			if (context.ShellPage is ModernShellPage { CurrentResourceLibraryPage: { } resourceLibraryPage })
+			{
+				await resourceLibraryPage.RefreshAsync();
+				return;
+			}
+#endif
 			if (context.ShellPage is null)
 				return;
 

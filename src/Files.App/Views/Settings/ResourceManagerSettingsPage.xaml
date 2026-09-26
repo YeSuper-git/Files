@@ -1,0 +1,175 @@
+<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
+<Page
+	x:Class="Files.App.Views.Settings.ResourceManagerSettingsPage"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:helpers="using:Files.App.Helpers"
+	xmlns:wctconverters="using:CommunityToolkit.WinUI.Converters"
+	xmlns:wctcontrols="using:CommunityToolkit.WinUI.Controls">
+	<Page.Resources>
+		<wctconverters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+	</Page.Resources>
+
+	<StackPanel Spacing="4">
+		<TextBlock
+			Padding="0,0,0,12"
+			Style="{StaticResource App.Theme.SubtitleTextBlockStyle}"
+			Text="{helpers:ResourceString Name=ResourceManagerTranslationSettingsTitle}" />
+
+		<wctcontrols:SettingsExpander
+			Header="{helpers:ResourceString Name=ResourceManagerTranslationProvider}"
+			IsExpanded="False">
+			<wctcontrols:SettingsExpander.HeaderIcon>
+				<FontIcon Glyph="&#xE8D4;" />
+			</wctcontrols:SettingsExpander.HeaderIcon>
+			<ComboBox
+				x:Name="TranslationProviderComboBox"
+				Width="320"
+				Margin="0,0,28,0"
+				HorizontalAlignment="Right"
+				AutomationProperties.Name="{helpers:ResourceString Name=ResourceManagerTranslationProvider}"
+				SelectionChanged="TranslationProviderComboBox_SelectionChanged">
+				<ComboBoxItem Content="{helpers:ResourceString Name=ResourceManagerMachineTranslation}" Tag="AliyunMachineTranslation" />
+				<ComboBoxItem Content="{helpers:ResourceString Name=ResourceManagerBailianQwenMt}" Tag="BailianQwenMt" />
+			</ComboBox>
+			<wctcontrols:SettingsExpander.ItemsHeader>
+				<StackPanel Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+					<Grid
+						x:Name="TranslationProviderSummaryPanel"
+						Padding="32,12"
+						ColumnSpacing="16">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="Auto" />
+						</Grid.ColumnDefinitions>
+						<Button
+							x:Name="EditTranslationProviderButton"
+							Grid.Column="1"
+							HorizontalAlignment="Right"
+							Click="EditTranslationProviderButton_Click"
+							Content="{helpers:ResourceString Name=Edit}" />
+					</Grid>
+
+					<StackPanel
+						x:Name="TranslationProviderEditPanel"
+						Padding="32,12"
+						Spacing="10"
+						Visibility="Collapsed">
+						<Grid
+							x:Name="MachineTranslationConfigPanel"
+							ColumnDefinitions="*,*,Auto,Auto"
+							ColumnSpacing="8"
+							Visibility="Collapsed">
+							<TextBox
+								x:Name="MachineAccessKeyIdTextBox"
+								Grid.Column="0"
+								Header="{helpers:ResourceString Name=ResourceManagerAccessKeyId}"
+								PlaceholderText="{helpers:ResourceString Name=ResourceManagerCredentialEmpty}" />
+							<PasswordBox
+								x:Name="MachineAccessKeySecretPasswordBox"
+								Grid.Column="1"
+								Header="{helpers:ResourceString Name=ResourceManagerAccessKeySecret}"
+								PlaceholderText="{helpers:ResourceString Name=ResourceManagerCredentialEmpty}" />
+							<Button
+								Grid.Column="2"
+								Width="36"
+								Height="36"
+								MinWidth="36"
+								Padding="0"
+								VerticalAlignment="Bottom"
+								AutomationProperties.Name="{helpers:ResourceString Name=ResourceManagerSaveCredentials}"
+								Click="SaveMachineCredentialsButton_Click"
+								ToolTipService.ToolTip="{helpers:ResourceString Name=ResourceManagerSaveCredentials}">
+								<SymbolIcon Symbol="Save" />
+							</Button>
+							<Button
+								Grid.Column="3"
+								Width="36"
+								Height="36"
+								MinWidth="36"
+								Padding="0"
+								VerticalAlignment="Bottom"
+								AutomationProperties.Name="{helpers:ResourceString Name=ResourceManagerRemoveCredentials}"
+								Click="RemoveMachineCredentialsButton_Click"
+								ToolTipService.ToolTip="{helpers:ResourceString Name=ResourceManagerRemoveCredentials}">
+								<SymbolIcon Symbol="Delete" />
+							</Button>
+						</Grid>
+						<Grid
+							x:Name="BailianTranslationConfigPanel"
+							ColumnDefinitions="*,Auto,Auto"
+							ColumnSpacing="8"
+							Visibility="Collapsed">
+							<PasswordBox
+								x:Name="BailianApiKeyPasswordBox"
+								Grid.Column="0"
+								Header="{helpers:ResourceString Name=ResourceManagerApiKey}"
+								PlaceholderText="{helpers:ResourceString Name=ResourceManagerCredentialEmpty}" />
+							<Button
+								Grid.Column="1"
+								Width="36"
+								Height="36"
+								MinWidth="36"
+								Padding="0"
+								VerticalAlignment="Bottom"
+								AutomationProperties.Name="{helpers:ResourceString Name=ResourceManagerSaveCredentials}"
+								Click="SaveBailianCredentialsButton_Click"
+								ToolTipService.ToolTip="{helpers:ResourceString Name=ResourceManagerSaveCredentials}">
+								<SymbolIcon Symbol="Save" />
+							</Button>
+							<Button
+								Grid.Column="2"
+								Width="36"
+								Height="36"
+								MinWidth="36"
+								Padding="0"
+								VerticalAlignment="Bottom"
+								AutomationProperties.Name="{helpers:ResourceString Name=ResourceManagerRemoveCredentials}"
+								Click="RemoveBailianCredentialsButton_Click"
+								ToolTipService.ToolTip="{helpers:ResourceString Name=ResourceManagerRemoveCredentials}">
+								<SymbolIcon Symbol="Delete" />
+							</Button>
+						</Grid>
+					</StackPanel>
+				</StackPanel>
+			</wctcontrols:SettingsExpander.ItemsHeader>
+		</wctcontrols:SettingsExpander>
+
+		<wctcontrols:SettingsExpander Header="回退快照" IsExpanded="False">
+			<wctcontrols:SettingsExpander.HeaderIcon>
+				<FontIcon Glyph="&#xE777;" />
+			</wctcontrols:SettingsExpander.HeaderIcon>
+			<wctcontrols:SettingsExpander.ItemsHeader>
+				<StackPanel Padding="16,8,16,12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Spacing="10">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<Button x:Name="RollbackSnapshotButton" Content="回退所选快照" IsEnabled="False" Click="RollbackSnapshotButton_Click" />
+						<Button x:Name="DeleteSnapshotButton" Content="删除所选快照" IsEnabled="False" Click="DeleteSnapshotButton_Click" />
+						<Button Content="刷新" Click="RefreshSnapshotsButton_Click" />
+					</StackPanel>
+					<TextBlock x:Name="SnapshotsEmptyTextBlock" Text="暂无回退快照。" Visibility="Collapsed" />
+					<ListView
+						x:Name="SnapshotsListView"
+						Padding="0,2"
+						SelectionMode="Single"
+						SelectionChanged="SnapshotsListView_SelectionChanged">
+						<ListView.ItemTemplate>
+							<DataTemplate>
+								<Border Padding="8,6">
+									<Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12" ToolTipService.ToolTip="{Binding ScopePath}">
+										<TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding Action}" />
+										<TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding Summary}" TextTrimming="CharacterEllipsis" />
+										<TextBlock Grid.Column="2" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{Binding CreatedAt}" />
+										<TextBlock Grid.Column="3" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" Text="已回退" Visibility="{Binding IsRestored, Converter={StaticResource BoolToVisibilityConverter}}" />
+									</Grid>
+								</Border>
+							</DataTemplate>
+						</ListView.ItemTemplate>
+					</ListView>
+					<TextBlock x:Name="SnapshotStatusTextBlock" TextWrapping="Wrap" />
+				</StackPanel>
+			</wctcontrols:SettingsExpander.ItemsHeader>
+		</wctcontrols:SettingsExpander>
+
+		<TextBlock x:Name="StatusTextBlock" Margin="0,8,0,0" TextWrapping="Wrap" />
+	</StackPanel>
+</Page>

@@ -43,6 +43,9 @@ namespace Files.App.ViewModels.Settings
 			NavigationItems.Add(CreateNavigationItem(SettingsPageKind.FoldersPage, "SettingsItemFolders", Strings.FilesAndFolders.GetLocalizedResource(), "App.ThemedIcons.Settings.FilesFolders"));
 			NavigationItems.Add(CreateNavigationItem(SettingsPageKind.ActionsPage, "SettingsItemActions", Strings.Actions.GetLocalizedResource(), "App.ThemedIcons.Settings.KeyboardActions"));
 			NavigationItems.Add(CreateNavigationItem(SettingsPageKind.TagsPage, "SettingsItemTags", Strings.FileTags.GetLocalizedResource(), "App.ThemedIcons.Settings.Tags"));
+			#if FILES_RESOURCE_MANAGER
+			NavigationItems.Add(CreateNavigationItem(SettingsPageKind.ResourceManagerPage, "SettingsItemResourceManager", Strings.SettingsItemResourceManager.GetLocalizedResource(), "App.ThemedIcons.Settings.FilesFolders"));
+			#endif
 			NavigationItems.Add(CreateNavigationItem(SettingsPageKind.DevToolsPage, "SettingsItemDevTools", Strings.DevTools.GetLocalizedResource(), "App.ThemedIcons.Settings.DevTools"));
 			NavigationItems.Add(CreateNavigationItem(SettingsPageKind.AdvancedPage, "SettingsItemAdvanced", Strings.Advanced.GetLocalizedResource(), "App.ThemedIcons.Settings.Advanced"));
 			NavigationItems.Add(CreateNavigationItem(SettingsPageKind.AboutPage, "SettingsItemAbout", Strings.About.GetLocalizedResource(), "App.ThemedIcons.Info"));

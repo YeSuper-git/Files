@@ -134,14 +134,17 @@ public sealed class ResourceBrowserService : IResourceBrowserService
 
     private string? ResolvePoster(string targetPath, DirectoryInfo directory, string targetName, ResourceSettings settings)
     {
+        var excludedPosterPaths = _workspace.GetActorDetails(targetPath).ExcludedPosterPaths ?? [];
         var overridePath = _workspace.GetPosterOverride(targetPath);
-        if (IsImageFile(overridePath, settings.ImageExtensions))
+        if (IsImageFile(overridePath, settings.ImageExtensions) &&
+            !excludedPosterPaths.Contains(overridePath!, StringComparer.OrdinalIgnoreCase))
             return overridePath;
 
         try
         {
             var candidates = directory.EnumerateFiles()
                 .Where(file => IsImageFile(file.FullName, settings.ImageExtensions))
+                .Where(file => !excludedPosterPaths.Contains(file.FullName, StringComparer.OrdinalIgnoreCase))
                 .Select(file => new
                 {
                     File = file,

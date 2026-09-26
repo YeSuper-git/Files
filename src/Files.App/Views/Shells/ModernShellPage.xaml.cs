@@ -7,6 +7,8 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Navigation;
 using Microsoft.Extensions.Logging;
+using Files.App.Data.Models;
+using Files.App.ViewModels.UserControls;
 using System.IO;
 using Windows.System;
 #if FILES_RESOURCE_MANAGER
@@ -26,6 +28,10 @@ namespace Files.App.Views.Shells
 
 #if FILES_RESOURCE_MANAGER
 		private readonly IResourceWorkspaceService _resourceWorkspaceService = Ioc.Default.GetRequiredService<IResourceWorkspaceService>();
+		private StatusBarViewModel? _resourceLibraryStatusBarViewModel;
+		private readonly SelectedItemsPropertiesViewModel _resourceLibrarySelectionPropertiesViewModel = new();
+		public StatusBarViewModel ResourceLibraryStatusBarViewModel => _resourceLibraryStatusBarViewModel ??= new StatusBarViewModel();
+		public ResourceManager.ResourceLibraryPage? CurrentResourceLibraryPage => ItemDisplayFrame?.Content as ResourceManager.ResourceLibraryPage;
 #endif
 
 		private NavigationParams? _NavParams;
@@ -91,6 +97,14 @@ namespace Files.App.Views.Shells
 
 		private void UpdateStatusBarProperties()
 		{
+			if (CurrentResourceLibraryPage is not null)
+			{
+				StatusBar.StatusBarViewModel = ResourceLibraryStatusBarViewModel;
+				StatusBar.SelectedItemsPropertiesViewModel = _resourceLibrarySelectionPropertiesViewModel;
+				CurrentResourceLibraryPage.UpdateNativeResourceStatus();
+				return;
+			}
+
 			var contentPage = SlimContentPage is ColumnsLayoutPage columnsLayoutPage
 				? columnsLayoutPage.ActiveColumnShellPage?.SlimContentPage
 				: SlimContentPage;
@@ -301,8 +315,8 @@ namespace Files.App.Views.Shells
 					TextWrapping = TextWrapping.Wrap,
 					MinHeight = 120,
 					MaxHeight = 360,
-					VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
 				};
+				ScrollViewer.SetVerticalScrollBarVisibility(errorText, ScrollBarVisibility.Auto);
 				var dialog = new ContentDialog
 				{
 					Title = "资源管理页面打开失败",
@@ -433,6 +447,10 @@ namespace Files.App.Views.Shells
 #endif
 			_navigationInteractionTracker.NavigationRequested -= OverscrollNavigationRequested;
 			_navigationInteractionTracker.Dispose();
+#if FILES_RESOURCE_MANAGER
+			_resourceLibraryStatusBarViewModel?.Dispose();
+			_resourceLibraryStatusBarViewModel = null;
+#endif
 
 			base.Dispose();
 		}
@@ -663,7 +681,7 @@ namespace Files.App.Views.Shells
 						Path = paths[index],
 						Title = title,
 						ChevronToolTip = title,
-						ChevronVisibilityOverride = false,
+						ChevronVisibilityOverride = true,
 					});
 				}
 
