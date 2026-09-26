@@ -655,32 +655,66 @@ jobs:
           }
 
           # Windows chooses these package-identity variants for the running
-          # app's taskbar button. Keep them pixel-identical to the ICO used by
-          # the installer and native window icon instead of copying a second,
-          # independently maintained set of PNG artwork.
+          # app's taskbar button. Render every requested size from the shared
+          # ICO's 256px source so sizes absent from its embedded image list
+          # (such as 20px) are still generated at the exact requested size.
           Add-Type -AssemblyName System.Drawing
           $taskbarIconAssets = @()
-          foreach ($size in $taskbarIconSizes) {
-            $icon = $null
-            $bitmap = $null
-            try {
-              $icon = [System.Drawing.Icon]::new($appIconPath, [int]$size, [int]$size)
-              $bitmap = $icon.ToBitmap()
-              if ($bitmap.Width -ne [int]$size -or $bitmap.Height -ne [int]$size) {
-                throw "Logo.ico produced an unexpected ${size}px taskbar icon size ($($bitmap.Width)x$($bitmap.Height))."
-              }
+          $iconBytes = [System.IO.File]::ReadAllBytes($appIconPath)
+          $iconImageCount = [BitConverter]::ToUInt16($iconBytes, 4)
+          $sourceImageOffset = $null
+          $sourceImageLength = $null
+          for ($index = 0; $index -lt $iconImageCount; $index++) {
+            $entryOffset = 6 + (16 * $index)
+            $entryWidth = if ($iconBytes[$entryOffset] -eq 0) { 256 } else { $iconBytes[$entryOffset] }
+            $entryHeight = if ($iconBytes[$entryOffset + 1] -eq 0) { 256 } else { $iconBytes[$entryOffset + 1] }
+            if ($entryWidth -eq 256 -and $entryHeight -eq 256) {
+              $sourceImageLength = [BitConverter]::ToUInt32($iconBytes, $entryOffset + 8)
+              $sourceImageOffset = [BitConverter]::ToUInt32($iconBytes, $entryOffset + 12)
+              break
+            }
+          }
+          if (-not $sourceImageLength -or -not $sourceImageOffset) {
+            throw 'Logo.ico does not contain the required 256px source image.'
+          }
+          $sourceStream = [System.IO.MemoryStream]::new($iconBytes, [int]$sourceImageOffset, [int]$sourceImageLength)
+          $sourceBitmap = [System.Drawing.Bitmap]::new($sourceStream)
+          try {
+            if ($sourceBitmap.Width -ne 256 -or $sourceBitmap.Height -ne 256) {
+              throw "Logo.ico did not provide the required 256px source image ($($sourceBitmap.Width)x$($sourceBitmap.Height))."
+            }
 
-              foreach ($variant in @("${size}_altform-unplated.png", "${size}_altform-lightunplated_theme-light.png")) {
-                $assetName = "Square44x44Logo.targetsize-$variant"
-                $assetPath = Join-Path $identityAssetDir $assetName
-                $bitmap.Save($assetPath, [System.Drawing.Imaging.ImageFormat]::Png)
-                $taskbarIconAssets += Get-Item -LiteralPath $assetPath
+            foreach ($size in $taskbarIconSizes) {
+              $bitmap = $null
+              $graphics = $null
+              try {
+                $bitmap = [System.Drawing.Bitmap]::new([int]$size, [int]$size)
+                $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+                $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+                $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+                $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+                $graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+                $graphics.DrawImage($sourceBitmap, 0, 0, [int]$size, [int]$size)
+                if ($bitmap.Width -ne [int]$size -or $bitmap.Height -ne [int]$size) {
+                  throw "Generated an unexpected ${size}px taskbar icon size ($($bitmap.Width)x$($bitmap.Height))."
+                }
+
+                foreach ($variant in @("${size}_altform-unplated.png", "${size}_altform-lightunplated_theme-light.png")) {
+                  $assetName = "Square44x44Logo.targetsize-$variant"
+                  $assetPath = Join-Path $identityAssetDir $assetName
+                  $bitmap.Save($assetPath, [System.Drawing.Imaging.ImageFormat]::Png)
+                  $taskbarIconAssets += Get-Item -LiteralPath $assetPath
+                }
+              }
+              finally {
+                if ($graphics) { $graphics.Dispose() }
+                if ($bitmap) { $bitmap.Dispose() }
               }
             }
-            finally {
-              if ($bitmap) { $bitmap.Dispose() }
-              if ($icon) { $icon.Dispose() }
-            }
+          }
+          finally {
+            $sourceBitmap.Dispose()
+            $sourceStream.Dispose()
           }
           if ($taskbarIconAssets.Count -ne ($taskbarIconSizes.Count * 2)) {
             throw "Expected $($taskbarIconSizes.Count * 2) taskbar icon variants, generated $($taskbarIconAssets.Count)."
