@@ -296,7 +296,11 @@ namespace Files.App.Utils.Taskbar
 			{
 				_lastLaunchDate = DateTime.Now;
 
-				_ = Launcher.LaunchUriAsync(new Uri("files-dev:"));
+				// Multiple Files channels register this protocol; activate this package directly.
+				_ = Launcher.LaunchUriAsync(new Uri("files-dev:"), new LauncherOptions
+				{
+					TargetApplicationPackageFamilyName = Package.Current.Id.FamilyName
+				});
 			}
 			else
 				MainWindow.Instance.Activate();

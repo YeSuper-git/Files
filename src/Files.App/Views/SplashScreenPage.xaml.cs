@@ -12,12 +12,16 @@ namespace Files.App.Views
 	public sealed partial class SplashScreenPage : Page
 	{
 		private string BranchLabel =>
+#if FILES_EXTERNAL_LOCATION_BUILD
+			"max";
+#else
 			AppLifecycleHelper.AppEnvironment switch
 			{
 				AppEnvironment.Dev => "Dev",
 				AppEnvironment.SideloadPreview or AppEnvironment.StorePreview => "Preview",
 				_ => string.Empty,
 			};
+#endif
 
 		public SplashScreenPage()
 		{
