@@ -274,7 +274,9 @@ jobs:
           path: |
             artifacts/publish
             artifacts/server-publish
-          key: ${{ runner.os }}-files-max-publish-${{ inputs.fast_build }}-${{ hashFiles('src/**/*', 'Directory.*', 'global.json', 'NuGet.config', 'Files.slnx') }}
+          # Bind cached native-AOT output to the exact source commit so the
+          # executable and compiled XAML resources always come from one revision.
+          key: ${{ runner.os }}-files-max-publish-${{ inputs.fast_build }}-${{ github.sha }}-${{ hashFiles('src/**/*', 'Directory.*', 'global.json', 'NuGet.config', 'Files.slnx') }}
 
       - name: Use installer-only NuGet package directory
         if: ${{ inputs.fast_build == true && steps.restore-publish.outputs.cache-hit == 'true' }}
@@ -524,6 +526,13 @@ jobs:
           if (-not (Test-Path -LiteralPath (Join-Path $publishDir 'Files.exe'))) {
             throw 'Unpackaged Files.exe was not produced.'
           }
+
+          $publishedExe = Join-Path $publishDir 'Files.exe'
+          $publishedRevision = [Diagnostics.FileVersionInfo]::GetVersionInfo($publishedExe).ProductVersion
+          if (-not $publishedRevision -or -not $publishedRevision.Contains($env:GITHUB_SHA, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Published Files.exe does not match this workflow source revision. Expected '$($env:GITHUB_SHA)', found '$publishedRevision'."
+          }
+          Write-Host "Published Files.exe source revision verified: $publishedRevision."
 
           $runtimeFiles = @(Get-ChildItem -LiteralPath $publishDir -Filter 'Microsoft.WindowsAppRuntime*.dll' -File)
           if ($runtimeFiles.Count -eq 0) {
@@ -1136,6 +1145,12 @@ jobs:
             throw "Files.exe was not installed to '$installDir'."
           }
 
+          $installedRevision = [Diagnostics.FileVersionInfo]::GetVersionInfo($installedExe).ProductVersion
+          if (-not $installedRevision -or -not $installedRevision.Contains($env:GITHUB_SHA, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Installed Files.exe does not match this workflow source revision. Expected '$($env:GITHUB_SHA)', found '$installedRevision'."
+          }
+          Write-Host "Installed Files.exe source revision verified: $installedRevision."
+
           $identity = Get-AppxPackage -Name 'FilesDev' -ErrorAction SilentlyContinue |
             Where-Object { $_.Publisher -eq 'CN=Files' -and $_.Status -eq 'Ok' } |
             Select-Object -First 1
@@ -1231,6 +1246,15 @@ jobs:
             throw 'Files process stayed alive but did not create a visible main window within 30 seconds.'
           }
           Write-Host "Startup smoke test passed with process id $($appProcess.Id), window handle $($appProcess.MainWindowHandle), title '$($appProcess.MainWindowTitle)'."
+          Start-Sleep -Seconds 2
+          $localStateDir = Join-Path $env:LOCALAPPDATA "Packages\$($identity.PackageFamilyName)\LocalState"
+          $debugLog = Join-Path $localStateDir 'debug.log'
+          if (Test-Path -LiteralPath $debugLog) {
+            $homePageBindingFailure = Select-String -LiteralPath $debugLog -Pattern 'Files\.App\.Views\.HomePage\..*Bindings\.Connect\(Int32, Object\)' -Quiet
+            if ($homePageBindingFailure) {
+              throw 'Home page XAML binding failed during the startup smoke test.'
+            }
+          }
           Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
 
           $repairProcess = Start-Process -FilePath $setupPath -ArgumentList '/repair', '/quiet', '/norestart' -Wait -PassThru
