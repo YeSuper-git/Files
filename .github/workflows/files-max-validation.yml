@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  files-max-build:
     runs-on: windows-2025
     timeout-minutes: 35
     steps:
