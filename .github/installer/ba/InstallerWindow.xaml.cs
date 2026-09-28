@@ -71,7 +71,11 @@ public partial class InstallerWindow : Window
 
     public void SetVersion(string version)
     {
-        WelcomeVersionText.Text = $"版本 {version}";
+        var installerTitle = string.IsNullOrWhiteSpace(version)
+            ? "Files max 安装程序"
+            : $"Files max {version.Trim()} 安装程序";
+        Title = installerTitle;
+        InstallerTitleText.Text = installerTitle;
     }
 
     public void SetInstallFolder(string path, bool lockPath = false)
@@ -86,20 +90,20 @@ public partial class InstallerWindow : Window
 
     public void ShowWelcome()
     {
-        SetPage(WelcomePage, WelcomeActions, "第 1 步，共 3 步");
+        SetPage(WelcomePage, WelcomeActions);
         LicenseCheckBox.IsChecked = false;
         NextButton.IsEnabled = false;
     }
 
     public void ShowOptions()
     {
-        SetPage(OptionsPage, OptionsActions, "第 2 步，共 3 步");
+        SetPage(OptionsPage, OptionsActions);
         InstallButton.IsEnabled = LicenseAccepted && !string.IsNullOrWhiteSpace(InstallFolder);
     }
 
     public void ShowModify()
     {
-        SetPage(ModifyPage, ModifyActions, "管理已安装的应用");
+        SetPage(ModifyPage, ModifyActions);
     }
 
     public void ShowProgress(string header, string message)
@@ -109,7 +113,7 @@ public partial class InstallerWindow : Window
         displayedProgress = 0;
         targetProgress = 0;
         lastProgressTick = DateTime.UtcNow;
-        SetPage(ProgressPage, ProgressActions, "正在处理，请稍候");
+        SetPage(ProgressPage, ProgressActions);
         ProgressHeaderText.Text = string.IsNullOrWhiteSpace(header) ? "正在安装" : header;
         InstallProgressBar.Value = 0;
         ProgressPercentText.Text = "0%";
@@ -147,7 +151,7 @@ public partial class InstallerWindow : Window
     public void ShowComplete(string header, string description, bool canLaunch)
     {
         StopProgressAnimation();
-        SetPage(CompletePage, CompleteActions, "操作已完成");
+        SetPage(CompletePage, CompleteActions);
         CompleteHeaderText.Text = header;
         CompleteDescriptionText.Text = description;
         LaunchButton.Visibility = canLaunch ? Visibility.Visible : Visibility.Collapsed;
@@ -159,7 +163,7 @@ public partial class InstallerWindow : Window
     public void ShowFailure(string message, string? header = null, string? clipboardDetails = null)
     {
         StopProgressAnimation();
-        SetPage(FailurePage, FailureActions, "操作未完成");
+        SetPage(FailurePage, FailureActions);
         FailureHeaderText.Text = string.IsNullOrWhiteSpace(header) ? "安装失败" : header;
         CopyFailureDetailsButton.Content = "复制诊断信息";
         CopyFailureDetailsButton.ToolTip = "复制本次错误、操作编号及相关日志片段，便于直接发送排查";
@@ -210,7 +214,7 @@ public partial class InstallerWindow : Window
         Close();
     }
 
-    private void SetPage(FrameworkElement page, FrameworkElement actions, string step)
+    private void SetPage(FrameworkElement page, FrameworkElement actions)
     {
         WelcomePage.Visibility = Visibility.Collapsed;
         OptionsPage.Visibility = Visibility.Collapsed;
@@ -226,7 +230,6 @@ public partial class InstallerWindow : Window
         FailureActions.Visibility = Visibility.Collapsed;
         page.Visibility = Visibility.Visible;
         actions.Visibility = Visibility.Visible;
-        StepText.Text = step;
     }
 
     private void ProgressTimer_Tick(object? sender, EventArgs e)

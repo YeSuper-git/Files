@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using FilesMax.Installer.Bootstrapper;
 
 namespace FilesMax.Installer.Verification;
@@ -29,7 +30,16 @@ internal static class Program
 			Console.WriteLine(nativeFrameApplied
 				? "Window frame policy: native DWM border and rounded-corner attributes accepted."
 				: "Window frame policy: clipped rounded-corner fallback active.");
-			window.SetVersion("预览版本");
+			window.SetVersion("1.0.15");
+			Require(window.Title == "Files max 1.0.15 安装程序", "The native window title must include the current installer version.");
+			Require(Control<TextBlock>(window, "InstallerTitleText").Text == "Files max 1.0.15 安装程序", "The visible title bar must include the current installer version.");
+			Require(Control<TextBlock>(window, "ProgramDescriptionText").Text == "适用于 Windows 的现代化文件管理器", "The brand subtitle must describe Files max instead of calling it an installer.");
+			var welcomeDescription = Control<TextBlock>(window, "WelcomeDescriptionText");
+			Require(welcomeDescription.Text == "即将在这台电脑上安装Files max。\n请先确认许可条款。", "The welcome description must use the requested two-line copy.");
+			Require(welcomeDescription.Margin.Top >= 20, "The welcome description must sit lower below the heading.");
+			Require(Control<CheckBox>(window, "LicenseCheckBox").Margin.Top >= 20, "The license checkbox must follow the welcome copy with clear spacing.");
+			Require(window.FindName("WelcomeVersionText") is null, "The separate welcome-page version label must be removed.");
+			Require(window.FindName("StepText") is null, "The page step indicator must be removed.");
 			window.SetInstallFolder(@"C:\Program Files\Files max");
 			window.ShowWelcome();
 			var next = Control<Button>(window, "NextButton");
@@ -53,11 +63,10 @@ internal static class Program
 			Capture(window, output, "05-maintenance");
 			window.ShowProgress("正在安装", "正在复制应用文件……");
 			window.SetProgress(64, "正在复制应用文件……");
-			// Capture a settled frame without waiting for wall-clock animation timing.
-			var progress = Control<ProgressBar>(window, "InstallProgressBar");
-			progress.BeginAnimation(RangeBase.ValueProperty, null);
-			progress.Value = 64;
-			Require(Control<TextBlock>(window, "ProgressPercentText").Text == "64%", "Progress text must reflect the engine percentage.");
+			WaitUntil(
+				() => Control<TextBlock>(window, "ProgressPercentText").Text == "64%",
+				TimeSpan.FromSeconds(3),
+				"Progress text must reflect the engine percentage.");
 			Capture(window, output, "06-progress");
 			window.ShowComplete("安装完成", "Files max 已安装完成，可以开始使用了。", true);
 			Capture(window, output, "07-installed");
@@ -100,6 +109,27 @@ internal static class Program
 
 	private static T Control<T>(InstallerWindow window, string name) where T : FrameworkElement =>
 		window.FindName(name) as T ?? throw new InvalidOperationException($"Missing control: {name}");
+
+	private static void WaitUntil(Func<bool> condition, TimeSpan timeout, string failureMessage)
+	{
+		if (condition())
+			return;
+
+		var frame = new DispatcherFrame();
+		var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+		var deadline = DateTime.UtcNow + timeout;
+		timer.Tick += (_, _) =>
+		{
+			if (condition() || DateTime.UtcNow >= deadline)
+			{
+				timer.Stop();
+				frame.Continue = false;
+			}
+		};
+		timer.Start();
+		Dispatcher.PushFrame(frame);
+		Require(condition(), failureMessage);
+	}
 
 	private static void Require(bool condition, string message)
 	{

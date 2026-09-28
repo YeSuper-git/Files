@@ -220,7 +220,7 @@
 				<RowDefinition Height="44" /><RowDefinition Height="124" /><RowDefinition Height="*" /><RowDefinition Height="84" />
 			</Grid.RowDefinitions>
 			<Grid Background="Transparent" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-				<TextBlock Margin="20,0,0,0" VerticalAlignment="Center" Foreground="{StaticResource MutedTextBrush}" FontSize="12" Text="Files max 安装程序" />
+				<TextBlock x:Name="InstallerTitleText" Margin="20,0,0,0" VerticalAlignment="Center" Foreground="{StaticResource MutedTextBrush}" FontSize="12" Text="Files max 安装程序" />
 				<StackPanel Margin="0,4,6,4" HorizontalAlignment="Right" Orientation="Horizontal">
 					<Button x:Name="MinimizeButton" Click="MinimizeButton_Click" Style="{StaticResource TitleBarButtonStyle}" ToolTip="最小化" AutomationProperties.Name="最小化">
 						<Path Width="12" Height="12" Data="M1,6 L11,6" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1" />
@@ -238,22 +238,18 @@
 				</Border>
 				<StackPanel Grid.Column="1" Margin="20,0,0,0" VerticalAlignment="Center">
 					<TextBlock FontSize="30" FontWeight="SemiBold" Text="Files max" />
-					<TextBlock Margin="0,4,0,0" Foreground="{StaticResource MutedTextBrush}" Text="Windows 安装程序" />
+					<TextBlock x:Name="ProgramDescriptionText" Margin="0,4,0,0" Foreground="{StaticResource MutedTextBrush}" Text="适用于 Windows 的现代化文件管理器" />
 				</StackPanel>
 			</Grid>
 			<Border x:Name="ContentCard" Grid.Row="2" Margin="32,0,32,0" Padding="28"
 				Background="White" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="12">
 				<Grid>
 					<Grid x:Name="WelcomePage">
-						<Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+						<Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
 						<StackPanel>
 							<TextBlock Style="{StaticResource HeadingStyle}" Text="欢迎使用 Files max" />
-							<TextBlock Margin="0,12,0,0" Style="{StaticResource BodyStyle}" Text="即将在这台电脑上安装 Files max。&#x0a;请先确认许可条款，再选择安装位置。" />
-						</StackPanel>
-						<StackPanel Grid.Row="2">
-							<TextBlock x:Name="WelcomeVersionText" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Text="版本" />
-							<Border Margin="0,12,0,8" Height="1" Background="{StaticResource LineBrush}" />
-							<CheckBox x:Name="LicenseCheckBox" HorizontalAlignment="Left" Checked="LicenseCheckBox_Changed" Unchecked="LicenseCheckBox_Changed"
+							<TextBlock x:Name="WelcomeDescriptionText" Margin="0,20,0,0" Style="{StaticResource BodyStyle}" Text="即将在这台电脑上安装Files max。&#x0a;请先确认许可条款。" />
+							<CheckBox x:Name="LicenseCheckBox" Margin="0,24,0,0" HorizontalAlignment="Left" Checked="LicenseCheckBox_Changed" Unchecked="LicenseCheckBox_Changed"
 								Content="我同意许可条款和条件" Style="{StaticResource LicenseCheckBoxStyle}" />
 						</StackPanel>
 					</Grid>
@@ -322,7 +318,6 @@
 				</Grid>
 			</Border>
 			<Grid Grid.Row="3" Margin="32,24">
-				<TextBlock x:Name="StepText" VerticalAlignment="Center" Foreground="{StaticResource MutedTextBrush}" FontSize="12" Text="第 1 步，共 3 步" />
 				<StackPanel x:Name="WelcomeActions" HorizontalAlignment="Right" Orientation="Horizontal">
 					<Button x:Name="NextButton" Content="下一步" Click="NextButton_Click" Style="{StaticResource PrimaryButtonStyle}" IsEnabled="False" />
 					<Button x:Name="WelcomeCancelButton" Content="取消" Click="CancelButton_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0" />
