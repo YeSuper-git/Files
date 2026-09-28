@@ -45,6 +45,10 @@ VIAddVersionKey /LANG=2052 "FileDescription" "文件资源管理器安装程序"
 VIAddVersionKey /LANG=2052 "FileVersion" "${APP_VERSION}"
 VIAddVersionKey /LANG=2052 "ProductVersion" "${APP_VERSION}"
 
+!ifndef APP_DISPLAY_VERSION
+!define APP_DISPLAY_VERSION "${APP_VERSION}"
+!endif
+
 !include LogicLib.nsh
 !include ShellIntegration.nsh
 
@@ -78,7 +82,7 @@ Section "Install"
 
     WriteUninstaller "$INSTDIR\Uninstall.exe"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "DisplayName" "文件资源管理器"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "DisplayVersion" "${APP_VERSION}"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "DisplayVersion" "${APP_DISPLAY_VERSION}"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "Publisher" "YeSuper"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "InstallLocation" "$INSTDIR"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Files" "DisplayIcon" "$INSTDIR\Assets\AppTiles\Dev\Logo.ico"
@@ -94,7 +98,7 @@ Section "Uninstall"
     StrCpy $IdentityPackage "$INSTDIR\Files.Identity.msix"
 
     DetailPrint "正在注销文件资源管理器..."
-    nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$InstallScript" -Mode Uninstall -InstallDirectory "$INSTDIR" -IdentityPackagePath "$IdentityPackage" -PackageName "FilesDev" -Publisher "CN=Files" -ProductName "Files" -CertificateFileName "Files.cer" -LogFileName "Files-install.log"'
+    nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$InstallScript" -Mode Uninstall -IdentityVersion "${APP_VERSION}" -InstallDirectory "$INSTDIR" -IdentityPackagePath "$IdentityPackage" -PackageName "FilesDev" -Publisher "CN=Files" -ProductName "Files" -CertificateFileName "Files.cer" -LogFileName "Files-install.log"'
     Pop $0
     ${If} $0 != 0
         MessageBox MB_ICONEXCLAMATION|MB_OK "文件资源管理器身份清理失败。请关闭文件资源管理器后重新运行卸载程序。未删除任何文件。"

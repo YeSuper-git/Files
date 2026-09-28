@@ -10,7 +10,12 @@
       Compressed="yes">
 
     <SummaryInformation Description="Files max" Manufacturer="YeSuper" />
-    <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="电脑中已经安装了更新版本的 Files max。" />
+    <!-- Install/update the new external-location identity before removing the
+         previous MSI. Removing the identity first is treated as an app
+         uninstall by Windows and can delete its per-user LocalState. The old
+         MSI's version-scoped cleanup then sees the new identity and preserves
+         it. Keep harvested component identities stable for this late schedule. -->
+    <MajorUpgrade Schedule="afterInstallExecute" AllowDowngrades="yes" />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <!-- Ask the user to close Files during repair, upgrade, or uninstall so
@@ -52,12 +57,24 @@
          deterministic MSI components. Support files are authored separately
          because the identity registration custom actions need stable File ids. -->
     <ComponentGroup Id="ApplicationFiles" Directory="INSTALLFOLDER">
-      <Files Include="$(var.PayloadDir)\**" />
+      <Files Include="$(var.PayloadDir)\**">
+        <!-- e_sqlite3.dll is language-neutral but carries a file version. Give
+             its MSI File row LANGID 0 explicitly to satisfy ICE60. -->
+        <Exclude Files="$(var.PayloadDir)\e_sqlite3.dll" />
+      </Files>
+      <ComponentRef Id="SqliteNativeLibrary" />
     </ComponentGroup>
+
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="SqliteNativeLibrary" Guid="C9DF7897-A4C6-4E69-9BCB-4CFD59A0D530">
+        <File Id="SqliteNativeLibraryFile" Source="$(var.PayloadDir)\e_sqlite3.dll" DefaultLanguage="0" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
 
     <DirectoryRef Id="INSTALLSUPPORT">
       <Component Id="InstallerSupportFiles" Guid="E2600A42-10A0-4A04-B2AB-3DD40F14734B">
         <File Id="InstallAppScript" Source="$(var.InstallScript)" KeyPath="yes" />
+        <File Id="InstallAppLauncherScript" Source="$(var.InstallLauncherScript)" />
         <File Id="IdentityPackageFile" Source="$(var.IdentityPackage)" />
         <File Id="IdentityCertificateFile" Source="$(var.Certificate)" />
       </Component>
@@ -102,6 +119,19 @@
         </RegistryKey>
       </Component>
 
+      <!-- This canonical version marker lets the bootstrapper distinguish a
+           legacy 4.2.32 install (no marker) from a newer 1.0.x install, so an
+           archived older installer cannot overwrite the current product. -->
+      <Component Id="InstallerVersionMarker" Guid="B53029E0-AC47-49B6-949D-42B5D18A4DB2">
+        <RegistryValue
+            Root="HKLM"
+            Key="Software\YeSuper\Files"
+            Name="InstallerVersion"
+            Type="string"
+            Value="$(var.AppVersion)"
+            KeyPath="yes" />
+      </Component>
+
       <Component Id="DriveShellIntegration" Guid="3ED18D14-8C7B-4D30-9E83-B0874D6DD9ED">
         <RegistryKey Root="HKLM" Key="Software\Classes\Drive\shell\FilesYeSuper">
           <RegistryValue Name="MUIVerb" Value="在 Files max 中打开" Type="string" />
@@ -127,10 +157,13 @@
          but it is now invoked by a deferred WiX custom action. This action
          deliberately impersonates the installing user: Add-AppxPackage
          registers the external-location identity per user, so running it as
-         LocalSystem would register the package for the wrong account. -->
+         LocalSystem would register the package for the wrong account. The
+         launcher captures syntax errors before Install-App.ps1 can initialize
+         its own diagnostics. The script derives INSTALLFOLDER from its own
+         INSTALLSUPPORT location; do not pass a quoted path ending in a slash. -->
     <SetProperty
         Id="RegisterFilesIdentity"
-        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppScript]&quot; -Mode Install -InstallDirectory &quot;[INSTALLFOLDER].&quot; -LogFileName &quot;Files max Installer-script.log&quot;"
+        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppLauncherScript]&quot; -Mode Install -AttemptId &quot;[INSTALLERATTEMPTID]&quot; -LogFileName &quot;Files max Installer-script.log&quot; -ErrorFileName &quot;Files max Installer-error.log&quot;"
         Before="RegisterFilesIdentity"
         Sequence="execute"
         Condition="NOT Installed OR REINSTALL~=&quot;ALL&quot;" />
@@ -144,10 +177,10 @@
 
     <SetProperty
         Id="UnregisterFilesIdentity"
-        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppScript]&quot; -Mode Uninstall -LogFileName &quot;Files max Installer-script.log&quot;"
+        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;[#InstallAppLauncherScript]&quot; -Mode Uninstall -IdentityVersion &quot;$(var.IdentityVersion)&quot; -AttemptId &quot;[INSTALLERATTEMPTID]&quot; -LogFileName &quot;Files max Installer-script.log&quot; -ErrorFileName &quot;Files max Installer-error.log&quot;"
         Before="UnregisterFilesIdentity"
         Sequence="execute"
-        Condition="REMOVE=&quot;ALL&quot;" />
+        Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
     <CustomAction
         Id="UnregisterFilesIdentity"
         BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
@@ -158,7 +191,7 @@
 
     <InstallExecuteSequence>
       <Custom Action="RegisterFilesIdentity" After="InstallFiles" Condition="NOT Installed OR REINSTALL~=&quot;ALL&quot;" />
-      <Custom Action="UnregisterFilesIdentity" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot;" />
+      <Custom Action="UnregisterFilesIdentity" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
     </InstallExecuteSequence>
 
     <Feature Id="MainFeature" Title="Files max" Level="1">
@@ -166,6 +199,7 @@
       <ComponentRef Id="InstallerSupportFiles" />
       <ComponentRef Id="StartMenuShortcut" />
       <ComponentRef Id="DirectoryShellIntegration" />
+      <ComponentRef Id="InstallerVersionMarker" />
       <ComponentRef Id="DriveShellIntegration" />
       <ComponentRef Id="DirectoryBackgroundShellIntegration" />
     </Feature>

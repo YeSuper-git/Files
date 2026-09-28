@@ -21,9 +21,9 @@ namespace Files.App.Services
 		// MSIX AppInstaller flow cannot replace binaries installed outside the
 		// identity package, so never start it from this deployment.
 #if FILES_EXTERNAL_LOCATION_BUILD
-		private const bool PackageUpdatesSupported = false;
+		private static readonly bool PackageUpdatesSupported = false;
 #else
-		private const bool PackageUpdatesSupported = true;
+		private static readonly bool PackageUpdatesSupported = true;
 #endif
 
 		private const string SIDELOAD_STABLE = "https://cdn.files.community/files/stable/Files.Package.appinstaller";

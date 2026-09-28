@@ -35,5 +35,11 @@ GitHub Actions 会在构建时提供发布目录和签名的外部位置身份�
 会持久化，并以 `INSTALLFOLDER` 传给 MSI，因此安装选项页中选择的路径会同时用于 MSI 和身份
 注册脚本。
 
+MSI major upgrade 必须使用 `Schedule="afterInstallExecute"`：先在同一 `FilesDev` 包身份下更新
+外部位置身份包，再移除旧 MSI。Windows 会在同身份的包更新时保留应用数据，但注销包身份会清理
+`LocalState`；旧 MSI 自带的版本范围卸载逻辑会识别并保留已经更新的新身份包。不要把移除旧 MSI
+提前到新身份包注册之前，否则升级会被当成卸载后重装并丢失用户数据。进度页依 MSI 实际动作显示
+“安装新版”和“卸载旧版本”两个阶段。
+
 备用 NSIS 脚本保留在 `.github/installer` 中，作为兼容和回滚参考；WiX bundle 工作流不再使用
 这两个脚本。

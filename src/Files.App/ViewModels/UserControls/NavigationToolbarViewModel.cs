@@ -661,6 +661,11 @@ namespace Files.App.ViewModels.UserControls
 				?? throw new InvalidOperationException("The current shell page is no longer available.");
 			shellViewModel = shellPage.ShellViewModel
 				?? throw new InvalidOperationException("The current shell page does not have a view model.");
+#if FILES_RESOURCE_MANAGER
+			if (shellPage.CurrentPageType == typeof(Files.App.Views.ResourceManager.ResourceLibraryPage))
+				PathControlDisplayText = PathComponents.LastOrDefault()?.Path ?? shellViewModel.WorkingDirectory;
+			else
+#endif
 			PathControlDisplayText = shellViewModel.WorkingDirectory;
 		}
 

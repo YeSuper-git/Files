@@ -4,19 +4,45 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Forms;
+using System.Windows.Interop;
+using System.Windows.Threading;
 
 namespace FilesMax.Installer.Bootstrapper;
 
 public partial class InstallerWindow : Window
 {
     private const double WindowCornerRadius = 14;
+    private const int DwmWindowCornerPreference = 33;
+    private const int DwmWindowBorderColor = 34;
+    private const uint DwmCornerRound = 2;
+    private const uint DwmBorderColor = 0x00E6D9D1;
+
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll", PreserveSig = true)]
+    private static extern int DwmSetWindowAttribute(
+        IntPtr hwnd,
+        int attribute,
+        ref uint value,
+        uint valueSize);
+
     private bool allowClose;
     private bool suppressFolderChanged;
+    private string? failureClipboardDetails;
+    private readonly DispatcherTimer progressTimer;
+    private double displayedProgress;
+    private double targetProgress;
+    private DateTime lastProgressTick;
+    private Action? progressCompleted;
 
     public InstallerWindow()
     {
         InitializeComponent();
         InstallFolderTextBox.Text = string.Empty;
+        progressTimer = new DispatcherTimer(DispatcherPriority.Render)
+        {
+            Interval = TimeSpan.FromMilliseconds(20),
+        };
+        progressTimer.Tick += ProgressTimer_Tick;
+        ApplyDwmWindowPolicy();
     }
 
     public event EventHandler? NextRequested;
@@ -35,6 +61,8 @@ public partial class InstallerWindow : Window
 
     public event EventHandler? LicenseChanged;
 
+    public event EventHandler? OpenErrorLogRequested;
+
     public event EventHandler? FinalCloseRequested;
 
     public string InstallFolder => InstallFolderTextBox.Text.Trim();
@@ -43,20 +71,25 @@ public partial class InstallerWindow : Window
 
     public void SetVersion(string version)
     {
-        WelcomeVersionText.Text = $"版本 {version}";
+        var installerTitle = string.IsNullOrWhiteSpace(version)
+            ? "Files max 安装程序"
+            : $"Files max {version.Trim()} 安装程序";
+        Title = installerTitle;
+        InstallerTitleText.Text = installerTitle;
     }
 
-    public void SetInstallFolder(string path)
+    public void SetInstallFolder(string path, bool lockPath = false)
     {
         suppressFolderChanged = true;
         InstallFolderTextBox.Text = path;
         suppressFolderChanged = false;
+        InstallFolderTextBox.IsReadOnly = lockPath;
+        BrowseButton.IsEnabled = !lockPath;
         InstallButton.IsEnabled = LicenseAccepted && !string.IsNullOrWhiteSpace(path);
     }
 
     public void ShowWelcome()
     {
-        ContentCard.Height = 249;
         SetPage(WelcomePage, WelcomeActions);
         LicenseCheckBox.IsChecked = false;
         NextButton.IsEnabled = false;
@@ -64,54 +97,103 @@ public partial class InstallerWindow : Window
 
     public void ShowOptions()
     {
-        ContentCard.Height = 216;
         SetPage(OptionsPage, OptionsActions);
         InstallButton.IsEnabled = LicenseAccepted && !string.IsNullOrWhiteSpace(InstallFolder);
     }
 
     public void ShowModify()
     {
-        ContentCard.Height = 190;
-        SetPage(CompletePage, ModifyActions);
-        CompleteHeaderText.Text = "修改安装";
-        CompleteDescriptionText.Text = "请选择要执行的操作。";
+        SetPage(ModifyPage, ModifyActions);
     }
 
     public void ShowProgress(string header, string message)
     {
-        ContentCard.Height = 190;
+        progressTimer.Stop();
+        progressCompleted = null;
+        displayedProgress = 0;
+        targetProgress = 0;
+        lastProgressTick = DateTime.UtcNow;
         SetPage(ProgressPage, ProgressActions);
-        ProgressHeaderText.Text = string.IsNullOrWhiteSpace(header) ? "安装进度" : header;
+        ProgressHeaderText.Text = string.IsNullOrWhiteSpace(header) ? "正在安装" : header;
         InstallProgressBar.Value = 0;
+        ProgressPercentText.Text = "0%";
         ProgressMessageText.Text = string.IsNullOrWhiteSpace(message) ? "正在准备……" : message;
         ProgressActions.IsEnabled = true;
     }
 
     public void SetProgress(int percentage, string message)
     {
-        InstallProgressBar.Value = Math.Clamp(percentage, 0, 100);
+        targetProgress = Math.Max(targetProgress, Math.Clamp(percentage, 0, 100));
+        if (!string.IsNullOrWhiteSpace(message))
+            ProgressMessageText.Text = message;
+
+        if (targetProgress > displayedProgress && !progressTimer.IsEnabled)
+        {
+            lastProgressTick = DateTime.UtcNow;
+            progressTimer.Start();
+        }
+    }
+
+    public void CompleteProgressThen(Action completed)
+    {
+        progressCompleted = completed;
+        SetProgress(100, "正在完成最后的配置……");
+        if (displayedProgress >= 100)
+            FinishProgressAnimation();
+    }
+
+    public void SetProgressMessage(string message)
+    {
         if (!string.IsNullOrWhiteSpace(message))
             ProgressMessageText.Text = message;
     }
 
     public void ShowComplete(string header, string description, bool canLaunch)
     {
-        ContentCard.Height = 190;
+        StopProgressAnimation();
         SetPage(CompletePage, CompleteActions);
         CompleteHeaderText.Text = header;
         CompleteDescriptionText.Text = description;
         LaunchButton.Visibility = canLaunch ? Visibility.Visible : Visibility.Collapsed;
         LaunchButton.IsEnabled = canLaunch;
+        CompleteCloseButton.Content = canLaunch ? "仅关闭" : "关闭";
+        CompleteCloseButton.Style = (Style)FindResource(canLaunch ? "SecondaryButtonStyle" : "PrimaryButtonStyle");
     }
 
-    public void ShowFailure(string message, string? header = null)
+    public void ShowFailure(string message, string? header = null, string? clipboardDetails = null)
     {
-        ContentCard.Height = 249;
+        StopProgressAnimation();
         SetPage(FailurePage, FailureActions);
         FailureHeaderText.Text = string.IsNullOrWhiteSpace(header) ? "安装失败" : header;
+        CopyFailureDetailsButton.Content = "复制诊断信息";
+        CopyFailureDetailsButton.ToolTip = "复制本次错误、操作编号及相关日志片段，便于直接发送排查";
+        failureClipboardDetails = clipboardDetails;
         FailureMessageText.Text = string.IsNullOrWhiteSpace(message)
             ? "安装程序遇到问题，请查看日志后重试。"
             : message;
+    }
+
+    private void CopyFailureDetailsButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var details = string.IsNullOrWhiteSpace(failureClipboardDetails)
+                ? string.Join(Environment.NewLine, FailureHeaderText.Text, FailureMessageText.Text)
+                : failureClipboardDetails;
+            System.Windows.Clipboard.SetText(details);
+            CopyFailureDetailsButton.Content = "已复制诊断信息";
+            CopyFailureDetailsButton.ToolTip = "诊断信息已复制，可直接粘贴发送排查";
+        }
+        catch (Exception)
+        {
+            CopyFailureDetailsButton.Content = "无法复制";
+            CopyFailureDetailsButton.ToolTip = "复制失败，请选择下方文字手动复制";
+        }
+    }
+
+    private void OpenErrorLogButton_Click(object sender, RoutedEventArgs e)
+    {
+        OpenErrorLogRequested?.Invoke(this, EventArgs.Empty);
     }
 
     public void SetBusy(bool busy)
@@ -136,6 +218,7 @@ public partial class InstallerWindow : Window
     {
         WelcomePage.Visibility = Visibility.Collapsed;
         OptionsPage.Visibility = Visibility.Collapsed;
+        ModifyPage.Visibility = Visibility.Collapsed;
         ProgressPage.Visibility = Visibility.Collapsed;
         CompletePage.Visibility = Visibility.Collapsed;
         FailurePage.Visibility = Visibility.Collapsed;
@@ -147,11 +230,41 @@ public partial class InstallerWindow : Window
         FailureActions.Visibility = Visibility.Collapsed;
         page.Visibility = Visibility.Visible;
         actions.Visibility = Visibility.Visible;
-        Height = page == WelcomePage || page == FailurePage
-            ? 556
-            : page == OptionsPage
-                ? 524
-                : 498;
+    }
+
+    private void ProgressTimer_Tick(object? sender, EventArgs e)
+    {
+        var now = DateTime.UtcNow;
+        var elapsedSeconds = Math.Max(0, (now - lastProgressTick).TotalSeconds);
+        lastProgressTick = now;
+
+        // Burn reports real work in coarse jumps. Advance the visible value at
+        // a steady rate so the bar remains continuous without inventing work
+        // beyond the latest reported percentage.
+        displayedProgress = Math.Min(targetProgress, displayedProgress + elapsedSeconds * 42);
+        InstallProgressBar.Value = displayedProgress;
+        var displayedPercent = (int)Math.Floor(displayedProgress);
+        ProgressPercentText.Text = $"{displayedPercent}%";
+
+        if (displayedProgress >= targetProgress)
+            FinishProgressAnimation();
+    }
+
+    private void FinishProgressAnimation()
+    {
+        progressTimer.Stop();
+        displayedProgress = targetProgress;
+        InstallProgressBar.Value = displayedProgress;
+        ProgressPercentText.Text = $"{(int)displayedProgress}%";
+        var completed = progressCompleted;
+        progressCompleted = null;
+        completed?.Invoke();
+    }
+
+    private void StopProgressAnimation()
+    {
+        progressTimer.Stop();
+        progressCompleted = null;
     }
 
     private void LicenseCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -201,18 +314,6 @@ public partial class InstallerWindow : Window
 
     private void MinimizeButton_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 
-    private void MaximizeButton_Click(object sender, RoutedEventArgs e)
-    {
-        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
-    }
-
-    private void Window_StateChanged(object? sender, EventArgs e)
-    {
-        MaximizeIcon.Data = WindowState == WindowState.Maximized
-            ? Geometry.Parse("M4,3 H10 V9 M8,11 H2 V5")
-            : Geometry.Parse("M4,9 L10,3 M6,3 H10 V7 M2,6 V11 H7");
-    }
-
     private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         var width = OuterFrame.ActualWidth;
@@ -220,19 +321,66 @@ public partial class InstallerWindow : Window
         if (width <= 0 || height <= 0)
             return;
 
-        OuterFrame.Clip = new RectangleGeometry(
-            new Rect(0, 0, width, height),
-            WindowCornerRadius,
-            WindowCornerRadius);
+        UpdateWindowFrame();
+    }
+
+    private void UpdateWindowFrame()
+    {
+        var width = OuterFrame.ActualWidth;
+        var height = OuterFrame.ActualHeight;
+        if (width <= 0 || height <= 0)
+            return;
+
+        var nativeFrameApplied = ApplyDwmWindowPolicy();
+        OuterFrame.BorderThickness = nativeFrameApplied ? new Thickness(0) : new Thickness(1);
+        OuterFrame.Clip = nativeFrameApplied
+            ? null
+            : new RectangleGeometry(
+                new Rect(0, 0, width, height),
+                WindowCornerRadius,
+                WindowCornerRadius);
+    }
+
+    private bool ApplyDwmWindowPolicy()
+    {
+        try
+        {
+            var hwnd = new WindowInteropHelper(this).EnsureHandle();
+            var preference = DwmCornerRound;
+            var cornerResult = DwmSetWindowAttribute(
+                hwnd,
+                DwmWindowCornerPreference,
+                ref preference,
+                sizeof(uint));
+
+            // Let DWM draw the one-pixel border together with the rounded
+            // corners. This keeps the radius and antialiasing on one layer.
+            var borderColor = DwmBorderColor;
+            var borderResult = DwmSetWindowAttribute(
+                hwnd,
+                DwmWindowBorderColor,
+                ref borderColor,
+                sizeof(uint));
+
+            return cornerResult == 0 && borderResult == 0;
+        }
+        catch (DllNotFoundException)
+        {
+            // DWM is available on supported Windows desktop versions; keep a
+            // graceful fallback for older or unusual hosts.
+            return false;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            // The Win11-only attributes are unavailable on older hosts.
+            return false;
+        }
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ClickCount == 2)
-        {
-            MaximizeButton_Click(sender, e);
             return;
-        }
 
         if (e.LeftButton == MouseButtonState.Pressed)
             DragMove();

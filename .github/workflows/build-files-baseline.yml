@@ -133,12 +133,18 @@ jobs:
           $vcRedistPath = Join-Path $workspace 'artifacts\VC_redist.x64.exe'
           $pfxPath = Join-Path $workspace 'artifacts\sign.pfx'
 
-          $sourcePackageManifest = Join-Path $workspace 'src\Files.App\Package.appxmanifest'
-          [xml]$sourceManifest = Get-Content -LiteralPath $sourcePackageManifest
-          $appVersion = [string]$sourceManifest.Package.Identity.Version
-          if ($appVersion -notmatch '^\d+\.\d+\.\d+\.\d+$') {
-            throw "Invalid package version: $appVersion"
+          $versionFile = Join-Path $workspace '.github\installer\build-version.txt'
+          $installerVersion = (Get-Content -Raw -LiteralPath $versionFile).Trim()
+          if ($installerVersion -notmatch '^(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)$') {
+            throw "Invalid canonical installer version in '$versionFile': $installerVersion"
           }
+          $major = [int]$Matches.major
+          $minor = [int]$Matches.minor
+          $patch = [int]$Matches.patch
+          if ($major -lt 1 -or $major -gt 255 -or $minor -gt 255 -or $patch -gt 65535) {
+            throw "Canonical version exceeds Windows Installer limits: $installerVersion"
+          }
+          $appVersion = '{0}.{1}.{2}.0' -f $major, $minor, $patch
 
           New-Item -ItemType Directory -Path $identityDir -Force | Out-Null
           $identityManifestPath = Join-Path $identityDir 'AppxManifest.xml'
@@ -146,27 +152,119 @@ jobs:
           [xml]$identityManifest = Get-Content -LiteralPath $identityManifestPath
           $identityManifest.Package.Identity.Version = $appVersion
           $identityManifest.Save($identityManifestPath)
+          if ($identityManifest.Package.Identity.Version -ne $appVersion) {
+            throw "Generated baseline identity version mismatch: expected $appVersion, found $($identityManifest.Package.Identity.Version)."
+          }
 
           $identityAssetDir = Join-Path $identityDir 'Assets\AppTiles\Dev'
           New-Item -ItemType Directory -Path $identityAssetDir -Force | Out-Null
           Copy-Item "$workspace\src\Files.App\Assets\AppTiles\Dev\StoreLogo.scale-100.png" $identityAssetDir -Force
           Copy-Item "$workspace\src\Files.App\Assets\AppTiles\Dev\Square150x150Logo.scale-100.png" $identityAssetDir -Force
           Copy-Item "$workspace\src\Files.App\Assets\AppTiles\Dev\Square44x44Logo.scale-100.png" $identityAssetDir -Force
+          $taskbarIconSourceDir = Join-Path $workspace 'src\Files.App\Assets\AppTiles\Dev'
+          $taskbarIconSizes = @('16', '20', '24', '30', '32', '36', '40', '48', '60', '64', '72', '80', '96', '256')
+          $appIconPath = Join-Path $taskbarIconSourceDir 'Logo.ico'
+          if (-not (Test-Path -LiteralPath $appIconPath -PathType Leaf)) {
+            throw "The shared application icon is missing: $appIconPath"
+          }
+
+          # Windows chooses these package-identity variants for the running
+          # app's taskbar button. Keep them pixel-identical to the ICO used by
+          # the installer and native window icon instead of copying a second,
+          # independently maintained set of PNG artwork.
+          Add-Type -AssemblyName System.Drawing
+          $taskbarIconAssets = @()
+          foreach ($size in $taskbarIconSizes) {
+            $icon = $null
+            $bitmap = $null
+            try {
+              $icon = [System.Drawing.Icon]::new($appIconPath, [int]$size, [int]$size)
+              $bitmap = $icon.ToBitmap()
+              if ($bitmap.Width -ne [int]$size -or $bitmap.Height -ne [int]$size) {
+                throw "Logo.ico produced an unexpected ${size}px taskbar icon size ($($bitmap.Width)x$($bitmap.Height))."
+              }
+
+              foreach ($variant in @("${size}_altform-unplated.png", "${size}_altform-lightunplated_theme-light.png")) {
+                $assetName = "Square44x44Logo.targetsize-$variant"
+                $assetPath = Join-Path $identityAssetDir $assetName
+                $bitmap.Save($assetPath, [System.Drawing.Imaging.ImageFormat]::Png)
+                $taskbarIconAssets += Get-Item -LiteralPath $assetPath
+              }
+            }
+            finally {
+              if ($bitmap) { $bitmap.Dispose() }
+              if ($icon) { $icon.Dispose() }
+            }
+          }
+          if ($taskbarIconAssets.Count -ne ($taskbarIconSizes.Count * 2)) {
+            throw "Expected $($taskbarIconSizes.Count * 2) taskbar icon variants, generated $($taskbarIconAssets.Count)."
+          }
           $archiveAssetDir = Join-Path $identityDir 'Assets\archives'
           New-Item -ItemType Directory -Path $archiveAssetDir -Force | Out-Null
           Copy-Item "$workspace\src\Files.App\Assets\archives\ExtensionIcon.png" $archiveAssetDir -Force
 
           $makeAppx = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\makeappx.exe' |
             Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          $makePri = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\makepri.exe' |
+            Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
           $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe' |
             Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
-          if (-not $makeAppx -or -not $signtool) {
-            throw 'Windows SDK makeappx.exe or signtool.exe was not found.'
+          if (-not $makeAppx -or -not $makePri -or -not $signtool) {
+            throw 'Windows SDK makeappx.exe, makepri.exe, or signtool.exe was not found.'
           }
+
+          # The external-location identity package must index its alternate-form
+          # assets. Merely copying the unplated PNGs into the MSIX leaves them
+          # invisible to Windows resource selection, so the shell falls back to
+          # the plated VisualElements logo for taskbar icons.
+          $identityPriPath = Join-Path $identityDir 'resources.pri'
+          $identityPriConfigPath = Join-Path $identityDir 'priconfig.xml'
+          $identityPriDumpPath = Join-Path $identityDir 'resources-dump.xml'
+          & $makePri createconfig /cf $identityPriConfigPath /dq en-US
+          if ($LASTEXITCODE -ne 0) {
+            throw "Identity package PRI configuration creation failed with exit code $LASTEXITCODE."
+          }
+          & $makePri new /pr $identityDir /cf $identityPriConfigPath /mn $identityManifestPath /of $identityPriPath /o
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $identityPriPath -PathType Leaf)) {
+            throw "Identity package resources.pri generation failed with exit code $LASTEXITCODE."
+          }
+          & $makePri dump /if $identityPriPath /of $identityPriDumpPath
+          if ($LASTEXITCODE -ne 0) {
+            throw "Identity package resources.pri verification failed with exit code $LASTEXITCODE."
+          }
+          $identityPriDump = Get-Content -LiteralPath $identityPriDumpPath -Raw
+          $unindexedTaskbarIcons = @($taskbarIconAssets | Where-Object { $identityPriDump -notlike "*$($_.Name)*" })
+          if ($unindexedTaskbarIcons.Count -gt 0) {
+            throw "Identity resources.pri does not index taskbar variants: $($unindexedTaskbarIcons.Name -join ', ')"
+          }
+          Remove-Item -LiteralPath $identityPriConfigPath, $identityPriDumpPath -Force
+          Write-Host "Generated resources.pri and verified all $($taskbarIconAssets.Count) taskbar icon variants are indexed."
 
           & $makeAppx pack /o /d $identityDir /nv /p $identityPackage
           if ($LASTEXITCODE -ne 0) {
             throw "Identity package creation failed with exit code $LASTEXITCODE."
+          }
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $identityArchive = [IO.Compression.ZipFile]::OpenRead($identityPackage)
+          try {
+            if (-not $identityArchive.GetEntry('resources.pri')) {
+              throw 'Identity MSIX is missing resources.pri; Windows cannot resolve taskbar icon variants.'
+            }
+            $missingPackagedTaskbarIcons = @(
+              foreach ($asset in $taskbarIconAssets) {
+                $entryName = "Assets/AppTiles/Dev/$($asset.Name)"
+                if (-not $identityArchive.GetEntry($entryName)) {
+                  $entryName
+                }
+              }
+            )
+            if ($missingPackagedTaskbarIcons.Count -gt 0) {
+              throw "Identity MSIX is missing taskbar icon variants: $($missingPackagedTaskbarIcons -join ', ')"
+            }
+            Write-Host "Verified $($taskbarIconAssets.Count) taskbar icon variants inside the identity MSIX."
+          } finally {
+            $identityArchive.Dispose()
           }
 
           # Keep the baseline identity and installer signed with the same
@@ -198,6 +296,7 @@ jobs:
           $installScript = Join-Path $workspace 'Install-App.ps1'
           & 'C:\Program Files (x86)\NSIS\makensis.exe' `
             "/DAPP_VERSION=$appVersion" `
+            "/DAPP_DISPLAY_VERSION=$installerVersion" `
             "/DPAYLOAD_DIR=$publishDir" `
             "/DIDENTITY_PACKAGE=$identityPackage" `
             "/DINSTALL_SCRIPT=$installScript" `

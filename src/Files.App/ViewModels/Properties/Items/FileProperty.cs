@@ -325,33 +325,13 @@ namespace Files.App.ViewModels.Properties
 				}
 			}
 
-#if DEBUG
-			// This makes it much easier to debug issues with the property list
-			var keyValuePairs = new Dictionary<string, object?>();
-			foreach (var prop in propsToGet)
-			{
-				object? val = null;
-				try
-				{
-					if (file.Properties is not null)
-					{
-						val = (await file.Properties.RetrievePropertiesAsync((string[])[prop])).First().Value;
-					}
-				}
-				catch (ArgumentException e)
-				{
-					Debug.WriteLine($"Unable to retrieve system file property {prop}.\n{e}");
-				}
-				keyValuePairs.Add(prop, val);
-			}
-#else
+			// Batch the property query for media files; sequential queries are significantly slower in Debug builds.
 			IDictionary<string, object?> keyValuePairs = new Dictionary<string, object?>();
 			if (file.Properties is not null)
 			{
 				keyValuePairs = (await file.Properties.RetrievePropertiesAsync(propsToGet))
 					.ToDictionary(pair => pair.Key, pair => (object?)pair.Value);
 			}
-#endif
 
 			foreach (var prop in list)
 			{

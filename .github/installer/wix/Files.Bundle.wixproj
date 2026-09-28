@@ -10,7 +10,7 @@
     <VCRedistPath Condition="'$(VCRedistPath)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\VC_redist.x64.exe</VCRedistPath>
     <BootstrapperApplicationPath Condition="'$(BootstrapperApplicationPath)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\installer\ba\FilesMax.Installer.Bootstrapper.exe</BootstrapperApplicationPath>
     <BootstrapperApplicationPayloadsPath Condition="'$(BootstrapperApplicationPayloadsPath)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\installer\GeneratedBootstrapperPayloads.wxs</BootstrapperApplicationPayloadsPath>
-    <AppVersion Condition="'$(AppVersion)' == ''">1.0.0.0</AppVersion>
+    <AppVersion Condition="'$(AppVersion)' == ''">1.0.0</AppVersion>
     <ProductName Condition="'$(ProductName)' == ''">Files max</ProductName>
     <LogoFile Condition="'$(LogoFile)' == ''">$(MSBuildThisFileDirectory)..\..\..\src\Files.App\Assets\AppTiles\Dev\FilesSiameseCatLogo.png</LogoFile>
     <IconFile Condition="'$(IconFile)' == ''">$(MSBuildThisFileDirectory)..\..\..\src\Files.App\Assets\AppTiles\Dev\Logo.ico</IconFile>

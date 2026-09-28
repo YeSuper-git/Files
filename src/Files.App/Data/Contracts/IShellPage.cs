@@ -73,6 +73,7 @@ namespace Files.App.Data.Contracts
 #if FILES_RESOURCE_MANAGER
 		public void NavigateToResourceManager();
 		public void NavigateToResourceManagerTools();
+		public void NavigateToResourceLibraryLocation(NavigationArguments arguments);
 #endif
 
 		/// <summary>

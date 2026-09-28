@@ -333,9 +333,13 @@ namespace Files.App.Helpers
 #if FILES_RESOURCE_MANAGER
 					// Resource Manager
 					.AddSingleton<Files.App.Services.ResourceManager.IResourceWorkspaceService, Files.App.Services.ResourceManager.ResourceWorkspaceService>()
+					.AddSingleton<Files.App.Services.ResourceManager.IResourceTitleTranslationService, Files.App.Services.ResourceManager.AliyunMachineTranslationTitleTranslationService>()
+					.AddSingleton<Files.App.Services.ResourceManager.IBailianQwenMtTitleTranslationService, Files.App.Services.ResourceManager.AliyunBailianQwenMtTitleTranslationService>()
 					.AddSingleton<Files.App.Services.ResourceManager.IResourceCodeParser, Files.App.Services.ResourceManager.ResourceCodeParser>()
 					.AddSingleton<Files.App.Services.ResourceManager.IResourceScanner, Files.App.Services.ResourceManager.ResourceScanner>()
 					.AddSingleton<Files.App.Services.ResourceManager.IResourceBrowserService, Files.App.Services.ResourceManager.ResourceBrowserService>()
+					.AddSingleton<Files.App.Services.ResourceManager.VideoAssistantSearchService>()
+					.AddTransient<Files.App.ViewModels.Assistant.VideoAssistantViewModel>()
 					.AddSingleton<Files.App.Services.ResourceManager.IResourceOperationsService, Files.App.Services.ResourceManager.ResourceOperationsService>()
 					.AddTransient<Files.App.ViewModels.ResourceManager.ResourceManagerViewModel>()
 #endif

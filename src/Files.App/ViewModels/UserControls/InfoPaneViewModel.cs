@@ -2,6 +2,8 @@
 // Licensed under the MIT License.
 
 using Files.App.UserControls.FilePreviews;
+using Files.App.Data.Items.ResourceManager;
+using Files.App.ViewModels.Properties;
 using Files.App.ViewModels.Previews;
 using Files.Shared.Helpers;
 using Microsoft.Extensions.Logging;
@@ -53,9 +55,14 @@ namespace Files.App.ViewModels.UserControls
 
 				if (SetProperty(ref selectedItem, value))
 				{
+					OnPropertyChanged(nameof(PreviewRowHeight));
+					OnPropertyChanged(nameof(PropertiesRowHeight));
 					UpdateTagsItems();
 					SetDriveItem();
 					OnPropertyChanged(nameof(LoadTagsList));
+					OnPropertyChanged(nameof(DetailsTagsListVisibility));
+					OnPropertyChanged(nameof(DetailsOpenPropertiesVisibility));
+					RefreshResourceActorDetails();
 
 					if (value is not null)
 						value.PropertyChanged += SelectedItem_PropertyChanged;
@@ -101,7 +108,11 @@ namespace Files.App.ViewModels.UserControls
 			set
 			{
 				if (SetProperty(ref previewPaneState, value))
+				{
 					OnPropertyChanged(nameof(LoadTagsList));
+					OnPropertyChanged(nameof(DetailsTagsListVisibility));
+					OnPropertyChanged(nameof(DetailsOpenPropertiesVisibility));
+				}
 			}
 		}
 
@@ -140,7 +151,129 @@ namespace Files.App.ViewModels.UserControls
 			PreviewPaneState is PreviewPaneStates.NoPreviewAvailable ||
 			PreviewPaneState is PreviewPaneStates.PreviewAndDetailsAvailable;
 
+		public Visibility DetailsTagsListVisibility
+			=> SelectedItem is ResourceActorListedItem
+				? Visibility.Collapsed
+				: LoadTagsList ? Visibility.Visible : Visibility.Collapsed;
+
+		public Visibility DetailsOpenPropertiesVisibility
+			=> SelectedItem is ResourceActorListedItem or ResourceVideoFolderListedItem
+				? Visibility.Collapsed
+				: PreviewPaneState is PreviewPaneStates.NoPreviewAvailable or PreviewPaneStates.PreviewAndDetailsAvailable or PreviewPaneStates.DriveStorageDetailsAvailable
+					? Visibility.Visible
+					: Visibility.Collapsed;
+
+		public string SelectedItemDisplayName
+			=> SelectedItem is ResourceActorListedItem actor && !string.IsNullOrWhiteSpace(actor.ActorDetails.Name)
+				? actor.ActorDetails.Name
+				: SelectedItem is ResourceVideoFolderListedItem videoFolder && !string.IsNullOrWhiteSpace(videoFolder.DisplayTitle)
+					? videoFolder.DisplayTitle
+				: SelectedItem?.Name ?? string.Empty;
+
+		public Visibility ResourceVideoFolderTitleActionVisibility
+			=> SelectedItem is ResourceVideoFolderListedItem { ToggleTitleAsync: not null }
+				? Visibility.Visible
+				: Visibility.Collapsed;
+
+		public string ResourceVideoFolderTitleActionText
+			=> SelectedItem is ResourceVideoFolderListedItem videoFolder ? videoFolder.TitleActionText : string.Empty;
+
+		public async Task ToggleResourceVideoFolderTitleAsync()
+		{
+			if (SelectedItem is not ResourceVideoFolderListedItem { ToggleTitleAsync: { } toggleTitle })
+				return;
+
+			await toggleTitle();
+			OnPropertyChanged(nameof(SelectedItemDisplayName));
+			OnPropertyChanged(nameof(ResourceVideoFolderTitleActionText));
+		}
+
+		public GridLength PreviewRowHeight
+			=> new(2, GridUnitType.Star);
+
+		public GridLength PropertiesRowHeight
+			=> SelectedTab == InfoPaneTabs.Preview
+				? new GridLength(0)
+				: new GridLength(3, GridUnitType.Star);
+
+		public string SelectedActorAliases
+			=> SelectedItem is ResourceActorListedItem actor && !string.IsNullOrWhiteSpace(actor.ActorDetails.Aliases)
+				? actor.ActorDetails.Aliases
+				: "暂无";
+
+		public string SelectedActorBiography
+			=> SelectedItem is ResourceActorListedItem actor && !string.IsNullOrWhiteSpace(actor.ActorDetails.Biography)
+				? actor.ActorDetails.Biography
+				: "暂无";
+
+		public Visibility SelectedActorAliasesVisibility
+			=> SelectedItem is ResourceActorListedItem
+				? Visibility.Visible
+				: Visibility.Collapsed;
+
+		public Visibility ResourceActorDetailsVisibility
+			=> SelectedItem is ResourceActorListedItem ? Visibility.Visible : Visibility.Collapsed;
+
+		public ObservableCollection<FileProperty> ResourceActorProperties { get; } = [];
+
 		public ObservableCollection<TagsListItem> Items { get; } = [];
+
+		public async Task EditSelectedResourceActorAsync()
+		{
+			if (SelectedItem is not ResourceActorListedItem actor || actor.EditActorDetailsAsync is not { } editActorDetailsAsync)
+				return;
+
+			await editActorDetailsAsync();
+			RefreshResourceActorDetails();
+		}
+
+		private void RefreshResourceActorDetails()
+		{
+			ResourceActorProperties.Clear();
+			OnPropertyChanged(nameof(SelectedItemDisplayName));
+			OnPropertyChanged(nameof(ResourceVideoFolderTitleActionVisibility));
+			OnPropertyChanged(nameof(ResourceVideoFolderTitleActionText));
+			OnPropertyChanged(nameof(SelectedActorAliases));
+			OnPropertyChanged(nameof(SelectedActorBiography));
+			OnPropertyChanged(nameof(SelectedActorAliasesVisibility));
+			OnPropertyChanged(nameof(ResourceActorDetailsVisibility));
+
+			if (SelectedItem is not ResourceActorListedItem actor)
+				return;
+
+			var details = actor.ActorDetails;
+			AddActorProperty("出生日期", details.BirthDate?.ToString("yyyy-MM-dd") ?? string.Empty, "未知");
+			AddActorProperty("身高", string.IsNullOrWhiteSpace(details.HeightCm) ? string.Empty : $"{details.HeightCm} cm", "未知");
+			AddActorProperty("体重", string.IsNullOrWhiteSpace(details.WeightKg) ? string.Empty : $"{details.WeightKg} kg", "未知");
+
+			var measurements = new List<string>();
+			if (!string.IsNullOrWhiteSpace(details.Bust))
+				measurements.Add($"B {details.Bust}");
+			if (!string.IsNullOrWhiteSpace(details.Waist))
+				measurements.Add($"W {details.Waist}");
+			if (!string.IsNullOrWhiteSpace(details.Hip))
+				measurements.Add($"H {details.Hip}");
+			AddActorProperty("数值", string.Join(" / ", measurements), "未知");
+			AddActorProperty("罩杯", details.CupSize ?? string.Empty, "未知");
+			var career = details.CareerRetirementDate is { } retiredDate
+				? $"{retiredDate:yyyy-MM-dd} 退役"
+				: details.IsCurrentlyActive switch
+				{
+					true => "现役",
+					false => "退役",
+					_ => string.Empty,
+				};
+			AddActorProperty("生涯", career, "未知");
+		}
+
+		private void AddActorProperty(string name, string value, string emptyValue = "暂无")
+		{
+			ResourceActorProperties.Add(new FileProperty
+			{
+				LocalizedName = name,
+				Value = string.IsNullOrWhiteSpace(value) ? emptyValue : value,
+			});
+		}
 
 		public InfoPaneViewModel()
 		{
@@ -249,6 +382,13 @@ namespace Files.App.ViewModels.UserControls
 		private async Task<UserControl?> GetBuiltInPreviewControlAsync(ListedItem item, bool downloadItem)
 		{
 			ShowCloudItemButton = false;
+
+			if (item is ResourceActorListedItem actorItem)
+			{
+				var actorPosterPreview = new ActorPosterPreview(actorItem);
+				await actorPosterPreview.LoadAsync();
+				return actorPosterPreview;
+			}
 
 			if (item.IsRecycleBinItem)
 			{
@@ -490,6 +630,7 @@ namespace Files.App.ViewModels.UserControls
 			if (e.PropertyName is nameof(infoPaneSettingsService.SelectedTab))
 			{
 				OnPropertyChanged(nameof(SelectedTab));
+				OnPropertyChanged(nameof(PropertiesRowHeight));
 
 				// The preview will need refreshing as the file details won't be accurate
 				var shouldUpdatePreview = ((MainWindow.Instance.Content as Frame)?.Content as MainPage)?.ViewModel.ShouldPreviewPaneBeActive;
@@ -563,9 +704,20 @@ namespace Files.App.ViewModels.UserControls
 		private void SelectedItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{
 			if (e.PropertyName is nameof(ListedItem.HasTags))
+			{
 				OnPropertyChanged(nameof(LoadTagsList));
+				OnPropertyChanged(nameof(DetailsTagsListVisibility));
+			}
 			else if (e.PropertyName is nameof(ListedItem.FileTagsUI))
 				UpdateTagsItems();
+			else if (e.PropertyName is nameof(ResourceVideoFolderListedItem.DisplayTitle)
+				or nameof(ResourceVideoFolderListedItem.TitleActionText)
+				or nameof(ResourceVideoFolderListedItem.ToggleTitleAsync))
+			{
+				OnPropertyChanged(nameof(SelectedItemDisplayName));
+				OnPropertyChanged(nameof(ResourceVideoFolderTitleActionVisibility));
+				OnPropertyChanged(nameof(ResourceVideoFolderTitleActionText));
+			}
 		}
 
 		private void UpdateTagsItems()

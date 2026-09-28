@@ -19,6 +19,15 @@ This project is a C#/.NET WinUI 3 desktop app; an alternative to File Explorer.
 - Keep implementation scoped to the requested behavior. Avoid opportunistic refactors, formatting churn, dependency updates, and generated file edits.
 - Treat tool output as evidence. When behavior changes, run the focused build that can prove it and report anything left unverified.
 
+## Files max branches and releases
+
+- Use a separate Git worktree and feature branch for each active task. Do not edit another task's worktree.
+- Treat `main` as the only Files max integration and official installer source. Do not push feature changes directly to `main`.
+- After local build and requested user review, push the task branch and open a focused pull request against `main`. Resolve conflicts against current `main` and merge only after required checks pass.
+- Keep unfinished work on its feature branch. Preview builds from feature branches must be identified as previews.
+- Build an official installer only when the user requests it, from the current `main` commit. Record the source commit and version, and verify installation and startup before sharing the artifact.
+- Change the installer version through a reviewed commit or pull request. Building an installer must not commit or push a version change.
+
 ## Code Review Rules
 
 ### Native interop

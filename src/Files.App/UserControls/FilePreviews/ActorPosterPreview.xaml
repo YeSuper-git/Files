@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+	x:Class="Files.App.UserControls.FilePreviews.ActorPosterPreview"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	d:DesignHeight="300"
+	d:DesignWidth="240"
+	mc:Ignorable="d">
+	<Grid Background="Transparent">
+		<Grid
+			x:Name="PosterViewport"
+			Background="Transparent"
+			PointerEntered="PosterViewport_PointerEntered"
+			PointerExited="PosterViewport_PointerExited">
+			<Grid.ContextFlyout>
+				<MenuFlyout>
+					<MenuFlyoutItem
+						x:Name="AddPosterMenuItem"
+						Text="添加海报"
+						Click="AddPosterMenuItem_Click"
+						Visibility="{x:Bind PosterActionsVisibility, Mode=OneWay}" />
+					<MenuFlyoutItem
+						x:Name="SetMainPosterMenuItem"
+						Text="设为主海报"
+						IsEnabled="False"
+						Click="SetMainPosterMenuItem_Click"
+						Visibility="{x:Bind PosterActionsVisibility, Mode=OneWay}" />
+					<MenuFlyoutItem
+						x:Name="DeletePosterMenuItem"
+						Text="删除当前海报"
+						Click="DeletePosterMenuItem_Click"
+						Visibility="{x:Bind PosterActionsVisibility, Mode=OneWay}" />
+					<MenuFlyoutSeparator Visibility="{x:Bind PosterActionsVisibility, Mode=OneWay}" />
+					<MenuFlyoutItem
+						x:Name="SaveOriginalMenuItem"
+						Text="保存原图"
+						Click="SaveOriginalMenuItem_Click" />
+				</MenuFlyout>
+			</Grid.ContextFlyout>
+			<Image x:Name="PosterImage" Stretch="Uniform">
+				<Image.RenderTransform>
+					<TranslateTransform x:Name="PosterTranslateTransform" />
+				</Image.RenderTransform>
+			</Image>
+			<Border
+				HorizontalAlignment="Center"
+				VerticalAlignment="Bottom"
+				Margin="0,0,0,8"
+				Padding="9,3"
+				Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+				CornerRadius="10">
+				<TextBlock
+					x:Name="PosterCountText"
+					Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+					FontSize="12" />
+			</Border>
+			<Button
+				x:Name="PreviousButton"
+				Width="32"
+				Height="32"
+				MinWidth="32"
+				Padding="0"
+				HorizontalAlignment="Left"
+				VerticalAlignment="Center"
+				Margin="6,0"
+				Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+				BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+				BorderThickness="1"
+				CornerRadius="16"
+				Click="PreviousButton_Click"
+				Visibility="Collapsed"
+				ToolTipService.ToolTip="上一张海报"
+				AutomationProperties.Name="上一张海报">
+				<SymbolIcon Symbol="Back" />
+			</Button>
+			<TextBlock
+				x:Name="EmptyPosterText"
+				HorizontalAlignment="Center"
+				VerticalAlignment="Center"
+				Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+				Text="暂无海报"
+				Visibility="Collapsed" />
+			<Button
+				x:Name="NextButton"
+				Width="32"
+				Height="32"
+				MinWidth="32"
+				Padding="0"
+				HorizontalAlignment="Right"
+				VerticalAlignment="Center"
+				Margin="6,0"
+				Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+				BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+				BorderThickness="1"
+				CornerRadius="16"
+				Click="NextButton_Click"
+				Visibility="Collapsed"
+				ToolTipService.ToolTip="下一张海报"
+				AutomationProperties.Name="下一张海报">
+				<SymbolIcon Symbol="Forward" />
+			</Button>
+		</Grid>
+	</Grid>
+</UserControl>

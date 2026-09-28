@@ -10,9 +10,17 @@ namespace Files.App.Data.Models.ResourceManager;
 /// </summary>
 public sealed class ResourceWorkspaceState
 {
-    public int Version { get; set; } = 1;
+    public int Version { get; set; } = 6;
     public string LibraryPath { get; set; } = string.Empty;
     public List<string> RecentLibraries { get; set; } = [];
     public ResourceSettings Settings { get; set; } = new();
     public Dictionary<string, string> PosterOverrides { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<string> HiddenActorFolders { get; set; } = [];
+    public Dictionary<string, ResourceActorDetails> ActorDetails { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<ResourceTagDefinition> ResourceTags { get; set; } = [];
+    public Dictionary<string, List<string>> ResourceTagAssignments { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, ResourceVideoWatchStatus> VideoWatchStatuses { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, DateTimeOffset> VideoLastWatchedAt { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, ResourceVideoTitleTranslation> VideoTitleTranslations { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<ResourceToolSnapshot> ResourceToolSnapshots { get; set; } = [];
 }

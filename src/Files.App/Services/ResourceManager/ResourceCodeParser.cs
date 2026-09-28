@@ -11,6 +11,9 @@ public sealed partial class ResourceCodeParser : IResourceCodeParser
     [GeneratedRegex(@"(?<![a-zA-Z0-9])([a-zA-Z]{2,6})-?(\d{1,6})(?![a-zA-Z0-9])", RegexOptions.IgnoreCase)]
     private static partial Regex CodePattern();
 
+    [GeneratedRegex(@"(?<![a-zA-Z0-9])[a-zA-Z]{2,6}-?\d{1,6}-C(?![a-zA-Z0-9])", RegexOptions.IgnoreCase)]
+    private static partial Regex ChineseSubtitleCodeSuffixPattern();
+
     private static readonly string[] DefaultSubKeywords = ["中文字幕", "中字", "中文", "chinese", "chs", "cht", "sub", "字幕"];
 
     public ResourceCodeInfo? ParseCode(string name)
@@ -29,6 +32,7 @@ public sealed partial class ResourceCodeParser : IResourceCodeParser
     public bool HasChineseSubtitle(string name, IReadOnlyList<string> keywords)
     {
         if (string.IsNullOrWhiteSpace(name)) return false;
+        if (ChineseSubtitleCodeSuffixPattern().IsMatch(name)) return true;
         var lower = name.ToLowerInvariant();
         return (keywords ?? []).Any(k => !string.IsNullOrWhiteSpace(k) && lower.Contains(k, StringComparison.OrdinalIgnoreCase));
     }

@@ -38,9 +38,10 @@ namespace Files.App
 			AppWindow.TitleBar.ButtonPressedBackgroundColor = Colors.Transparent;
 			AppWindow.TitleBar.ButtonHoverBackgroundColor = Colors.Transparent;
 
-			// Deferred: reads the .ico from disk
-			DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
-				AppWindow.SetIcon(AppLifecycleHelper.AppIconPath));
+			// Use the installer's Logo.ico for the native window icon. The installer
+			// build also derives the package-identity taskbar variants from this ICO,
+			// because Windows selects those assets for the running app's taskbar button.
+			AppWindow.SetIcon(AppLifecycleHelper.AppIconPath);
 		}
 
 		public void ShowSplashScreen()

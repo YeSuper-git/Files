@@ -5,6 +5,7 @@ using Files.App.Data.Items;
 using Files.App.Utils.Storage;
 using Files.Shared.Helpers;
 using Microsoft.Extensions.Logging;
+using Microsoft.UI.Xaml;
 using System.ComponentModel;
 using System.Text;
 using System.Windows.Input;

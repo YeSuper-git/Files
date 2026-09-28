@@ -1,6 +1,10 @@
 ﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
+#if FILES_RESOURCE_MANAGER
+using Files.App.Views.Shells;
+#endif
+
 namespace Files.App.Actions
 {
 	[GeneratedRichCommand]
@@ -44,6 +48,15 @@ namespace Files.App.Actions
 		{
 			if (context.ShellPage is not { } shellPage)
 				return;
+
+#if FILES_RESOURCE_MANAGER
+			if (shellPage is ModernShellPage { CurrentResourceLibraryPage: { } resourceLibraryPage })
+			{
+				await UIFilesystemHelpers.PasteItemAsync(resourceLibraryPage.CurrentPath, shellPage);
+				await resourceLibraryPage.RefreshAsync();
+				return;
+			}
+#endif
 
 			var shellViewModel = shellPage.GetRequiredShellViewModel();
 			string path = shellViewModel.WorkingDirectory!;

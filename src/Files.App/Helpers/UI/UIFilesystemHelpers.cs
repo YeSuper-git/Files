@@ -94,6 +94,13 @@ namespace Files.App.Helpers
 		public static async Task CreateFileFromDialogResultTypeAsync(AddItemDialogItemType itemType, ShellNewEntry? itemInfo, IShellPage associatedInstance)
 		{
 			await CreateFileFromDialogResultTypeForResult(itemType, itemInfo, associatedInstance);
+#if FILES_RESOURCE_MANAGER
+			if (associatedInstance is Files.App.Views.Shells.ModernShellPage { CurrentResourceLibraryPage: { } resourceLibraryPage })
+			{
+				await resourceLibraryPage.RefreshAsync();
+				return;
+			}
+#endif
 			await associatedInstance.RefreshIfNoWatcherExistsAsync();
 		}
 
@@ -101,6 +108,11 @@ namespace Files.App.Helpers
 		{
 			string? currentPath = null;
 
+#if FILES_RESOURCE_MANAGER
+			if (associatedInstance is Files.App.Views.Shells.ModernShellPage { CurrentResourceLibraryPage: { } resourceLibraryPage })
+				currentPath = resourceLibraryPage.CurrentPath;
+			else
+#endif
 			if (associatedInstance.SlimContentPage is not null)
 			{
 				var shellViewModel = associatedInstance.GetRequiredShellViewModel();
@@ -201,6 +213,10 @@ namespace Files.App.Helpers
 		{
 			var currentPath = associatedInstance is null
 				? null
+#if FILES_RESOURCE_MANAGER
+				: associatedInstance is Files.App.Views.Shells.ModernShellPage { CurrentResourceLibraryPage: { } resourceLibraryPage }
+					? resourceLibraryPage.CurrentPath
+#endif
 				: associatedInstance.GetRequiredShellViewModel().WorkingDirectory;
 
 			if (App.LibraryManager.TryGetLibrary(currentPath ?? string.Empty, out var library) && !library.IsEmpty)
@@ -216,7 +232,16 @@ namespace Files.App.Helpers
 			}
 
 			if (associatedInstance is not null)
+			{
+#if FILES_RESOURCE_MANAGER
+				if (associatedInstance is Files.App.Views.Shells.ModernShellPage { CurrentResourceLibraryPage: { } shortcutResourcePage })
+				{
+					await shortcutResourcePage.RefreshAsync();
+					return;
+				}
+#endif
 				await associatedInstance.RefreshIfNoWatcherExistsAsync();
+			}
 		}
 
 		public static async Task CreateShortcutFromDialogAsync(IShellPage associatedInstance)

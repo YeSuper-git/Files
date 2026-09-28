@@ -241,6 +241,11 @@ namespace Files.App.Views.Shells
 		{
 			this.FindAscendant<ColumnsLayoutPage>()?.ParentShellPageInstance?.NavigateToResourceManagerTools();
 		}
+
+		public override void NavigateToResourceLibraryLocation(NavigationArguments arguments)
+		{
+			this.FindAscendant<ColumnsLayoutPage>()?.ParentShellPageInstance?.NavigateToResourceLibraryLocation(arguments);
+		}
 #endif
 
 		public override void NavigateToSettings(string? selectItem = null)

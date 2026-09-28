@@ -11,10 +11,12 @@ namespace Files.App.Data.Items
 
 		public string? ChevronToolTip { get; set; }
 
+		public bool? ChevronVisibilityOverride { get; set; }
+
 		// Only enumerable for fully qualified filesystem paths. Excludes the search-results
 		// placeholder (Path == null), shell virtual locations ("Shell:..." / "Home" / "Settings"
 		// / "ReleaseNotes"), and other non-fileystem entries that GetSubfolders can't enumerate.
-		public bool IsChevronVisible =>
-			!string.IsNullOrEmpty(Path) && SystemIO.Path.IsPathFullyQualified(Path);
+		public bool IsChevronVisible => ChevronVisibilityOverride ??
+			(!string.IsNullOrEmpty(Path) && SystemIO.Path.IsPathFullyQualified(Path));
 	}
 }

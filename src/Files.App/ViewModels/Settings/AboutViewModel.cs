@@ -23,7 +23,7 @@ namespace Files.App.ViewModels.Settings
 		// Properties
 
 		public string Version
-			=> string.Format($"{Strings.SettingsAboutVersionTitle.GetLocalizedResource()} {AppVersion.Major}.{AppVersion.Minor}.{AppVersion.Build}.{AppVersion.Revision}");
+			=> string.Format($"{Strings.SettingsAboutVersionTitle.GetLocalizedResource()} {GetAppVersion()}");
 
 		public string AppName
 			=> Package.Current.DisplayName;
@@ -187,7 +187,9 @@ namespace Files.App.ViewModels.Settings
 
 		public string GetAppVersion()
 		{
-			return $"{AppVersion.Major}.{AppVersion.Minor}.{AppVersion.Build}.{AppVersion.Revision}";
+			return AppVersion.Revision == 0
+				? $"{AppVersion.Major}.{AppVersion.Minor}.{AppVersion.Build}"
+				: $"{AppVersion.Major}.{AppVersion.Minor}.{AppVersion.Build}.{AppVersion.Revision}";
 		}
 
 		public string GetWindowsVersion()

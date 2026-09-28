@@ -407,17 +407,6 @@
 			Orientation="Horizontal"
 			Spacing="4">
 
-			<!--  Resource Manager tools for the currently scoped native browser  -->
-			<Button
-				x:Name="ResourceManagerButton"
-				x:Load="{x:Bind ViewModel.IsResourceManagerMode, Mode=OneWay}"
-				AutomationProperties.Name="资源工具"
-				Click="ResourceManagerButton_Click"
-				Style="{StaticResource AddressToolbarButtonStyle}"
-				ToolTipService.ToolTip="资源工具">
-				<FontIcon FontSize="14" Glyph="&#xE8B7;" />
-			</Button>
-
 			<!--  Shelf Pane  -->
 			<ToggleButton
 				x:Name="ShelfPaneToggleButton"

@@ -95,6 +95,7 @@
 			<!--  Compact stand-in for the folder and selection info  -->
 			<Button
 				x:Name="StatusButton"
+				Grid.Row="0"
 				Height="24"
 				Padding="8,0,8,0"
 				HorizontalAlignment="Left"

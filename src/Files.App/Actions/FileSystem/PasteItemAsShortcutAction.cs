@@ -1,6 +1,10 @@
 ﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
+#if FILES_RESOURCE_MANAGER
+using Files.App.Views.Shells;
+#endif
+
 namespace Files.App.Actions
 {
 	[GeneratedRichCommand]
@@ -36,10 +40,23 @@ namespace Files.App.Actions
 			if (context.ShellPage is not { } shellPage)
 				return Task.CompletedTask;
 
+#if FILES_RESOURCE_MANAGER
+			if (shellPage is ModernShellPage { CurrentResourceLibraryPage: { } resourceLibraryPage })
+				return PasteIntoResourceLibraryAsync(resourceLibraryPage, shellPage);
+#endif
+
 			var shellViewModel = shellPage.GetRequiredShellViewModel();
 			string path = shellViewModel.WorkingDirectory!;
 			return UIFilesystemHelpers.PasteItemAsShortcutAsync(path, shellPage);
 		}
+
+#if FILES_RESOURCE_MANAGER
+		private static async Task PasteIntoResourceLibraryAsync(Files.App.Views.ResourceManager.ResourceLibraryPage resourceLibraryPage, IShellPage shellPage)
+		{
+			await UIFilesystemHelpers.PasteItemAsShortcutAsync(resourceLibraryPage.CurrentPath, shellPage);
+			await resourceLibraryPage.RefreshAsync();
+		}
+#endif
 
 		public bool GetIsExecutable()
 		{

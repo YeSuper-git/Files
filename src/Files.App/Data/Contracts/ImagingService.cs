@@ -3,7 +3,6 @@
 
 using Files.Shared.Utils;
 using Microsoft.Extensions.Logging;
-using Windows.Storage.FileProperties;
 
 namespace Files.App.Data.Contracts
 {
@@ -20,17 +19,17 @@ namespace Files.App.Data.Contracts
 			return bitmapImage is null ? null : new BitmapImageModel(bitmapImage);
 		}
 
-		public async Task<IImage?> GetImageModelFromDataAsync(byte[]? rawData)
+		public async Task<IImage?> GetImageFromDataAsync(byte[]? rawData)
 		{
 			return new BitmapImageModel(await BitmapHelper.ToBitmapAsync(rawData));
 		}
 
-		public async Task<IImage?> GetImageModelFromPathAsync(string filePath, uint thumbnailSize = 64)
+		public async Task<IImage?> GetImageFromPathAsync(string filePath, uint thumbnailSize = 64)
 		{
 			try
 			{
-				if (await FileThumbnailHelper.LoadIconFromPathAsync(filePath, thumbnailSize, ThumbnailMode.ListView, ThumbnailOptions.ResizeThumbnail) is byte[] imageBuffer)
-					return await GetImageModelFromDataAsync(imageBuffer);
+				if (await FileThumbnailHelper.GetIconAsync(filePath, thumbnailSize, false, IconOptions.None) is byte[] imageBuffer)
+					return await GetImageFromDataAsync(imageBuffer);
 			}
 			catch (Exception ex)
 			{

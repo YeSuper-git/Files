@@ -11,6 +11,9 @@ using Microsoft.UI.Xaml.Media.Imaging;
 using System.IO;
 using Windows.Win32.UI.WindowsAndMessaging;
 using WinRT;
+#if FILES_RESOURCE_MANAGER
+using Files.App.Views.Shells;
+#endif
 using DispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue;
 using DispatcherQueueTimer = Microsoft.UI.Dispatching.DispatcherQueueTimer;
 using FlyoutPlacementMode = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode;
@@ -47,6 +50,7 @@ namespace Files.App.UserControls
 		private void Toolbar_Loaded(object sender, RoutedEventArgs e)
 		{
 			foreach (var cmd in Commands) cmd.PropertyChanged += Command_PropertyChanged;
+			PageContext.PropertyChanged += PageContext_PropertyChanged;
 			RequestToolbarRefresh(true);
 			UserSettingsService.AppearanceSettingsService.PropertyChanged += AppearanceSettings_PropertyChanged;
 		}
@@ -54,6 +58,7 @@ namespace Files.App.UserControls
 		private void Toolbar_Unloaded(object sender, RoutedEventArgs e)
 		{
 			foreach (var cmd in Commands) cmd.PropertyChanged -= Command_PropertyChanged;
+			PageContext.PropertyChanged -= PageContext_PropertyChanged;
 			DetachToggleButtons();
 			UserSettingsService.AppearanceSettingsService.PropertyChanged -= AppearanceSettings_PropertyChanged;
 			if (editTagsMenu is not null)
@@ -91,6 +96,15 @@ namespace Files.App.UserControls
 		{
 			if (e.PropertyName is nameof(CurrentInstanceViewModel.IsPageTypeNotHome)
 				or nameof(CurrentInstanceViewModel.IsPageTypeRecycleBin))
+				RequestToolbarRefresh(false);
+		}
+
+		private void PageContext_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+		{
+			if (e.PropertyName is nameof(IContentPageContext.ShellPage)
+				or nameof(IContentPageContext.PageType)
+				or nameof(IContentPageContext.PageLayoutType)
+				or nameof(IContentPageContext.Folder))
 				RequestToolbarRefresh(false);
 		}
 
@@ -152,7 +166,59 @@ namespace Files.App.UserControls
 			}
 
 			UpdateCommandBarSeparatorVisibility(ContextCommandBar.PrimaryCommands);
+			#if FILES_RESOURCE_MANAGER
+			AppendResourceLibraryActions();
+			#endif
+			UpdateCommandBarSeparatorVisibility(ContextCommandBar.PrimaryCommands);
 		}
+
+#if FILES_RESOURCE_MANAGER
+		private void AppendResourceLibraryActions()
+		{
+			if (PageContext.ShellPage is not ModernShellPage { CurrentResourceLibraryPage: { } resourcePage })
+				return;
+
+			if (ContextCommandBar.PrimaryCommands.LastOrDefault() is not AppBarSeparator)
+				ContextCommandBar.PrimaryCommands.Add(new AppBarSeparator());
+
+			AddResourceAction(
+				"管理隐藏项",
+				"ResourceManageHiddenActors",
+				new RichGlyph(themedIconStyle: "App.ThemedIcons.Status.Hidden"),
+				async _ => await resourcePage.ManageHiddenActorsAsync());
+			AddResourceAction(
+				"更换资源路径",
+				"ResourceChangeLibraryPath",
+				new RichGlyph(themedIconStyle: "App.ThemedIcons.Omnibar.Path"),
+				async _ => await resourcePage.ChooseLibraryAsync());
+			AddResourceAction(
+				"格式优化",
+				"ResourceFormatOptimization",
+				new RichGlyph(themedIconStyle: "App.ThemedIcons.Rename"),
+				anchor =>
+				{
+					resourcePage.ShowFormatOptimization(anchor);
+					return Task.CompletedTask;
+				});
+			AddResourceAction(
+				"导入演员",
+				"ResourceImportActors",
+				new RichGlyph("\uE8D4", "SymbolThemeFontFamily"),
+				async _ => await resourcePage.ImportActorsAsync());
+		}
+
+		private void AddResourceAction(string label, string automationId, RichGlyph glyph, Func<FrameworkElement, Task> execute)
+		{
+			var button = CreateButton(true, false, label, label, null, automationId, glyph);
+			button.Style = (Style)Resources["ToolBarAppBarButtonFlyoutStyle"];
+			// ToolBarAppBarButtonFlyoutStyle renders Content through its custom template,
+			// but does not bind the AppBarButton.Icon property. Always set Content so both
+			// font and themed glyphs stay visible in this toolbar.
+			ApplyIcon(button, glyph, setContent: true);
+			button.Click += async (_, _) => await execute(button);
+			ContextCommandBar.PrimaryCommands.Add(button);
+		}
+#endif
 
 		private HashSet<string> GetActiveToolbarContexts()
 		{

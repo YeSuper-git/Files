@@ -8,9 +8,11 @@ using Microsoft.UI.Xaml.Shapes;
 using Files.App.Data.Models.ResourceManager;
 using Files.App.Services.ResourceManager;
 using Files.App.ViewModels.ResourceManager;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using WinRT;
 
 namespace Files.App.Views.ResourceManager;
 
@@ -37,16 +39,24 @@ public sealed partial class ResourceManagerPage : Page
     private async void OnPageLoaded(object sender, RoutedEventArgs e)
     {
         Loaded -= OnPageLoaded;
-        UpdateUI();
-        if (string.IsNullOrWhiteSpace(_vm.LibraryPath))
-            return;
-        if (!Directory.Exists(_vm.LibraryPath))
+        try
         {
-            SetStatus("上次资源库路径不可用，请重新选择文件夹");
-            return;
-        }
+            UpdateUI();
+            if (string.IsNullOrWhiteSpace(_vm.LibraryPath))
+                return;
+            if (!Directory.Exists(_vm.LibraryPath))
+            {
+                SetStatus("上次资源库路径不可用，请重新选择文件夹");
+                return;
+            }
 
-        await RefreshAsync();
+            await RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            App.Logger.LogError(ex, "Unable to initialize the Resource Manager tools page for {LibraryPath}", _vm.LibraryPath);
+            SetStatus($"资源工具初始化失败：{ex.Message}");
+        }
     }
 
     private void OnPageUnloaded(object sender, RoutedEventArgs e) => _operationCancellation?.Cancel();
@@ -82,6 +92,7 @@ public sealed partial class ResourceManagerPage : Page
 
     private void SetStatus(string msg) => StatusText.Text = msg;
 
+    [DynamicWindowsRuntimeCast(typeof(Microsoft.UI.Xaml.Media.Brush))]
     private void ApplyFilter(string? kw = null)
     {
         FolderList.Items.Clear();
@@ -102,11 +113,11 @@ public sealed partial class ResourceManagerPage : Page
             if (f.Code is not null)
             {
                 var cb = new Border { Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"], CornerRadius = new CornerRadius(4), Padding = new Thickness(8, 2, 8, 2), VerticalAlignment = VerticalAlignment.Center };
-                cb.Child = new TextBlock { Text = f.Code, FontSize = 11, Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemAccentColor"] };
+                cb.Child = new TextBlock { Text = f.Code, FontSize = 11, Foreground = GetSystemAccentBrush() };
                 panel.Children.Add(cb);
             }
             var vs = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
-            vs.Children.Add(new FontIcon { Glyph = "&#xE7F4;", FontSize = 12 });
+            vs.Children.Add(new FontIcon { Glyph = "\uE7F4", FontSize = 12 });
             vs.Children.Add(new TextBlock { Text = f.VideoCount.ToString(), FontSize = 11 });
             panel.Children.Add(vs);
             item.Content = panel;
@@ -156,6 +167,7 @@ public sealed partial class ResourceManagerPage : Page
         finally { ScanProgress.Visibility = Visibility.Collapsed; EndOperation(operation); }
     }
 
+    [DynamicWindowsRuntimeCast(typeof(Microsoft.UI.Xaml.Media.Brush))]
     private void AddCard(string label, int value, Windows.UI.Color? color = null)
     {
         var b = new Border { Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"], CornerRadius = new CornerRadius(8), Padding = new Thickness(16, 12, 16, 12) };
@@ -166,9 +178,12 @@ public sealed partial class ResourceManagerPage : Page
         s.Children.Add(v); b.Child = s; SummaryCards.Children.Add(b);
     }
 
+    [DynamicWindowsRuntimeCast(typeof(RadioButton))]
     private void OnFilterChecked(object s, RoutedEventArgs e) { if (s is RadioButton rb && rb.Tag is string f) { _filter = f; ApplyFilter(SearchBox.Text); } }
     private void OnSearchChanged(AutoSuggestBox s, AutoSuggestBoxTextChangedEventArgs e) => ApplyFilter(s.Text);
 
+    [DynamicWindowsRuntimeCast(typeof(ListViewItem))]
+    [DynamicWindowsRuntimeCast(typeof(Microsoft.UI.Xaml.Media.Brush))]
     private void OnFolderSelected(object s, SelectionChangedEventArgs e)
     {
         if (FolderList.SelectedItem is ListViewItem item && item.Tag is ResourceFolder folder)
@@ -176,7 +191,7 @@ public sealed partial class ResourceManagerPage : Page
             DetailPanel.Visibility = Visibility.Visible; DetailContent.Children.Clear();
             AddDetail("名称", folder.Name); AddDetail("路径", folder.Path, true);
             var cp = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-            cp.Children.Add(new TextBlock { Text = folder.Code ?? "未识别", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemAccentColor"] });
+            cp.Children.Add(new TextBlock { Text = folder.Code ?? "未识别", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Foreground = GetSystemAccentBrush() });
             if (folder.Code is not null) { var btn = new Button { Content = "复制", Padding = new Thickness(4, 2, 4, 2), MinHeight = 0, FontSize = 11 }; btn.Click += (_, _) => { var pkg = new Windows.ApplicationModel.DataTransfer.DataPackage(); pkg.SetText(folder.Code); Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(pkg); SetStatus($"已复制：{folder.Code}"); }; cp.Children.Add(btn); }
             DetailContent.Children.Add(new TextBlock { Text = "番号", FontSize = 12, Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"] }); DetailContent.Children.Add(cp);
             var sg = new Grid { ColumnSpacing = 16, RowSpacing = 8 }; sg.ColumnDefinitions.Add(new ColumnDefinition()); sg.ColumnDefinitions.Add(new ColumnDefinition()); sg.RowDefinitions.Add(new RowDefinition()); sg.RowDefinitions.Add(new RowDefinition());
@@ -188,6 +203,7 @@ public sealed partial class ResourceManagerPage : Page
         else DetailPanel.Visibility = Visibility.Collapsed;
     }
 
+    [DynamicWindowsRuntimeCast(typeof(Microsoft.UI.Xaml.Media.Brush))]
     private void AddDetail(string label, string value, bool small = false)
     {
         DetailContent.Children.Add(new TextBlock { Text = label, FontSize = 12, Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"] });
@@ -195,6 +211,19 @@ public sealed partial class ResourceManagerPage : Page
         DetailContent.Children.Add(t);
     }
 
+    [DynamicWindowsRuntimeCast(typeof(Microsoft.UI.Xaml.Media.SolidColorBrush))]
+    private static Microsoft.UI.Xaml.Media.SolidColorBrush GetSystemAccentBrush()
+    {
+        var accentResource = Application.Current.Resources["SystemAccentColor"];
+        return accentResource switch
+        {
+            Windows.UI.Color color => new Microsoft.UI.Xaml.Media.SolidColorBrush(color),
+            Microsoft.UI.Xaml.Media.SolidColorBrush brush => brush,
+            _ => new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.DodgerBlue),
+        };
+    }
+
+    [DynamicWindowsRuntimeCast(typeof(Microsoft.UI.Xaml.Media.Brush))]
     private void AddStatusCell(Grid g, int c, int r, string l, string v) { var s = new StackPanel(); s.Children.Add(new TextBlock { Text = l, FontSize = 12, Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"] }); s.Children.Add(new TextBlock { Text = v, FontSize = 15, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold }); Grid.SetColumn(s, c); Grid.SetRow(s, r); g.Children.Add(s); }
 
     private async void OnPreviewRename(object s, RoutedEventArgs e)
@@ -267,6 +296,7 @@ public sealed partial class ResourceManagerPage : Page
         PendingBar.Visibility = Visibility.Collapsed;
         SetStatus("已取消");
     }
+    [DynamicWindowsRuntimeCast(typeof(Button))]
     private void OnResolveConflict(object s, RoutedEventArgs e) { if (s is Button b && b.Tag is string st) { _pendingOps = _ops.ApplyConflictStrategy(_pendingOps, st); ShowPending(); } }
     private async void OnUndo(object s, RoutedEventArgs e)
     {

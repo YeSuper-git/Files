@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       fast_build:
-        description: '快速测试构建：关闭 ReadyToRun 和服务端裁剪分析，减少发布耗时'
+        description: '快速测试构建：优先复用发布缓存，减少构建耗时'
         required: false
         type: boolean
         default: true
@@ -14,39 +14,92 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   FILES_MAX_FAST_BUILD: ${{ inputs.fast_build }}
 
 jobs:
   build:
+    outputs:
+      installer_version: ${{ steps.installer_version.outputs.current }}
     runs-on: windows-2025
     timeout-minutes: 30
 
     steps:
+      - name: Require main branch for official installer
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -ne 'refs/heads/main') {
+            throw 'The official Files max installer must be built from main.'
+          }
+
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Preflight installer inputs
+      - name: Determine unified product version
+        id: installer_version
         shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $versionFile = Join-Path $env:GITHUB_WORKSPACE '.github\installer\build-version.txt'
+          $currentVersion = (Get-Content -Raw -LiteralPath $versionFile).Trim()
+          $parsedVersion = [regex]::Match($currentVersion, '^(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)$')
+          if (-not $parsedVersion.Success) {
+            throw "Invalid canonical product version in '$versionFile': $currentVersion"
+          }
+          $major = [int]$parsedVersion.Groups['major'].Value
+          $minor = [int]$parsedVersion.Groups['minor'].Value
+          $patch = [int]$parsedVersion.Groups['patch'].Value
+          if ($major -lt 1 -or $major -gt 255 -or $minor -gt 255 -or $patch -gt 65535) {
+            throw "Canonical version is outside the supported Windows Installer range: $currentVersion"
+          }
+
+          "current=$currentVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Host "Unified Files max version: $currentVersion."
+
+      - name: Preflight installer inputs
+        # The MSI custom action runs the inbox Windows PowerShell 5.1 host.
+        # Parse installer scripts with that exact engine, not PowerShell 7.
+        shell: powershell
+        env:
+          INSTALLER_VERSION: ${{ steps.installer_version.outputs.current }}
         run: |
           $ErrorActionPreference = 'Stop'
           $workspace = $env:GITHUB_WORKSPACE
 
-          # Catch PowerShell parser errors before the expensive Windows App
-          # SDK publish. This specifically protects MSI custom actions, which
-          # otherwise fail only after the application has been packaged.
-          $scriptPath = Join-Path $workspace 'Install-App.ps1'
-          $tokens = $null
-          $parseErrors = $null
-          [void][System.Management.Automation.Language.Parser]::ParseFile(
-            $scriptPath,
-            [ref]$tokens,
-            [ref]$parseErrors)
-          if ($parseErrors.Count -gt 0) {
-            $details = $parseErrors | ForEach-Object { $_.Message }
-            throw "Install-App.ps1 has PowerShell syntax errors: $($details -join '; ')"
+          # Catch parser errors before the expensive Windows App SDK publish.
+          # This uses the same Windows PowerShell 5.1 parser as the MSI action.
+          $scriptPaths = @(
+            (Join-Path $workspace 'Install-App.ps1'),
+            (Join-Path $workspace 'Invoke-Install-App.ps1')
+          )
+          foreach ($scriptPath in $scriptPaths) {
+            $scriptBytes = [IO.File]::ReadAllBytes($scriptPath)
+            if ($scriptBytes.Length -lt 3 -or
+                $scriptBytes[0] -ne 0xEF -or
+                $scriptBytes[1] -ne 0xBB -or
+                $scriptBytes[2] -ne 0xBF) {
+              throw "$(Split-Path -Leaf $scriptPath) must be UTF-8 with BOM for Windows PowerShell 5.1."
+            }
+
+            $tokens = $null
+            $parseErrors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $scriptPath,
+              [ref]$tokens,
+              [ref]$parseErrors)
+            if ($parseErrors.Count -gt 0) {
+              $details = $parseErrors | ForEach-Object {
+                "line $($_.Extent.StartLineNumber), column $($_.Extent.StartColumnNumber): $($_.Message)"
+              }
+              throw "$(Split-Path -Leaf $scriptPath) has Windows PowerShell 5.1 syntax errors: $($details -join '; ')"
+            }
+          }
+          $scriptPath = $scriptPaths[0]
+          $installScriptText = Get-Content -Raw -LiteralPath $scriptPath
+          if (-not $installScriptText.Contains("(Split-Path -Leaf `$scriptDirectory) -ieq 'Installer'")) {
+            throw 'Install-App.ps1 must resolve its install root from the parent of the Installer support directory.'
           }
 
           $xmlFiles = @(
@@ -67,6 +120,93 @@ jobs:
             } catch {
               throw "Invalid installer XML '$xmlFile': $($_.Exception.Message)"
             }
+          }
+
+          # The installed script lives under INSTALLFOLDER\Installer and
+          # derives the root from its own location. Passing INSTALLFOLDER in a
+          # quoted MSI custom-action argument is fragile because its trailing
+          # backslash interacts with Windows command-line quote parsing.
+          $packageWix = Get-Content -Raw -LiteralPath (Join-Path $workspace '.github\installer\wix\Files.Package.wxs')
+          if (-not $packageWix.Contains('<Exclude Files="$(var.PayloadDir)\e_sqlite3.dll" />')) {
+            throw 'Files.Package.wxs must exclude e_sqlite3.dll from harvesting so its language-neutral File metadata is authored explicitly.'
+          }
+          if (-not $packageWix.Contains('Source="$(var.PayloadDir)\e_sqlite3.dll" DefaultLanguage="0" KeyPath="yes"')) {
+            throw 'Files.Package.wxs must assign LANGID 0 to the language-neutral e_sqlite3.dll payload.'
+          }
+          if ($packageWix.Contains('-InstallDirectory &quot;[INSTALLFOLDER]')) {
+            throw 'Files.Package.wxs must not pass INSTALLFOLDER as a quoted PowerShell custom-action argument.'
+          }
+          if (-not $packageWix.Contains('-File &quot;[#InstallAppLauncherScript]&quot; -Mode Install -AttemptId &quot;[INSTALLERATTEMPTID]&quot;')) {
+            throw 'Files.Package.wxs must invoke the diagnostic launcher for install custom actions.'
+          }
+          if (-not $packageWix.Contains('-File &quot;[#InstallAppLauncherScript]&quot; -Mode Uninstall -IdentityVersion &quot;$(var.IdentityVersion)&quot; -AttemptId &quot;[INSTALLERATTEMPTID]&quot;')) {
+            throw 'Files.Package.wxs must pass the generated four-part identity version to uninstall custom actions.'
+          }
+          if (-not $packageWix.Contains('Name="InstallerVersion"') -or
+              -not $packageWix.Contains('Value="$(var.AppVersion)"')) {
+            throw 'Files.Package.wxs must persist the canonical installer version for downgrade protection.'
+          }
+          if (-not $packageWix.Contains('<MajorUpgrade Schedule="afterInstallExecute" AllowDowngrades="yes"')) {
+            throw 'Files.Package.wxs must install the new identity before removing the old MSI, preserving the external-location package user data during upgrades.'
+          }
+          $bundleWix = Get-Content -Raw -LiteralPath (Join-Path $workspace '.github\installer\wix\Files.Bundle.wxs')
+          if (-not $bundleWix.Contains('Name="InstallerAttemptId"')) {
+            throw 'Files.Bundle.wxs must declare the installer attempt id variable.'
+          }
+          if (-not $bundleWix.Contains('<MsiProperty Name="INSTALLERATTEMPTID" Value="[InstallerAttemptId]" />')) {
+            throw 'Files.Bundle.wxs must pass the custom BA attempt id through to the MSI.'
+          }
+          $bootstrapperSource = Get-Content -Raw -LiteralPath (Join-Path $workspace '.github\installer\ba\FilesBootstrapperApplication.cs')
+          if (-not $bootstrapperSource.Contains('SetVariableString("InstallerAttemptId"')) {
+            throw 'The custom bootstrapper must generate and set a unique attempt id before planning the MSI.'
+          }
+          if (-not $bootstrapperSource.Contains('PlanRelatedBundleType += OnPlanRelatedBundleType')) {
+            throw 'The custom bootstrapper must plan the legacy higher-numbered bundle as an upgrade during version migration.'
+          }
+          if (-not $bootstrapperSource.Contains('TryGetInstalledInstallerVersion')) {
+            throw 'The custom bootstrapper must reject stale installers after the version migration.'
+          }
+          if (-not $bootstrapperSource.Contains('MSI entered RemoveExistingProducts after the new identity was registered') -or
+              -not $bootstrapperSource.Contains('正在安装新版；现有用户数据会保留') -or
+              -not $bootstrapperSource.Contains('正在卸载旧版本并清理旧版安装记录')) {
+            throw 'The custom bootstrapper must expose the data-preserving install-new then remove-old upgrade stages.'
+          }
+          if (-not $installScriptText.Contains('[string]$AttemptId =')) {
+            throw 'Install-App.ps1 must accept the attempt id to create correlated unique log files.'
+          }
+          if (-not $installScriptText.Contains("[string]`$IdentityVersion = ''")) {
+            throw 'Install-App.ps1 must accept an owning identity version for version-scoped uninstall.'
+          }
+          if (-not $installScriptText.Contains('Skipping identity removal because this uninstall action did not specify its owning product version')) {
+            throw 'Unversioned legacy uninstall actions must safely skip identity removal during major upgrade.'
+          }
+          if (-not $installScriptText.Contains('Preserving identity package version')) {
+            throw 'Uninstall must preserve identity packages whose version is not owned by the MSI being removed.'
+          }
+          $launcherScriptText = Get-Content -Raw -LiteralPath (Join-Path $workspace 'Invoke-Install-App.ps1')
+          if (-not $launcherScriptText.Contains('[string]$IdentityVersion =')) {
+            throw 'The diagnostic launcher must accept and forward the MSI-owned identity version.'
+          }
+          if (-not $launcherScriptText.Contains('-IdentityVersion $IdentityVersion')) {
+            throw 'The diagnostic launcher must forward the MSI-owned identity version to Install-App.ps1.'
+          }
+          foreach ($nsisPath in @(
+            (Join-Path $workspace '.github\installer\Files-Installer.nsi'),
+            (Join-Path $workspace '.github\installer\Files-Baseline.nsi')
+          )) {
+            $nsisText = Get-Content -Raw -LiteralPath $nsisPath
+            if (-not $nsisText.Contains('-Mode Uninstall -IdentityVersion "${APP_VERSION}"')) {
+              throw "$(Split-Path -Leaf $nsisPath) must pass its own version to the shared identity-uninstall script."
+            }
+            if (-not $nsisText.Contains('"DisplayVersion" "${APP_DISPLAY_VERSION}"')) {
+              throw "$(Split-Path -Leaf $nsisPath) must display the canonical three-part product version in Windows."
+            }
+          }
+          if (-not $installScriptText.Contains('Set-InstallStage')) {
+            throw 'Install-App.ps1 must log named installation stages for failure diagnosis.'
+          }
+          if (-not $installScriptText.Contains("'{0}-{1}.log' -f `$logBaseName, `$AttemptId")) {
+            throw 'Install-App.ps1 must preserve a separate uniquely named script log for each attempt.'
           }
 
           $requiredFiles = @(
@@ -93,6 +233,7 @@ jobs:
             '.github\installer\ba\InstallerWindow.xaml.cs',
             '.github\installer\ba\ProgressWidthConverter.cs',
             '.github\installer\ba\FilesMax.Installer.Bootstrapper.csproj',
+            'Invoke-Install-App.ps1',
             'Install-App.ps1'
           ) | ForEach-Object { Join-Path $workspace $_ }
           $missingFiles = @($requiredFiles | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) })
@@ -101,12 +242,59 @@ jobs:
           }
           Write-Host "Installer preflight passed: $($xmlFiles.Count) XML files and $($requiredFiles.Count) required files checked."
 
+          if ($env:INSTALLER_VERSION -notmatch '^(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)$') {
+            throw "Canonical installer version must be MAJOR.MINOR.PATCH: $env:INSTALLER_VERSION"
+          }
+          $major = [int]$Matches.major
+          $minor = [int]$Matches.minor
+          $patch = [int]$Matches.patch
+          if ($major -lt 1 -or $major -gt 255 -or $minor -gt 255 -or $patch -gt 65535) {
+            throw "Canonical version exceeds Windows Installer version limits: $env:INSTALLER_VERSION"
+          }
+          $packageIdentityVersion = '{0}.{1}.{2}.0' -f $major, $minor, $patch
+          [xml]$sourcePackageManifest = Get-Content -Raw -LiteralPath (Join-Path $workspace 'src\Files.App\Package.appxmanifest')
+          if ($sourcePackageManifest.Package.Identity.Version -ne '1.0.0.0') {
+            throw 'The source app manifest must keep only the neutral development default; shipping builds take their version from build-version.txt.'
+          }
+          Write-Host "Canonical product version: $env:INSTALLER_VERSION; package identity format: $packageIdentityVersion."
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
 
+      - name: Restore publish output cache
+        id: restore-publish
+        uses: actions/cache@v5
+        with:
+          path: |
+            artifacts/publish
+            artifacts/server-publish
+          # Bind cached publish output to the exact source commit so the
+          # executable and compiled XAML resources always come from one revision.
+          key: ${{ runner.os }}-files-max-publish-v2-${{ inputs.fast_build }}-${{ github.sha }}-${{ hashFiles('.github/installer/build-version.txt', '.github/workflows/build-files-custom.yml', 'src/**/*', 'Directory.*', 'global.json', 'NuGet.config', 'Files.slnx') }}
+
+      - name: Use installer-only NuGet package directory
+        if: ${{ inputs.fast_build == true && steps.restore-publish.outputs.cache-hit == 'true' }}
+        shell: pwsh
+        run: |
+          $packageDir = Join-Path $env:GITHUB_WORKSPACE '.nuget\installer-packages'
+          New-Item -ItemType Directory -Path $packageDir -Force | Out-Null
+          "NUGET_PACKAGES=$packageDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Cache installer NuGet packages
+        if: ${{ inputs.fast_build == true && steps.restore-publish.outputs.cache-hit == 'true' }}
+        uses: actions/cache@v5
+        with:
+          path: .nuget/installer-packages
+          key: ${{ runner.os }}-files-max-installer-nuget-${{ hashFiles('Directory.Packages.props', 'Directory.Build.props', 'Directory.Build.targets', 'nuget.config', 'global.json', '.github/installer/**/*.csproj', '.github/installer/**/*.wixproj', 'src/Files.App.Launcher/Files.App.Launcher.vcxproj', 'src/Files.App.Launcher/packages.config') }}
+
       - name: Cache NuGet packages
+        # A fast build with a publish-cache hit only needs installer packages.
+        # Restoring the complete app's 2+ GB NuGet cache costs more than the
+        # targeted installer restores, so keep that cache for full builds and
+        # fast cache misses only.
+        if: ${{ inputs.fast_build != true || steps.restore-publish.outputs.cache-hit != 'true' }}
         uses: actions/cache@v5
         with:
           path: ~\.nuget\packages
@@ -118,12 +306,18 @@ jobs:
         uses: microsoft/setup-msbuild@v3
 
       - name: Setup NuGet
-        uses: NuGet/setup-nuget@v3
+        uses: NuGet/setup-nuget@v4
 
       - name: Restore
         shell: pwsh
+        env:
+          FILES_MAX_PUBLISH_CACHE_HIT: ${{ steps.restore-publish.outputs.cache-hit }}
         run: |
           $ErrorActionPreference = 'Stop'
+          if ($env:FILES_MAX_FAST_BUILD -eq 'true' -and $env:FILES_MAX_PUBLISH_CACHE_HIT -eq 'true') {
+            Write-Host 'Fast build with a publish cache hit; skipping full solution restore.'
+            return
+          }
           msbuild "${{ github.workspace }}\Files.slnx" -m -t:Restore -p:Configuration=Release -p:Platform=x64
           if ($LASTEXITCODE -ne 0) {
             throw 'Solution restore failed.'
@@ -199,10 +393,12 @@ jobs:
 
           $makeAppx = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\makeappx.exe' |
             Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          $makePri = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\makepri.exe' |
+            Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
           $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe' |
             Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
-          if (-not $makeAppx -or -not $signtool) {
-            throw 'Windows SDK makeappx.exe or signtool.exe was not found.'
+          if (-not $makeAppx -or -not $makePri -or -not $signtool) {
+            throw 'Windows SDK makeappx.exe, makepri.exe, or signtool.exe was not found.'
           }
 
           # Download external prerequisites before the expensive Files
@@ -267,15 +463,6 @@ jobs:
           "FILES_MAX_WIX_TOOL=$wixTool" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host 'External installer tools preflight passed.'
 
-      - name: Restore publish output cache
-        id: restore-publish
-        uses: actions/cache@v5
-        with:
-          path: |
-            artifacts/publish
-            artifacts/server-publish
-          key: ${{ runner.os }}-files-max-publish-${{ inputs.fast_build }}-${{ hashFiles('src/**/*', 'Directory.*', 'global.json', 'NuGet.config', 'Files.slnx') }}
-
       - name: Build launcher
         shell: pwsh
         run: |
@@ -295,40 +482,63 @@ jobs:
       - name: Publish unpackaged application
         shell: pwsh
         env:
+          INSTALLER_VERSION: ${{ steps.installer_version.outputs.current }}
           FILES_MAX_PUBLISH_CACHE_HIT: ${{ steps.restore-publish.outputs.cache-hit }}
         run: |
           $ErrorActionPreference = 'Stop'
           $publishDir = Join-Path $env:GITHUB_WORKSPACE 'artifacts\publish'
-          $publishReadyToRun = if ($env:FILES_MAX_FAST_BUILD -eq 'true') { 'false' } else { 'true' }
-          $publishTrimmed = if ($env:FILES_MAX_FAST_BUILD -eq 'true') { 'false' } else { 'true' }
+          # Keep the installed app on the same managed, untrimmed runtime as
+          # the verified MSIX test build. Release still uses the normal installer.
+          $publishReadyToRun = 'false'
+          $publishTrimmed = 'false'
           New-Item -ItemType Directory -Path $publishDir -Force | Out-Null
 
-          if ($env:FILES_MAX_PUBLISH_CACHE_HIT -eq 'true') {
-            Write-Host 'Publish output cache hit; skipping the full Files application publish.'
-          } else {
-            msbuild "$env:GITHUB_WORKSPACE\src\Files.App\Files.App.csproj" `
-              -m `
-              -t:Publish `
-              -p:Configuration=Release `
-              -p:Platform=x64 `
-              -p:RuntimeIdentifier=win-x64 `
-              -p:SelfContained=true `
-              -p:WindowsPackageType=None `
-              -p:FilesExternalLocationBuild=true `
-              -p:FilesResourceManagerBuild=true `
-              "-p:PublishReadyToRun=$publishReadyToRun" `
-              "-p:PublishReadyToRunComposite=$publishReadyToRun" `
-              -p:GenerateAppxPackageOnBuild=false `
-              "-p:PublishDir=$publishDir\" `
-              -v:minimal
+          $appPublishTimer = [System.Diagnostics.Stopwatch]::StartNew()
+          try {
+            if ($env:FILES_MAX_PUBLISH_CACHE_HIT -eq 'true') {
+              Write-Host 'Publish output cache hit; skipping the full Files application publish.'
+            } else {
+              msbuild "$env:GITHUB_WORKSPACE\src\Files.App\Files.App.csproj" `
+                -m `
+                -t:Publish `
+                -p:Configuration=Release `
+                -p:Platform=x64 `
+                -p:RuntimeIdentifier=win-x64 `
+                -p:SelfContained=true `
+                -p:WindowsPackageType=None `
+                -p:FilesExternalLocationBuild=true `
+                -p:FilesResourceManagerBuild=true `
+                "-p:FileVersion=$env:INSTALLER_VERSION.0" `
+                -p:PublishAot=false `
+                "-p:PublishTrimmed=$publishTrimmed" `
+                "-p:PublishReadyToRun=$publishReadyToRun" `
+                "-p:PublishReadyToRunComposite=$publishReadyToRun" `
+                -p:GenerateAppxPackageOnBuild=false `
+                "-p:PublishDir=$publishDir\" `
+                -v:minimal
 
-            if ($LASTEXITCODE -ne 0) {
-              throw 'Unpackaged Files application publish failed.'
+              if ($LASTEXITCODE -ne 0) {
+                throw 'Unpackaged Files application publish failed.'
+              }
             }
+          } finally {
+            $appPublishTimer.Stop()
+            Write-Host "Files application publish phase: $($appPublishTimer.Elapsed); cacheHit=$($env:FILES_MAX_PUBLISH_CACHE_HIT)."
           }
           if (-not (Test-Path -LiteralPath (Join-Path $publishDir 'Files.exe'))) {
             throw 'Unpackaged Files.exe was not produced.'
           }
+
+          $publishedExe = Join-Path $publishDir 'Files.exe'
+          $publishedFileVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($publishedExe).FileVersion
+          if ([version]$publishedFileVersion -ne [version]"$env:INSTALLER_VERSION.0") {
+            throw "Published Files.exe file version mismatch: expected $env:INSTALLER_VERSION.0, found $publishedFileVersion."
+          }
+          $publishedRevision = [Diagnostics.FileVersionInfo]::GetVersionInfo($publishedExe).ProductVersion
+          if (-not $publishedRevision -or -not $publishedRevision.Contains($env:GITHUB_SHA, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Published Files.exe does not match this workflow source revision. Expected '$($env:GITHUB_SHA)', found '$publishedRevision'."
+          }
+          Write-Host "Published Files.exe source revision verified: $publishedRevision."
 
           $runtimeFiles = @(Get-ChildItem -LiteralPath $publishDir -Filter 'Microsoft.WindowsAppRuntime*.dll' -File)
           if ($runtimeFiles.Count -eq 0) {
@@ -336,6 +546,9 @@ jobs:
           }
           if (-not (Test-Path -LiteralPath (Join-Path $publishDir 'resources.pri'))) {
             throw 'resources.pri was not copied to the publish output.'
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $publishDir 'e_sqlite3.dll'))) {
+            throw 'e_sqlite3.dll was not copied to the publish output required by the explicit MSI component.'
           }
           if (-not (Test-Path -LiteralPath (Join-Path $publishDir 'Assets'))) {
             throw 'Application assets were not copied to the publish output.'
@@ -354,37 +567,62 @@ jobs:
 
           $serverPublishDir = Join-Path $env:GITHUB_WORKSPACE 'artifacts\server-publish'
           New-Item -ItemType Directory -Path $serverPublishDir -Force | Out-Null
-          if ($env:FILES_MAX_PUBLISH_CACHE_HIT -eq 'true') {
-            Write-Host 'Server publish output cache hit; skipping the server publish.'
-          } else {
-            msbuild "$env:GITHUB_WORKSPACE\src\Files.App.Server\Files.App.Server.csproj" `
-              -m `
-              -t:Publish `
-              -p:Configuration=Release `
-              -p:Platform=x64 `
-              -p:RuntimeIdentifier=win-x64 `
-              -p:SelfContained=true `
-              "-p:PublishTrimmed=$publishTrimmed" `
-              "-p:PublishReadyToRun=$publishReadyToRun" `
-              "-p:PublishReadyToRunComposite=$publishReadyToRun" `
-              "-p:PublishDir=$serverPublishDir\" `
-              -v:minimal
+          $serverPublishTimer = [System.Diagnostics.Stopwatch]::StartNew()
+          try {
+            if ($env:FILES_MAX_PUBLISH_CACHE_HIT -eq 'true') {
+              Write-Host 'Server publish output cache hit; skipping the server publish.'
+            } else {
+              msbuild "$env:GITHUB_WORKSPACE\src\Files.App.Server\Files.App.Server.csproj" `
+                -m `
+                -t:Publish `
+                -p:Configuration=Release `
+                -p:Platform=x64 `
+                -p:RuntimeIdentifier=win-x64 `
+                -p:SelfContained=true `
+                "-p:FileVersion=$env:INSTALLER_VERSION.0" `
+                -p:PublishAot=false `
+                "-p:PublishTrimmed=$publishTrimmed" `
+                "-p:PublishReadyToRun=$publishReadyToRun" `
+                "-p:PublishReadyToRunComposite=$publishReadyToRun" `
+                "-p:PublishDir=$serverPublishDir\" `
+                -v:minimal
 
-            if ($LASTEXITCODE -ne 0) {
-              throw 'Files.App.Server publish failed.'
+              if ($LASTEXITCODE -ne 0) {
+                throw 'Files.App.Server publish failed.'
+              }
             }
+          } finally {
+            $serverPublishTimer.Stop()
+            Write-Host "Files server publish phase: $($serverPublishTimer.Elapsed); cacheHit=$($env:FILES_MAX_PUBLISH_CACHE_HIT)."
           }
           $serverExe = Get-ChildItem -LiteralPath $serverPublishDir -Filter 'Files.App.Server.exe' -File | Select-Object -First 1
           if (-not $serverExe) {
             throw 'Files.App.Server.exe was not produced.'
           }
+          $serverFileVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($serverExe.FullName).FileVersion
+          if ([version]$serverFileVersion -ne [version]"$env:INSTALLER_VERSION.0") {
+            throw "Published Files.App.Server.exe file version mismatch: expected $env:INSTALLER_VERSION.0, found $serverFileVersion."
+          }
           $serverPayloadDir = Join-Path $publishDir 'Files.App.Server'
-          New-Item -ItemType Directory -Path $serverPayloadDir -Force | Out-Null
-          Copy-Item -Path (Join-Path $serverPublishDir '*') -Destination $serverPayloadDir -Recurse -Force
+          $serverPayloadExe = Join-Path $serverPayloadDir 'Files.App.Server.exe'
+          if ($env:FILES_MAX_PUBLISH_CACHE_HIT -eq 'true' -and (Test-Path -LiteralPath $serverPayloadExe -PathType Leaf)) {
+            Write-Host 'Server payload is already present in the restored publish cache; skipping redundant copy.'
+          } else {
+            $payloadCopyTimer = [System.Diagnostics.Stopwatch]::StartNew()
+            try {
+              New-Item -ItemType Directory -Path $serverPayloadDir -Force | Out-Null
+              Copy-Item -Path (Join-Path $serverPublishDir '*') -Destination $serverPayloadDir -Recurse -Force
+            } finally {
+              $payloadCopyTimer.Stop()
+              Write-Host "Files server payload copy phase: $($payloadCopyTimer.Elapsed)."
+            }
+          }
           Write-Host "Self-contained runtime files: $($runtimeFiles.Name -join ', ')"
 
       - name: Build external-location identity package and installer
         shell: pwsh
+        env:
+          INSTALLER_VERSION: ${{ steps.installer_version.outputs.current }}
         run: |
           $ErrorActionPreference = 'Stop'
           $workspace = $env:GITHUB_WORKSPACE
@@ -402,35 +640,87 @@ jobs:
             throw "Preflight WiX command-line tool is missing at '$wixTool'."
           }
 
-          $sourcePackageManifest = Join-Path $workspace 'src\Files.App\Package.appxmanifest'
-          [xml]$sourceManifest = Get-Content -LiteralPath $sourcePackageManifest
-          $appVersion = [string]$sourceManifest.Package.Identity.Version
-          if ($appVersion -notmatch '^\d+\.\d+\.\d+\.\d+$') {
-            throw "Invalid package version: $appVersion"
+          if ($env:INSTALLER_VERSION -notmatch '^(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)$') {
+            throw "Canonical installer version must be MAJOR.MINOR.PATCH: $env:INSTALLER_VERSION"
           }
+          $versionMajor = [int]$Matches.major
+          $versionMinor = [int]$Matches.minor
+          $versionPatch = [int]$Matches.patch
+          if ($versionMajor -lt 1 -or $versionMajor -gt 255 -or $versionMinor -gt 255 -or $versionPatch -gt 65535) {
+            throw "Canonical version exceeds Windows Installer limits: $env:INSTALLER_VERSION"
+          }
+          $installerVersion = '{0}.{1}.{2}' -f $versionMajor, $versionMinor, $versionPatch
+          $identityVersion = '{0}.{1}.{2}.0' -f $versionMajor, $versionMinor, $versionPatch
+          Write-Host "Unified Files max version: $installerVersion; MSIX identity uses the required four-part form $identityVersion."
 
           New-Item -ItemType Directory -Path $identityDir -Force | Out-Null
           $identityManifestPath = Join-Path $identityDir 'AppxManifest.xml'
           Copy-Item "$workspace\.github\installer\ExternalLocation.AppxManifest" $identityManifestPath -Force
           [xml]$identityManifest = Get-Content -LiteralPath $identityManifestPath
-          $identityManifest.Package.Identity.Version = $appVersion
+          $identityManifest.Package.Identity.Version = $identityVersion
           $identityManifest.Save($identityManifestPath)
+          if ($identityManifest.Package.Identity.Version -ne $identityVersion) {
+            throw "Generated MSIX identity version mismatch: expected $identityVersion, found $($identityManifest.Package.Identity.Version)."
+          }
 
           $identityAssetDir = Join-Path $identityDir 'Assets\AppTiles\Dev'
           New-Item -ItemType Directory -Path $identityAssetDir -Force | Out-Null
-          Copy-Item "$workspace\src\Files.App\Assets\AppTiles\Dev\StoreLogo.scale-100.png" $identityAssetDir -Force
-          Copy-Item "$workspace\src\Files.App\Assets\AppTiles\Dev\Square150x150Logo.scale-100.png" $identityAssetDir -Force
-          Copy-Item "$workspace\src\Files.App\Assets\AppTiles\Dev\Square44x44Logo.scale-100.png" $identityAssetDir -Force
+          $taskbarIconSourceDir = Join-Path $workspace 'src\Files.App\Assets\AppTiles\Dev'
+          foreach ($logo in @('StoreLogo', 'Square150x150Logo')) {
+            foreach ($scale in @('100', '125', '150', '200', '400')) {
+              $assetName = "$logo.scale-$scale.png"
+              $sourceAsset = Join-Path $taskbarIconSourceDir $assetName
+              if (-not (Test-Path -LiteralPath $sourceAsset -PathType Leaf)) {
+                throw "Test-package logo is missing: $sourceAsset"
+              }
+              Copy-Item -LiteralPath $sourceAsset -Destination $identityAssetDir -Force
+            }
+          }
+          $taskbarIconSizes = @('16', '20', '24', '30', '32', '36', '40', '48', '60', '64', '72', '80', '96', '256')
+          $taskbarIconAssets = @()
+          # Use the exact PNG variants included in the verified test MSIX.
+          foreach ($size in $taskbarIconSizes) {
+            foreach ($suffix in @('.png', '_altform-unplated.png', '_altform-lightunplated_theme-light.png')) {
+              $assetName = "Square44x44Logo.targetsize-$size$suffix"
+              $sourceAsset = Join-Path $taskbarIconSourceDir $assetName
+              if (-not (Test-Path -LiteralPath $sourceAsset -PathType Leaf)) {
+                throw "Test-package taskbar icon is missing: $sourceAsset"
+              }
+              $assetPath = Join-Path $identityAssetDir $assetName
+              Copy-Item -LiteralPath $sourceAsset -Destination $assetPath -Force
+              if ((Get-FileHash -LiteralPath $sourceAsset -Algorithm SHA256).Hash -ne
+                  (Get-FileHash -LiteralPath $assetPath -Algorithm SHA256).Hash) {
+                throw "Copied taskbar icon differs from the test-package asset: $assetName"
+              }
+              $taskbarIconAssets += Get-Item -LiteralPath $assetPath
+            }
+          }
+          foreach ($scale in @('100', '125', '150', '200', '400')) {
+            $assetName = "Square44x44Logo.scale-$scale.png"
+            $sourceAsset = Join-Path $taskbarIconSourceDir $assetName
+            if (-not (Test-Path -LiteralPath $sourceAsset -PathType Leaf)) {
+              throw "Test-package taskbar icon is missing: $sourceAsset"
+            }
+            $assetPath = Join-Path $identityAssetDir $assetName
+            Copy-Item -LiteralPath $sourceAsset -Destination $assetPath -Force
+            $taskbarIconAssets += Get-Item -LiteralPath $assetPath
+          }
+          $expectedTaskbarIconCount = ($taskbarIconSizes.Count * 3) + 5
+          if ($taskbarIconAssets.Count -ne $expectedTaskbarIconCount) {
+            throw "Expected $expectedTaskbarIconCount test-package taskbar icons, copied $($taskbarIconAssets.Count)."
+          }
           $archiveAssetDir = Join-Path $identityDir 'Assets\archives'
           New-Item -ItemType Directory -Path $archiveAssetDir -Force | Out-Null
           Copy-Item "$workspace\src\Files.App\Assets\archives\ExtensionIcon.png" $archiveAssetDir -Force
 
           $makeAppx = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\makeappx.exe' |
             Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          $makePri = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\makepri.exe' |
+            Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
           $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe' |
             Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
-          if (-not $makeAppx -or -not $signtool) {
-            throw 'Windows SDK makeappx.exe or signtool.exe was not found.'
+          if (-not $makeAppx -or -not $makePri -or -not $signtool) {
+            throw 'Windows SDK makeappx.exe, makepri.exe, or signtool.exe was not found.'
           }
 
           function Invoke-SignFile {
@@ -452,9 +742,79 @@ jobs:
             throw "$Description signing failed after 3 attempts."
           }
 
+          # The external-location identity package must index the same icon
+          # variants as the test MSIX so Windows selects identical taskbar art.
+          $identityPriPath = Join-Path $identityDir 'resources.pri'
+          $identityPriConfigPath = Join-Path $identityDir 'priconfig.xml'
+          & $makePri createconfig /cf $identityPriConfigPath /dq en-US
+          if ($LASTEXITCODE -ne 0) {
+            throw "Identity package PRI configuration creation failed with exit code $LASTEXITCODE."
+          }
+          & $makePri new /pr $identityDir /cf $identityPriConfigPath /mn $identityManifestPath /of $identityPriPath /o
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $identityPriPath -PathType Leaf)) {
+            throw "Identity package resources.pri generation failed with exit code $LASTEXITCODE."
+          }
+          $identityPriFiles = @(Get-ChildItem -LiteralPath $identityDir -Filter 'resources*.pri' -File)
+          $identityPriDump = ''
+          foreach ($priFile in $identityPriFiles) {
+            $dumpPath = Join-Path $identityDir "dump-$($priFile.BaseName).xml"
+            & $makePri dump /if $priFile.FullName /of $dumpPath
+            if ($LASTEXITCODE -ne 0) {
+              throw "Identity package $($priFile.Name) verification failed with exit code $LASTEXITCODE."
+            }
+            $identityPriDump += Get-Content -LiteralPath $dumpPath -Raw
+            Remove-Item -LiteralPath $dumpPath -Force
+          }
+          $unindexedTaskbarIcons = @($taskbarIconAssets | Where-Object { $identityPriDump -notlike "*$($_.Name)*" })
+          if ($unindexedTaskbarIcons.Count -gt 0) {
+            throw "Identity resources.pri does not index taskbar variants: $($unindexedTaskbarIcons.Name -join ', ')"
+          }
+          Remove-Item -LiteralPath $identityPriConfigPath -Force
+          Write-Host "Generated resources.pri and verified all $($taskbarIconAssets.Count) test-package taskbar icons are indexed."
+
           & $makeAppx pack /o /d $identityDir /nv /p $identityPackage
           if ($LASTEXITCODE -ne 0) {
             throw "Identity package creation failed with exit code $LASTEXITCODE."
+          }
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $identityArchive = [IO.Compression.ZipFile]::OpenRead($identityPackage)
+          try {
+            if (-not $identityArchive.GetEntry('resources.pri')) {
+              throw 'Identity MSIX is missing resources.pri; Windows cannot resolve taskbar icon variants.'
+            }
+            foreach ($priFile in $identityPriFiles) {
+              if (-not $identityArchive.GetEntry($priFile.Name)) {
+                throw "Identity MSIX is missing resource index $($priFile.Name)."
+              }
+            }
+            $missingPackagedTaskbarIcons = @(
+              foreach ($asset in $taskbarIconAssets) {
+                $entryName = "Assets/AppTiles/Dev/$($asset.Name)"
+                $entry = $identityArchive.GetEntry($entryName)
+                if (-not $entry) {
+                  $entryName
+                  continue
+                }
+                $entryStream = $entry.Open()
+                $sha256 = [Security.Cryptography.SHA256]::Create()
+                try {
+                  $packagedHash = [Convert]::ToHexString($sha256.ComputeHash($entryStream))
+                  if ($packagedHash -ne (Get-FileHash -LiteralPath $asset.FullName -Algorithm SHA256).Hash) {
+                    throw "Identity MSIX taskbar icon differs from the test-package asset: $entryName"
+                  }
+                } finally {
+                  $sha256.Dispose()
+                  $entryStream.Dispose()
+                }
+              }
+            )
+            if ($missingPackagedTaskbarIcons.Count -gt 0) {
+              throw "Identity MSIX is missing taskbar icon variants: $($missingPackagedTaskbarIcons -join ', ')"
+            }
+            Write-Host "Verified $($taskbarIconAssets.Count) taskbar icon variants inside the identity MSIX."
+          } finally {
+            $identityArchive.Dispose()
           }
 
           # This is an unpackaged development-style build. Generate the
@@ -490,7 +850,8 @@ jobs:
             -m `
             --configuration Release `
             --no-restore `
-            "-p:AppVersion=$appVersion" `
+            "-p:AppVersion=$installerVersion" `
+            "-p:IdentityVersion=$identityVersion" `
             "-p:ProductName=Files max" `
             "-p:PayloadDir=$publishDir" `
             "-p:InstallScript=$installScript" `
@@ -517,6 +878,21 @@ jobs:
           # valid and language-neutral for this non-localized application.
           $msiDatabase = New-Object -ComObject WindowsInstaller.Installer
           $msiTransaction = $msiDatabase.OpenDatabase($msiPath, 1)
+
+          # ICE60 reports only the generated File identifier, which is not
+          # actionable on its own. Log the corresponding names for versioned
+          # files whose language metadata is absent so the next warning can
+          # be traced to its publish input without suppressing ICE validation.
+          $msiView = $msiTransaction.OpenView("SELECT ``File``, ``FileName``, ``Version`` FROM ``File`` WHERE ``Version`` IS NOT NULL AND ``Language`` IS NULL")
+          $msiView.Execute()
+          while ($msiRecord = $msiView.Fetch()) {
+            Write-Host ("MSI ICE60 diagnostic candidate: FileId='{0}', FileName='{1}', Version='{2}'" -f `
+              $msiRecord.StringData(1), $msiRecord.StringData(2), $msiRecord.StringData(3))
+            [void][Runtime.InteropServices.Marshal]::ReleaseComObject($msiRecord)
+          }
+          $msiView.Close()
+          [void][Runtime.InteropServices.Marshal]::ReleaseComObject($msiView)
+
           $msiView = $msiTransaction.OpenView("UPDATE ``File`` SET ``Language`` = '0' WHERE ``Language`` IS NOT NULL")
           $msiView.Execute()
           $msiView.Close()
@@ -624,7 +1000,7 @@ jobs:
             -m `
             --configuration Release `
             --no-restore `
-            "-p:AppVersion=$appVersion" `
+            "-p:AppVersion=$installerVersion" `
             "-p:ProductName=Files max" `
             "-p:MsiPath=$msiPath" `
             "-p:VCRedistPath=$vcRedistPath" `
@@ -679,8 +1055,15 @@ jobs:
     needs: build
     runs-on: windows-2025
     timeout-minutes: 10
+    env:
+      INSTALLER_VERSION: ${{ needs.build.outputs.installer_version }}
 
     steps:
+      - name: Checkout version state
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+
       - name: Restore candidate installer from internal cache
         uses: actions/cache/restore@v5
         with:
@@ -764,16 +1147,94 @@ jobs:
             throw "Files.exe was not installed to '$installDir'."
           }
 
+          $installedRevision = [Diagnostics.FileVersionInfo]::GetVersionInfo($installedExe).ProductVersion
+          $installedFileVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($installedExe).FileVersion
+          if ([version]$installedFileVersion -ne [version]"$env:INSTALLER_VERSION.0") {
+            throw "Installed Files.exe file version mismatch: expected $env:INSTALLER_VERSION.0, found $installedFileVersion."
+          }
+          if (-not $installedRevision -or -not $installedRevision.Contains($env:GITHUB_SHA, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Installed Files.exe does not match this workflow source revision. Expected '$($env:GITHUB_SHA)', found '$installedRevision'."
+          }
+          Write-Host "Installed Files.exe source revision verified: $installedRevision."
+
           $identity = Get-AppxPackage -Name 'FilesDev' -ErrorAction SilentlyContinue |
             Where-Object { $_.Publisher -eq 'CN=Files' -and $_.Status -eq 'Ok' } |
             Select-Object -First 1
           if (-not $identity) {
             throw 'External-location identity was not registered.'
           }
+          $expectedIdentityVersion = '{0}.0' -f $env:INSTALLER_VERSION
+          if ([version]$identity.Version -ne [version]$expectedIdentityVersion) {
+            throw "Identity version mismatch: expected $expectedIdentityVersion from canonical installer version $env:INSTALLER_VERSION, found $($identity.Version)."
+          }
+          $versionMarkerPath = 'HKLM:\Software\YeSuper\Files'
+          $versionMarker = (Get-ItemProperty -LiteralPath $versionMarkerPath -Name InstallerVersion -ErrorAction Stop).InstallerVersion
+          if ($versionMarker -ne $env:INSTALLER_VERSION) {
+            throw "Installed version marker mismatch: expected $env:INSTALLER_VERSION, found '$versionMarker'."
+          }
+          Write-Host "Unified version smoke check passed: installer=$env:INSTALLER_VERSION identity=$($identity.Version)."
+
+          # Verify the installed-version guard prevents an archived older
+          # installer from downgrading a newer canonical release.
+          $installedVersion = [version]$env:INSTALLER_VERSION
+          $newerMarker = '{0}.{1}.{2}' -f $installedVersion.Major, $installedVersion.Minor, ($installedVersion.Build + 1)
+          Set-ItemProperty -LiteralPath $versionMarkerPath -Name InstallerVersion -Value $newerMarker
+          $downgradeLog = Join-Path $env:TEMP 'files-max-installer-downgrade-guard.log'
+          try {
+            $downgradeProcess = Start-Process -FilePath $setupPath -ArgumentList '/quiet', '/norestart', ('/log={0}' -f $downgradeLog) -WorkingDirectory $env:GITHUB_WORKSPACE -Wait -PassThru
+            if ($downgradeProcess.ExitCode -eq 0) {
+              throw 'The installer accepted a lower version while a newer canonical version marker was present.'
+            }
+            if (-not (Test-Path -LiteralPath $installedExe)) {
+              throw 'The downgrade guard removed the installed application instead of safely refusing the operation.'
+            }
+          } finally {
+            Set-ItemProperty -LiteralPath $versionMarkerPath -Name InstallerVersion -Value $env:INSTALLER_VERSION
+          }
+          Write-Host "Stale installer guard passed: $env:INSTALLER_VERSION was refused against marker $newerMarker."
+
+          # An older cached MSI can invoke the current shared installer
+          # script after this version has registered its identity. Reproduce
+          # that legacy custom-action call (no IdentityVersion argument) and
+          # assert that it cannot unregister the current app.
+          $legacyUninstallLauncher = Join-Path $installDir 'Installer\Invoke-Install-App.ps1'
+          if (-not (Test-Path -LiteralPath $legacyUninstallLauncher -PathType Leaf)) {
+            throw "Installer diagnostic launcher was not installed at '$legacyUninstallLauncher'."
+          }
+          $legacyUninstallArguments = '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{0}" -Mode Uninstall -AttemptId "smoke-legacy-uninstall"' -f $legacyUninstallLauncher
+          $legacyUninstallProcess = Start-Process `
+            -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') `
+            -ArgumentList $legacyUninstallArguments `
+            -WindowStyle Hidden `
+            -Wait `
+            -PassThru
+          if ($legacyUninstallProcess.ExitCode -ne 0) {
+            throw "Legacy unversioned uninstall simulation failed with exit code $($legacyUninstallProcess.ExitCode)."
+          }
+          $identityAfterLegacyUninstall = Get-AppxPackage -Name 'FilesDev' -ErrorAction SilentlyContinue |
+            Where-Object { $_.Publisher -eq 'CN=Files' -and $_.Status -eq 'Ok' } |
+            Select-Object -First 1
+          if (-not $identityAfterLegacyUninstall -or
+              [version]$identityAfterLegacyUninstall.Version -ne [version]$identity.Version) {
+            throw 'A legacy unversioned uninstall action removed or replaced the active Files identity package.'
+          }
+          Write-Host "Legacy unversioned uninstall simulation preserved active identity $($identityAfterLegacyUninstall.PackageFullName)."
 
           $appProcess = Start-Process -FilePath $installedExe -WorkingDirectory $installDir -PassThru
-          Start-Sleep -Seconds 5
-          if ($appProcess.HasExited) {
+          $windowFound = $false
+          for ($attempt = 0; $attempt -lt 60; $attempt++) {
+            Start-Sleep -Milliseconds 500
+            $appProcess.Refresh()
+            if ($appProcess.HasExited) {
+              break
+            }
+            if ($appProcess.MainWindowHandle -ne 0) {
+              $windowFound = $true
+              break
+            }
+          }
+
+          if ($appProcess.HasExited -or -not $windowFound) {
             $localStateDir = Join-Path $env:LOCALAPPDATA "Packages\$($identity.PackageFamilyName)\LocalState"
             $debugLog = Join-Path $localStateDir 'debug.log'
             if (Test-Path -LiteralPath $debugLog) {
@@ -785,9 +1246,21 @@ jobs:
                 ForEach-Object { Get-ChildItem -Path $_.FullName -Recurse -Filter 'debug.log' -File -ErrorAction SilentlyContinue } |
                 ForEach-Object { Write-Host "Candidate log: $($_.FullName)"; Get-Content -LiteralPath $_.FullName }
             }
-            throw "Files exited during startup with code $($appProcess.ExitCode)."
+            if ($appProcess.HasExited) {
+              throw "Files exited during startup with code $($appProcess.ExitCode)."
+            }
+            throw 'Files process stayed alive but did not create a visible main window within 30 seconds.'
           }
-          Write-Host "Startup smoke test passed with process id $($appProcess.Id)."
+          Write-Host "Startup smoke test passed with process id $($appProcess.Id), window handle $($appProcess.MainWindowHandle), title '$($appProcess.MainWindowTitle)'."
+          Start-Sleep -Seconds 2
+          $localStateDir = Join-Path $env:LOCALAPPDATA "Packages\$($identity.PackageFamilyName)\LocalState"
+          $debugLog = Join-Path $localStateDir 'debug.log'
+          if (Test-Path -LiteralPath $debugLog) {
+            $homePageBindingFailure = Select-String -LiteralPath $debugLog -Pattern 'Files\.App\.Views\.HomePage\..*Bindings\.Connect\(Int32, Object\)' -Quiet
+            if ($homePageBindingFailure) {
+              throw 'Home page XAML binding failed during the startup smoke test.'
+            }
+          }
           Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
 
           $repairProcess = Start-Process -FilePath $setupPath -ArgumentList '/repair', '/quiet', '/norestart' -Wait -PassThru
@@ -796,6 +1269,17 @@ jobs:
           }
           if (-not (Test-Path -LiteralPath $installedExe)) {
             throw "Files.exe disappeared after repair from '$installDir'."
+          }
+          $identityAfterRepair = Get-AppxPackage -Name 'FilesDev' -ErrorAction SilentlyContinue |
+            Where-Object { $_.Publisher -eq 'CN=Files' -and $_.Status -eq 'Ok' } |
+            Select-Object -First 1
+          if (-not $identityAfterRepair -or
+              [version]$identityAfterRepair.Version -ne [version]$identity.Version) {
+            throw 'Repair removed or changed the registered Files identity.'
+          }
+          $repairedFileVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($installedExe).FileVersion
+          if ([version]$repairedFileVersion -ne [version]"$env:INSTALLER_VERSION.0") {
+            throw "Repair left an unexpected Files.exe file version: $repairedFileVersion."
           }
 
           $uninstallEntries = @(
@@ -840,25 +1324,22 @@ jobs:
             throw 'External-location identity remained registered after uninstall.'
           }
 
+      - name: Stage versioned installer artifact
+        shell: pwsh
+        env:
+          INSTALLER_VERSION: ${{ needs.build.outputs.installer_version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sourcePath = Join-Path $env:GITHUB_WORKSPACE 'Files max Setup.exe'
+          $artifactPath = Join-Path $env:GITHUB_WORKSPACE "Files max Setup $env:INSTALLER_VERSION.exe"
+          Copy-Item -LiteralPath $sourcePath -Destination $artifactPath -Force
+          if ((Get-Item -LiteralPath $artifactPath).Length -ne (Get-Item -LiteralPath $sourcePath).Length) {
+            throw 'Versioned installer artifact does not match the verified installer size.'
+          }
+
       - name: Upload verified installer
         uses: actions/upload-artifact@v7
         with:
-          name: Files max
-          path: Files max Setup.exe
+          name: Files max Setup ${{ needs.build.outputs.installer_version }}
+          path: Files max Setup ${{ needs.build.outputs.installer_version }}.exe
           if-no-files-found: error
-
-      - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: Files max Setup.exe
-          draft: false
-          body: |
-            ## Files max
-
-            Traditional installer for Windows 10/11. Files max is installed as a normal desktop application under Program Files.
-
-            - Full Files max file manager
-            - resource code detection
-            - Health check / batch rename
-            - Subtitle classification / undo

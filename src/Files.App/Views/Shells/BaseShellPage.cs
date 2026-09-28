@@ -331,7 +331,14 @@ namespace Files.App.Views.Shells
 					headBranch);
 			}
 
+			#if FILES_RESOURCE_MANAGER
+			if (ItemDisplay.Content is not ResourceManager.ResourceLibraryPage)
+			{
+				contentPage.StatusBarViewModel.DirectoryItemCount = $"{shellViewModel.FilesAndFolders.Count} {directoryItemCountLocalization}";
+			}
+			#else
 			contentPage.StatusBarViewModel.DirectoryItemCount = $"{shellViewModel.FilesAndFolders.Count} {directoryItemCountLocalization}";
+			#endif
 			contentPage.InfoPaneViewModel.DirectoryItemCount = $"{shellViewModel.FilesAndFolders.Count} {directoryItemCountLocalization}";
 			contentPage.UpdateSelectionSize();
 		}
@@ -584,6 +591,16 @@ namespace Files.App.Views.Shells
 
 		public async Task Refresh_Click()
 		{
+#if FILES_RESOURCE_MANAGER
+			if (ItemDisplay.Content is ResourceManager.ResourceLibraryPage resourceLibraryPage)
+			{
+				ToolbarViewModel.CanRefresh = false;
+				await resourceLibraryPage.RefreshAsync();
+				ToolbarViewModel.CanRefresh = true;
+				return;
+			}
+#endif
+
 			if (InstanceViewModel.IsPageTypeSearchResults)
 			{
 				var shellViewModel = this.GetRequiredShellViewModel();
@@ -859,6 +876,11 @@ namespace Files.App.Views.Shells
 			if (incomingPageNavPath is not null)
 				incomingPageNavPath.IsLayoutSwitch = false;
 
+#if FILES_RESOURCE_MANAGER
+			if (incomingPageNavPath?.IsResourceLibraryPage == true)
+				return;
+#endif
+
 			// Update layout type
 			if (pageContent.SourcePageType != typeof(HomePage))
 			{
@@ -881,6 +903,7 @@ namespace Files.App.Views.Shells
 #if FILES_RESOURCE_MANAGER
 		public abstract void NavigateToResourceManager();
 		public abstract void NavigateToResourceManagerTools();
+		public abstract void NavigateToResourceLibraryLocation(NavigationArguments arguments);
 #endif
 
 		public abstract void NavigateToSettings(string? selectItem = null);
