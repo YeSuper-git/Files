@@ -486,6 +486,7 @@ jobs:
       - name: Publish unpackaged application
         shell: pwsh
         env:
+          INSTALLER_VERSION: ${{ steps.installer_version.outputs.current }}
           FILES_MAX_PUBLISH_CACHE_HIT: ${{ steps.restore-publish.outputs.cache-hit }}
         run: |
           $ErrorActionPreference = 'Stop'
