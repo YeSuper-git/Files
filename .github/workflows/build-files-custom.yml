@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   FILES_MAX_FAST_BUILD: ${{ inputs.fast_build }}
@@ -23,11 +23,17 @@ jobs:
   build:
     outputs:
       installer_version: ${{ steps.installer_version.outputs.current }}
-      next_installer_version: ${{ steps.installer_version.outputs.next }}
     runs-on: windows-2025
     timeout-minutes: 30
 
     steps:
+      - name: Require main branch for official installer
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -ne 'refs/heads/main') {
+            throw 'The official Files max installer must be built from main.'
+          }
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -36,30 +42,20 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          if ($env:GITHUB_REF_TYPE -eq 'tag') {
-            $currentVersion = $env:GITHUB_REF_NAME -replace '^v', ''
-            if ($currentVersion -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$') {
-              throw "Installer tags must use vMAJOR.MINOR.PATCH, got '$env:GITHUB_REF_NAME'."
-            }
-            $nextVersion = ''
-          } else {
-            $versionFile = Join-Path $env:GITHUB_WORKSPACE '.github\installer\build-version.txt'
-            $currentVersion = (Get-Content -Raw -LiteralPath $versionFile).Trim()
-            $parsedVersion = [regex]::Match($currentVersion, '^(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)$')
-            if (-not $parsedVersion.Success) {
-              throw "Invalid canonical product version in '$versionFile': $currentVersion"
-            }
-            $major = [int]$parsedVersion.Groups['major'].Value
-            $minor = [int]$parsedVersion.Groups['minor'].Value
-            $patch = [int]$parsedVersion.Groups['patch'].Value
-            if ($major -lt 1 -or $major -gt 255 -or $minor -gt 255 -or $patch -ge 65535) {
-              throw "Canonical version is outside the supported Windows Installer range or cannot be incremented safely: $currentVersion"
-            }
-            $nextVersion = '{0}.{1}.{2}' -f $major, $minor, ($patch + 1)
+          $versionFile = Join-Path $env:GITHUB_WORKSPACE '.github\installer\build-version.txt'
+          $currentVersion = (Get-Content -Raw -LiteralPath $versionFile).Trim()
+          $parsedVersion = [regex]::Match($currentVersion, '^(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)$')
+          if (-not $parsedVersion.Success) {
+            throw "Invalid canonical product version in '$versionFile': $currentVersion"
+          }
+          $major = [int]$parsedVersion.Groups['major'].Value
+          $minor = [int]$parsedVersion.Groups['minor'].Value
+          $patch = [int]$parsedVersion.Groups['patch'].Value
+          if ($major -lt 1 -or $major -gt 255 -or $minor -gt 255 -or $patch -gt 65535) {
+            throw "Canonical version is outside the supported Windows Installer range: $currentVersion"
           }
 
           "current=$currentVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          "next=$nextVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           Write-Host "Unified Files max version: $currentVersion."
 
       - name: Preflight installer inputs
@@ -1328,31 +1324,6 @@ jobs:
             throw 'External-location identity remained registered after uninstall.'
           }
 
-      - name: Advance unified product version
-        if: github.ref_type == 'branch'
-        shell: pwsh
-        env:
-          BUILT_VERSION: ${{ needs.build.outputs.installer_version }}
-          NEXT_VERSION: ${{ needs.build.outputs.next_installer_version }}
-          BUILD_BRANCH: ${{ github.ref_name }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $versionFile = Join-Path $env:GITHUB_WORKSPACE '.github\installer\build-version.txt'
-          $recordedVersion = (Get-Content -Raw -LiteralPath $versionFile).Trim()
-          if ($recordedVersion -ne $env:BUILT_VERSION) {
-            throw "Installer version changed during the build: expected $env:BUILT_VERSION, found $recordedVersion. No version was advanced."
-          }
-          if ($env:NEXT_VERSION -notmatch '^\d+\.\d+\.\d+$') {
-            throw "Invalid next installer version: $env:NEXT_VERSION"
-          }
-
-          Set-Content -LiteralPath $versionFile -Value $env:NEXT_VERSION -NoNewline -Encoding ascii
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- .github/installer/build-version.txt
-          git commit -m "Advance Files max version to $env:NEXT_VERSION"
-          git push origin "HEAD:refs/heads/$env:BUILD_BRANCH"
-
       - name: Stage versioned installer artifact
         shell: pwsh
         env:
@@ -1372,19 +1343,3 @@ jobs:
           name: Files max Setup ${{ needs.build.outputs.installer_version }}
           path: Files max Setup ${{ needs.build.outputs.installer_version }}.exe
           if-no-files-found: error
-
-      - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: Files max Setup.exe
-          draft: false
-          body: |
-            ## Files max
-
-            Traditional installer for Windows 10/11. Files max is installed as a normal desktop application under Program Files.
-
-            - Full Files max file manager
-            - resource code detection
-            - Health check / batch rename
-            - Subtitle classification / undo
