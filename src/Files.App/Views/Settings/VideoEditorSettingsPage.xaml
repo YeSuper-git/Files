@@ -28,15 +28,12 @@
 				<ComboBoxItem Content="{video:VideoEditorText Name=VideoEditorSourceFolderOption}" Tag="Source" />
 				<ComboBoxItem Content="{video:VideoEditorText Name=VideoEditorCustomFolderOption}" Tag="Custom" />
 			</ComboBox>
-			<wctcontrols:SettingsExpander.Items>
-				<wctcontrols:SettingsCard Header="{video:VideoEditorText Name=VideoEditorCustomFolderOption}">
-					<wctcontrols:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8B7;" /></wctcontrols:SettingsCard.HeaderIcon>
-					<StackPanel Orientation="Horizontal" Spacing="8">
-						<TextBox x:Name="FolderPathTextBox" Width="360" IsReadOnly="True" PlaceholderText="{video:VideoEditorText Name=VideoEditorNoFolderSelected}" />
-						<Button x:Name="ChooseFolderButton" Content="{video:VideoEditorText Name=VideoEditorChooseFolder}" Click="ChooseFolderButton_Click" />
-					</StackPanel>
-				</wctcontrols:SettingsCard>
-			</wctcontrols:SettingsExpander.Items>
+			<wctcontrols:SettingsExpander.ItemsHeader>
+				<Grid Padding="20,12,32,12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+					<TextBox x:Name="FolderPathTextBox" Grid.Column="0" IsReadOnly="True" PlaceholderText="{video:VideoEditorText Name=VideoEditorNoFolderSelected}" />
+					<Button x:Name="ChooseFolderButton" Grid.Column="1" Content="{video:VideoEditorText Name=VideoEditorChooseFolder}" Click="ChooseFolderButton_Click" />
+				</Grid>
+			</wctcontrols:SettingsExpander.ItemsHeader>
 		</wctcontrols:SettingsExpander>
 		<TextBlock x:Name="FolderStatusText" Margin="48,4,0,0" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
 	</StackPanel>
