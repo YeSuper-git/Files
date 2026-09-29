@@ -246,6 +246,11 @@ namespace Files.App.Views.Shells
 		{
 			this.FindAscendant<ColumnsLayoutPage>()?.ParentShellPageInstance?.NavigateToResourceLibraryLocation(arguments);
 		}
+
+		public override void NavigateToVideoEditor()
+		{
+			this.FindAscendant<ColumnsLayoutPage>()?.ParentShellPageInstance?.NavigateToVideoEditor();
+		}
 #endif
 
 		public override void NavigateToSettings(string? selectItem = null)

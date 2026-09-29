@@ -1,4 +1,4 @@
-﻿// Copyright (c) Files Community
+// Copyright (c) Files Community
 // SPDX-License-Identifier: MPL-2.0
 
 namespace Files.App.Data.Enums
@@ -11,6 +11,7 @@ namespace Files.App.Data.Enums
 		FoldersPage,
 		ActionsPage,
 		TagsPage,
+		VideoEditorPage,
 		DevToolsPage,
 		AdvancedPage,
 		AboutPage,

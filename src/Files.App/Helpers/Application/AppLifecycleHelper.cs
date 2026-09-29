@@ -1,4 +1,4 @@
-﻿// Copyright (c) Files Community
+// Copyright (c) Files Community
 // Licensed under the MIT License.
 
 using Files.App.Helpers.Application;
@@ -331,6 +331,13 @@ namespace Files.App.Helpers
 					.AddSingleton<ISidebarContext, SidebarContext>()
 					.AddSingleton<IShelfContext, ShelfContext>()
 #if FILES_RESOURCE_MANAGER
+					// Video Editor
+					.AddSingleton<Files.App.Services.VideoEditor.VideoToolchain>()
+					.AddSingleton<Files.App.Services.VideoEditor.VideoProbeService>()
+					.AddSingleton<Files.App.Services.VideoEditor.VideoCutProcessor>()
+					.AddSingleton<Files.App.Services.VideoEditor.VideoCutPresetService>()
+					.AddSingleton<Files.App.Services.VideoEditor.VideoCutQueueService>()
+					.AddSingleton<Files.App.ViewModels.VideoEditor.VideoEditorViewModel>()
 					// Resource Manager
 					.AddSingleton<Files.App.Services.ResourceManager.IResourceWorkspaceService, Files.App.Services.ResourceManager.ResourceWorkspaceService>()
 					.AddSingleton<Files.App.Services.ResourceManager.IResourceTitleTranslationService, Files.App.Services.ResourceManager.AliyunMachineTranslationTitleTranslationService>()

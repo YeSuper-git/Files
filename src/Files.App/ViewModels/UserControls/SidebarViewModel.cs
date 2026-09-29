@@ -86,7 +86,8 @@ namespace Files.App.ViewModels.UserControls
 				SectionType.WSL,
 				SectionType.FileTag
 #if FILES_RESOURCE_MANAGER
-				, SectionType.ResourceManager
+				, SectionType.ResourceManager,
+				SectionType.VideoEditor
 #endif
 			];
 
@@ -321,6 +322,7 @@ namespace Files.App.ViewModels.UserControls
 			Manager_DataChanged(SectionType.FileTag, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
 #if FILES_RESOURCE_MANAGER
 			Manager_DataChanged(SectionType.ResourceManager, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+			Manager_DataChanged(SectionType.VideoEditor, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
 #endif
 
 			App.QuickAccessManager.Model.DataChanged += Manager_DataChanged;
@@ -384,7 +386,7 @@ namespace Files.App.ViewModels.UserControls
 #if FILES_RESOURCE_MANAGER
 				// Resource Manager is a standalone navigation item, so it has no
 				// child collection to synchronize like the filesystem sections do.
-				if (sectionType == SectionType.ResourceManager)
+				if (sectionType is SectionType.ResourceManager or SectionType.VideoEditor)
 					return;
 #endif
 
@@ -400,6 +402,7 @@ namespace Files.App.ViewModels.UserControls
 #if FILES_RESOURCE_MANAGER
 					// Resource Manager is a standalone navigation item, not a collection-backed section.
 					SectionType.ResourceManager => Array.Empty<INavigationControlItem>(),
+					SectionType.VideoEditor => Array.Empty<INavigationControlItem>(),
 #endif
 					_ => throw new ArgumentOutOfRangeException(nameof(sectionType), sectionType, "The sidebar section type is not supported.")
 				};
@@ -627,13 +630,20 @@ namespace Files.App.ViewModels.UserControls
 
 #if FILES_RESOURCE_MANAGER
 				case SectionType.ResourceManager:
-					section = BuildSection("资源管理", sectionType, new ContextMenuOptions { IsLocationItem = true }, true);
+					section = BuildSection(Strings.SettingsItemResourceManager.GetLocalizedResource(), sectionType, new ContextMenuOptions { IsLocationItem = true }, true);
 					// This is a navigable application page, not a collapsible sidebar group.
 					// BuildSection creates an empty child collection for normal sections;
 					// keeping it here makes SidebarView classify this row as a group header
 					// and suppress its ItemInvoked event.
 					section.ChildItems = null;
 					section.Path = "ResourceManager";
+					section.IsHeader = true;
+					break;
+
+				case SectionType.VideoEditor:
+					section = BuildSection(Strings.VideoEditorNavigationTitle.GetLocalizedResource(), sectionType, new ContextMenuOptions { IsLocationItem = true }, true);
+					section.ChildItems = null;
+					section.Path = "VideoEditor";
 					section.IsHeader = true;
 					break;
 #endif
@@ -686,6 +696,7 @@ namespace Files.App.ViewModels.UserControls
 					SectionType.Pinned => App.QuickAccessManager.Model.AddAllItemsToSidebarAsync,
 #if FILES_RESOURCE_MANAGER
 					SectionType.ResourceManager => () => Task.CompletedTask,
+					SectionType.VideoEditor => () => Task.CompletedTask,
 #endif
 					_ => () => Task.CompletedTask
 				};
@@ -876,6 +887,19 @@ namespace Files.App.ViewModels.UserControls
 
 				if (PaneHolder?.ActivePane is IShellPage resourceManagerShellPage)
 					resourceManagerShellPage.NavigateToResourceManager();
+				return;
+			}
+
+			if (string.Equals(navigationPath, "VideoEditor", StringComparison.OrdinalIgnoreCase))
+			{
+				if (ctrlPressed || middleClickPressed)
+				{
+					await NavigationHelpers.OpenVideoEditorInNewTab();
+					return;
+				}
+
+				if (PaneHolder?.ActivePane is IShellPage videoEditorShellPage)
+					videoEditorShellPage.NavigateToVideoEditor();
 				return;
 			}
 #endif

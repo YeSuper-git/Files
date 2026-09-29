@@ -22,6 +22,7 @@ namespace Files.App.ViewModels.Settings
 				(SettingsPageKind.FoldersPage,    Strings.FilesAndFolders.GetLocalizedResource(), () => new FoldersPage()),
 				(SettingsPageKind.ActionsPage,    Strings.Actions.GetLocalizedResource(),         () => new ActionsPage()),
 				(SettingsPageKind.TagsPage,       Strings.FileTags.GetLocalizedResource(),        () => new TagsPage()),
+				(SettingsPageKind.VideoEditorPage, Strings.VideoEditorSettingsTitle.GetLocalizedResource(), () => new VideoEditorSettingsPage()),
 				#if FILES_RESOURCE_MANAGER
 				(SettingsPageKind.ResourceManagerPage, Strings.SettingsItemResourceManager.GetLocalizedResource(), () => new ResourceManagerSettingsPage()),
 				#endif

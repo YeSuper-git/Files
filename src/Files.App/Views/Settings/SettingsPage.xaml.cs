@@ -136,6 +136,7 @@ namespace Files.App.Views
 				SettingsPageKind.FoldersPage => typeof(FoldersPage),
 				SettingsPageKind.ActionsPage => typeof(ActionsPage),
 				SettingsPageKind.TagsPage => typeof(TagsPage),
+				SettingsPageKind.VideoEditorPage => typeof(VideoEditorSettingsPage),
 				#if FILES_RESOURCE_MANAGER
 				SettingsPageKind.ResourceManagerPage => typeof(ResourceManagerSettingsPage),
 				#endif

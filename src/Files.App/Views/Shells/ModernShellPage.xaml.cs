@@ -181,6 +181,10 @@ namespace Files.App.Views.Shells
 			{
 				NavigateToResourceManagerTools();
 			}
+			else if (navParams.NavPath == "VideoEditor")
+			{
+				NavigateToVideoEditor();
+			}
 #endif
 			else if (navParams.NavPath == "Settings")
 			{
@@ -218,6 +222,15 @@ namespace Files.App.Views.Shells
 
 		private async void ItemDisplayFrame_Navigated(object sender, NavigationEventArgs e)
 		{
+			InstanceViewModel.IsPageTypeVideoEditor = e.SourcePageType == typeof(Files.App.Views.VideoEditor.VideoEditorPage);
+			if (InstanceViewModel.IsPageTypeVideoEditor)
+			{
+				InstanceViewModel.IsPageTypeNotHome = true;
+				ToolbarViewModel.PathControlDisplayText = Strings.VideoEditorTitle.GetLocalizedResource();
+				ToolbarViewModel.CanNavigateToParent = false;
+				ToolbarViewModel.SelectedItems = null;
+			}
+
 			try
 			{
 				ContentPage = await GetContentOrNullAsync();
@@ -555,6 +568,24 @@ namespace Files.App.Views.Shells
 			itemDisplayFrame.Navigate(
 				typeof(ResourceManager.ResourceLibraryPage),
 				arguments,
+				new SuppressNavigationTransitionInfo());
+		}
+
+		public override void NavigateToVideoEditor()
+		{
+			InstanceViewModel.IsResourceManagerMode = false;
+			InstanceViewModel.ResourceLibraryPath = null;
+			InstanceViewModel.IsPageTypeVideoEditor = true;
+			InstanceViewModel.IsPageTypeNotHome = true;
+			ToolbarViewModel.PathControlDisplayText = Strings.VideoEditorTitle.GetLocalizedResource();
+			ToolbarViewModel.CanNavigateToParent = false;
+			ItemDisplayFrame.Navigate(
+				typeof(Files.App.Views.VideoEditor.VideoEditorPage),
+				new NavigationArguments()
+				{
+					NavPathParam = "VideoEditor",
+					AssociatedTabInstance = this
+				},
 				new SuppressNavigationTransitionInfo());
 		}
 #endif

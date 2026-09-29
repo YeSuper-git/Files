@@ -123,6 +123,7 @@ namespace Files.App.Views.Shells
 			CurrentPageType != typeof(HomePage) &&
 			CurrentPageType != typeof(ReleaseNotesPage) &&
 			CurrentPageType != typeof(SettingsPage) &&
+			!InstanceViewModel.IsPageTypeVideoEditor &&
 			(PaneHolder is null || !PaneHolder.IsMultiPaneActive || Equals(PaneHolder.ActivePane, this));
 
 		protected TabBarItemParameter? _TabItemArguments;
@@ -904,6 +905,7 @@ namespace Files.App.Views.Shells
 		public abstract void NavigateToResourceManager();
 		public abstract void NavigateToResourceManagerTools();
 		public abstract void NavigateToResourceLibraryLocation(NavigationArguments arguments);
+		public abstract void NavigateToVideoEditor();
 #endif
 
 		public abstract void NavigateToSettings(string? selectItem = null);

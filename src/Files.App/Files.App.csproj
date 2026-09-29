@@ -97,6 +97,10 @@
         <Compile Remove="ViewModels\ResourceManager\**\*.cs" Condition="'$(FilesResourceManagerBuild)' != 'true'" />
         <Compile Remove="Views\ResourceManager\**\*.xaml.cs" Condition="'$(FilesResourceManagerBuild)' != 'true'" />
         <Page Remove="Views\ResourceManager\**\*.xaml" Condition="'$(FilesResourceManagerBuild)' != 'true'" />
+        <Compile Remove="Services\VideoEditor\**\*.cs" Condition="'$(FilesResourceManagerBuild)' != 'true'" />
+        <Compile Remove="ViewModels\VideoEditor\**\*.cs" Condition="'$(FilesResourceManagerBuild)' != 'true'" />
+        <Compile Remove="Views\VideoEditor\**\*.xaml.cs" Condition="'$(FilesResourceManagerBuild)' != 'true'" />
+        <Page Remove="Views\VideoEditor\**\*.xaml" Condition="'$(FilesResourceManagerBuild)' != 'true'" />
         <Manifest Include="$(ApplicationManifest)" />
         <!-- External-location builds still resolve ms-appx resources from the
              real install directory, so publish the complete asset tree. -->

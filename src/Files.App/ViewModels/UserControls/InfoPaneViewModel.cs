@@ -558,7 +558,7 @@ namespace Files.App.ViewModels.UserControls
 		public async Task UpdateSelectedItemPreviewAsync(bool downloadItem = false)
 		{
 			CancelPreviewLoad();
-			if (contentPageContext.PageType is ContentPageTypes.ReleaseNotes || contentPageContext.PageType is ContentPageTypes.Settings)
+			if (contentPageContext.PageType is ContentPageTypes.ReleaseNotes or ContentPageTypes.Settings or ContentPageTypes.VideoEditor)
 			{
 				PreviewPaneState = PreviewPaneStates.NoPreviewOrDetailsAvailable;
 				PreviewPaneContent = null;

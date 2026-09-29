@@ -52,6 +52,14 @@ namespace Files.App.Helpers
 				new PaneNavigationArguments { LeftPaneNavPathParam = "ResourceManager" },
 				 switchToNewTab: GeneralSettingsService.AlwaysSwitchToNewlyOpenedTab);
 		}
+
+		public static Task OpenVideoEditorInNewTab()
+		{
+			return AddNewTabByParamAsync(
+				typeof(ShellPanesPage),
+				new PaneNavigationArguments { LeftPaneNavPathParam = "VideoEditor" },
+				switchToNewTab: GeneralSettingsService.AlwaysSwitchToNewlyOpenedTab);
+		}
 #endif
 
 		public static Task AddNewTabAsync()
@@ -291,6 +299,12 @@ namespace Files.App.Helpers
 			{
 				tabLocationHeader = "资源管理";
 				iconSource = new FontIconSource() { Glyph = "\uE8B7" };
+				toolTipText = tabLocationHeader;
+			}
+			else if (currentPath.Equals("VideoEditor", StringComparison.OrdinalIgnoreCase))
+			{
+				tabLocationHeader = Strings.VideoEditorTitle.GetLocalizedResource();
+				((ImageIconSource)iconSource).ImageSource = new BitmapImage(new Uri(SidebarSectionIcons.For(SectionType.VideoEditor)!));
 				toolTipText = tabLocationHeader;
 			}
 #endif

@@ -33,7 +33,7 @@ namespace Files.App.Data.Items
 			get => text;
 			set
 			{
-				text = value;
+				SetProperty(ref text, value);
 				// Just in case path hasn't been set
 				if (ToolTip is "")
 					ToolTip = value;

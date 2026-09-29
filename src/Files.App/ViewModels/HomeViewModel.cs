@@ -211,30 +211,31 @@ namespace Files.App.ViewModels
 				return false;
 			}
 
-			if (atIndex > WidgetItems.Count)
+			void AddWidget()
 			{
-				MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() =>
-				{
+				if (atIndex > WidgetItems.Count)
 					WidgetItems.Add(widgetModel);
-				});
-			}
-			else
-			{
-				MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() =>
-				{
+				else
 					WidgetItems.Insert(atIndex, widgetModel);
-				});
 			}
+
+			var dispatcher = MainWindow.Instance.DispatcherQueue;
+			if (dispatcher.HasThreadAccess)
+				AddWidget();
+			else
+				_ = dispatcher.EnqueueOrInvokeAsync(AddWidget);
 
 			return true;
 		}
 
 		public bool CanAddWidget(string widgetName)
 		{
-			return MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() =>
-			{
-				return !(WidgetItems.Any((item) => item.WidgetItemModel.WidgetName == widgetName));
-			}).GetAwaiter().GetResult();
+			bool CanAdd() => !WidgetItems.Any(item => item.WidgetItemModel.WidgetName == widgetName);
+
+			var dispatcher = MainWindow.Instance.DispatcherQueue;
+			return dispatcher.HasThreadAccess
+				? CanAdd()
+				: dispatcher.EnqueueOrInvokeAsync(CanAdd).GetAwaiter().GetResult();
 		}
 
 		private void RemoveWidgetAt(int index)

@@ -1,0 +1,43 @@
+<!-- Copyright (c) Files Community. Licensed under the MIT License. -->
+<Page
+	x:Class="Files.App.Views.Settings.VideoEditorSettingsPage"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:video="using:Files.App.Services.VideoEditor"
+	xmlns:wctcontrols="using:CommunityToolkit.WinUI.Controls">
+	<StackPanel Spacing="8">
+		<TextBlock Padding="0,0,0,12" Style="{StaticResource App.Theme.SubtitleTextBlockStyle}" Text="{video:VideoEditorText Name=VideoEditorSettingsTitle}" />
+		<TextBlock Margin="0,8,0,0" FontSize="16" FontWeight="Medium" Text="{video:VideoEditorText Name=VideoEditorExportGroup}" />
+		<wctcontrols:SettingsCard Header="{video:VideoEditorText Name=VideoEditorExportMode}" Description="{video:VideoEditorText Name=VideoEditorExportModeHint}">
+			<wctcontrols:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE898;" /></wctcontrols:SettingsCard.HeaderIcon>
+			<ComboBox x:Name="OutputModeComboBox" Width="240" SelectionChanged="OutputModeComboBox_SelectionChanged">
+				<ComboBoxItem Content="{video:VideoEditorText Name=VideoEditorReplaceOriginalOption}" Tag="Replace" />
+				<ComboBoxItem Content="{video:VideoEditorText Name=VideoEditorKeepOriginalOption}" Tag="New" />
+			</ComboBox>
+		</wctcontrols:SettingsCard>
+		<wctcontrols:SettingsCard x:Name="SourceLocationCard" Header="{video:VideoEditorText Name=VideoEditorExportLocation}" Description="{video:VideoEditorText Name=VideoEditorExportLocationHint}">
+			<wctcontrols:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8B7;" /></wctcontrols:SettingsCard.HeaderIcon>
+			<ComboBox x:Name="SourceFolderModeComboBox" Width="240" SelectionChanged="FolderModeComboBox_SelectionChanged">
+				<ComboBoxItem Content="{video:VideoEditorText Name=VideoEditorSourceFolderOption}" Tag="Source" />
+				<ComboBoxItem Content="{video:VideoEditorText Name=VideoEditorCustomFolderOption}" Tag="Custom" />
+			</ComboBox>
+		</wctcontrols:SettingsCard>
+		<wctcontrols:SettingsExpander x:Name="LocationExpander" Header="{video:VideoEditorText Name=VideoEditorExportLocation}" Description="{video:VideoEditorText Name=VideoEditorExportLocationHint}" IsExpanded="False" Visibility="Collapsed">
+			<wctcontrols:SettingsExpander.HeaderIcon><FontIcon Glyph="&#xE8B7;" /></wctcontrols:SettingsExpander.HeaderIcon>
+			<ComboBox x:Name="FolderModeComboBox" Width="240" SelectionChanged="FolderModeComboBox_SelectionChanged">
+				<ComboBoxItem Content="{video:VideoEditorText Name=VideoEditorSourceFolderOption}" Tag="Source" />
+				<ComboBoxItem Content="{video:VideoEditorText Name=VideoEditorCustomFolderOption}" Tag="Custom" />
+			</ComboBox>
+			<wctcontrols:SettingsExpander.Items>
+				<wctcontrols:SettingsCard Header="{video:VideoEditorText Name=VideoEditorCustomFolderOption}">
+					<wctcontrols:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8B7;" /></wctcontrols:SettingsCard.HeaderIcon>
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<TextBox x:Name="FolderPathTextBox" Width="360" IsReadOnly="True" PlaceholderText="{video:VideoEditorText Name=VideoEditorNoFolderSelected}" />
+						<Button x:Name="ChooseFolderButton" Content="{video:VideoEditorText Name=VideoEditorChooseFolder}" Click="ChooseFolderButton_Click" />
+					</StackPanel>
+				</wctcontrols:SettingsCard>
+			</wctcontrols:SettingsExpander.Items>
+		</wctcontrols:SettingsExpander>
+		<TextBlock x:Name="FolderStatusText" Margin="48,4,0,0" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+	</StackPanel>
+</Page>
