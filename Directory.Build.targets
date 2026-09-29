@@ -19,4 +19,20 @@
       </ResolvedFileToPublish>
     </ItemGroup>
   </Target>
+
+  <!-- Unpackaged publish omits compiled XAML pages needed by sparse-package apps. -->
+  <Target Name="FilesCopyCompiledXamlToPublishDirectory"
+          Condition="'$(WindowsPackageType)' == 'None'"
+          AfterTargets="Publish">
+    <PropertyGroup>
+      <_FilesPublishDirectory>$([MSBuild]::NormalizeDirectory('$(PublishDir)'))</_FilesPublishDirectory>
+    </PropertyGroup>
+    <ItemGroup>
+      <_FilesCompiledXamlForPublish Include="$(TargetDir)**\*.xbf"
+                                    Exclude="$(_FilesPublishDirectory)**\*.xbf" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_FilesCompiledXamlForPublish)"
+          DestinationFiles="@(_FilesCompiledXamlForPublish->'$(PublishDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
 </Project>
