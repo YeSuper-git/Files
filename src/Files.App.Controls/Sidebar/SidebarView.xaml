@@ -19,6 +19,7 @@
 				ContentOpacity="{x:Bind RowOpacity}"
 				DataContext="{x:Bind}"
 				Item="{x:Bind Item}"
+				IsTopLevel="{x:Bind IsTopLevel}"
 				Margin="{x:Bind SectionGapMargin, Mode=OneWay}"
 				NestingLevel="{x:Bind Depth}"
 				UseItemPresentation="True" />

@@ -4788,4 +4788,49 @@
   <data name="ResourceManagerCredentialsSaveFailed" xml:space="preserve">
     <value>无法保存凭证。</value>
   </data>
+  <data name="ResourceManagerActorsCollected" xml:space="preserve">
+    <value>已收录 {0} 位演员</value>
+  </data>
+  <data name="ResourceManagerWorksCollected" xml:space="preserve">
+    <value>已收录 {0} 部作品</value>
+  </data>
+  <data name="ResourceManagerVideoLength" xml:space="preserve">
+    <value>片长</value>
+  </data>
+  <data name="ResourceManagerVideoResolution" xml:space="preserve">
+    <value>分辨率</value>
+  </data>
+  <data name="ResourceManagerVideoFrameRate" xml:space="preserve">
+    <value>帧率</value>
+  </data>
+  <data name="ResourceManagerVideoQuality" xml:space="preserve">
+    <value>画质规格</value>
+  </data>
+  <data name="ResourceManagerVideoQualitySd" xml:space="preserve">
+    <value>标清</value>
+  </data>
+  <data name="ResourceManagerVideoQualityHd" xml:space="preserve">
+    <value>高清</value>
+  </data>
+  <data name="ResourceManagerVideoQualityFullHd" xml:space="preserve">
+    <value>全高清</value>
+  </data>
+  <data name="ResourceManagerVideoQualityQhd" xml:space="preserve">
+    <value>QHD 超清</value>
+  </data>
+  <data name="ResourceManagerVideoQuality4K" xml:space="preserve">
+    <value>4K 超高清</value>
+  </data>
+  <data name="ResourceManagerVideoQuality8K" xml:space="preserve">
+    <value>8K 超高清</value>
+  </data>
+  <data name="ResourceManagerVideoQualityNear" xml:space="preserve">
+    <value>{0}P · 接近 {1}P {2}</value>
+  </data>
+  <data name="ResourceManagerVideoQualityWide" xml:space="preserve">
+    <value>{0}级（宽银幕）</value>
+  </data>
+  <data name="ResourceManagerVideoQualityOther" xml:space="preserve">
+    <value>{0}P {1}级</value>
+  </data>
 </root>

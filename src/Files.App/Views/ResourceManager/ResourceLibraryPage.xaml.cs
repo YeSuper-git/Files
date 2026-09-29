@@ -601,6 +601,10 @@ public sealed partial class ResourceLibraryPage : Page
             };
             listedItem = videoFolderListedItem;
         }
+        else if (isFile)
+        {
+            listedItem = new ResourceVideoFileListedItem();
+        }
         else
         {
             listedItem = new ListedItem();
@@ -620,7 +624,7 @@ public sealed partial class ResourceLibraryPage : Page
             };
             actor.AddActorPosterAsync = async () =>
             {
-                var posterPath = await PickPosterPathAsync();
+                var posterPath = await PickAndImportPosterAsync();
                 if (posterPath is null)
                     return null;
 
@@ -630,7 +634,10 @@ public sealed partial class ResourceLibraryPage : Page
                 if (!updatedDetails.PosterPaths.Contains(posterPath, StringComparer.OrdinalIgnoreCase))
                     updatedDetails.PosterPaths.Add(posterPath);
                 _workspace.SetActorDetails(item.Path, updatedDetails);
+                var previousMainPoster = _workspace.GetPosterOverride(item.Path);
                 _workspace.SetPosterOverride(item.Path, posterPath);
+                if (previousMainPoster is not null)
+                    _workspace.DeleteImportedPosterIfUnused(previousMainPoster);
                 actor.ActorDetails = _workspace.GetActorDetails(item.Path);
                 actor.ActorPosterPaths = GetActorPosterPaths(item, actor.ActorDetails);
                 actor.MainPosterPath = posterPath;
@@ -673,6 +680,7 @@ public sealed partial class ResourceLibraryPage : Page
                 item.Poster = actor.MainPosterPath is { } mainPosterPath
                     ? await LoadPosterAsync(mainPosterPath, CancellationToken.None)
                     : null;
+                _workspace.DeleteImportedPosterIfUnused(posterPath);
             };
         }
 
@@ -1274,9 +1282,8 @@ public sealed partial class ResourceLibraryPage : Page
         if (GetNativeResourceStatusBarViewModel() is not { } statusBarViewModel)
             return;
 
-        var count = BrowserItems.Count;
         statusBarViewModel.DirectoryItemCount = string.IsNullOrWhiteSpace(message)
-            ? $"{count} {Strings.Items.GetLocalizedFormatResource(count)}"
+            ? GetResourceCountStatus()
             : message;
     }
 
@@ -1285,10 +1292,28 @@ public sealed partial class ResourceLibraryPage : Page
         if (GetNativeResourceStatusBarViewModel() is not { } statusBarViewModel)
             return;
 
-        var count = BrowserItems.Count;
         statusBarViewModel.DirectoryItemCount = string.IsNullOrWhiteSpace(description)
-            ? $"{count} {Strings.Items.GetLocalizedFormatResource(count)}"
+            ? GetResourceCountStatus()
             : description;
+    }
+
+    private string GetResourceCountStatus()
+    {
+        var locationKind = _locations.Count > 0 ? _locations[^1].Kind : ResourceBrowserLocationKind.LibraryRoot;
+        if (locationKind == ResourceBrowserLocationKind.LibraryRoot)
+        {
+            var actorCount = BrowserItems.Count(item => item.Kind == ResourceBrowserItemKind.ActorFolder);
+            return string.Format(CultureInfo.CurrentCulture, Strings.ResourceManagerActorsCollected.GetLocalizedResource(), actorCount);
+        }
+
+        if (locationKind is ResourceBrowserLocationKind.ActorFolder or ResourceBrowserLocationKind.CategoryFolder)
+        {
+            var workCount = BrowserItems.Count(item => item.Kind == ResourceBrowserItemKind.VideoFolder);
+            return string.Format(CultureInfo.CurrentCulture, Strings.ResourceManagerWorksCollected.GetLocalizedResource(), workCount);
+        }
+
+        var count = BrowserItems.Count;
+        return $"{count} {Strings.Items.GetLocalizedFormatResource(count)}";
     }
 
     private string GetVideoTitleForTranslation(ResourceBrowserItemViewModel item)
@@ -2027,16 +2052,19 @@ public sealed partial class ResourceLibraryPage : Page
 
     private async Task ChoosePosterAsync(ResourceBrowserItemViewModel item)
     {
-        var posterPath = await PickPosterPathAsync();
+        var posterPath = await PickAndImportPosterAsync();
         if (posterPath is null)
             return;
 
+        var previousPoster = _workspace.GetPosterOverride(item.Path);
         _workspace.SetPosterOverride(item.Path, posterPath);
+        if (previousPoster is not null)
+            _workspace.DeleteImportedPosterIfUnused(previousPoster);
         await RefreshAsync();
         SetResourceStatusMessage($"已设置海报：{item.Name}");
     }
 
-    private async Task<string?> PickPosterPathAsync()
+    private async Task<string?> PickAndImportPosterAsync()
     {
         var picker = new Windows.Storage.Pickers.FileOpenPicker();
         WinRT.Interop.InitializeWithWindow.Initialize(picker, MainWindow.Instance.WindowHandle);
@@ -2045,7 +2073,19 @@ public sealed partial class ResourceLibraryPage : Page
             picker.FileTypeFilter.Add($".{extension.TrimStart('.')}");
 
         var file = await picker.PickSingleFileAsync();
-        return file?.Path;
+        if (file is null)
+            return null;
+
+        try
+        {
+            return await _workspace.ImportPosterAsync(file.Path);
+        }
+        catch (Exception ex)
+        {
+            App.Logger.LogError(ex, "Unable to import resource poster from {PosterPath}", file.Path);
+            SetResourceStatusMessage($"导入海报失败：{ex.Message}");
+            return null;
+        }
     }
 
     private static void OpenContainingFolder(string path)

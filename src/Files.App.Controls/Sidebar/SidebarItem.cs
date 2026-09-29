@@ -478,14 +478,14 @@ namespace Files.App.Controls
 		{
 			if (Owner?.SupportsExpansion == false)
 			{
-				VisualStateManager.GoToState(this, "NoExpansion", false);
+				VisualStateManager.GoToState(this, IsTopLevel ? "NoChildren" : "NoExpansion", false);
 				UpdateSelectionState();
 				return;
 			}
 
 			if (Item?.Children is null || !CollapseEnabled)
 			{
-				VisualStateManager.GoToState(this, "NoExpansion", false);
+				VisualStateManager.GoToState(this, IsTopLevel ? "NoChildren" : "NoExpansion", false);
 			}
 			else if (!HasChildren)
 			{

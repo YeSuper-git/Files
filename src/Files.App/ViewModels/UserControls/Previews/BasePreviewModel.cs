@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System.IO;
+using Files.App.Data.Items.ResourceManager;
 using Files.App.ViewModels.Properties;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -138,7 +139,98 @@ namespace Files.App.ViewModels.Previews
 				? string.Join(',', Item.FileTagsUI.Select(x => x.Name))
 				: null;
 
+			if (Item is ResourceVideoFileListedItem)
+				FormatResourceVideoDetails(list);
+
 			return list.Where(i => i.ValueText is not null).ToList();
+		}
+
+		private static void FormatResourceVideoDetails(List<FileProperty> properties)
+		{
+			var duration = properties.Find(property => property.Property is "System.Media.Duration");
+			if (duration is not null)
+				duration.NameResource = nameof(Strings.ResourceManagerVideoLength);
+
+			var frameRate = properties.Find(property => property.Property is "System.Video.FrameRate");
+			if (frameRate is not null)
+				frameRate.NameResource = nameof(Strings.ResourceManagerVideoFrameRate);
+
+			var widthProperty = properties.Find(property => property.Property is "System.Video.FrameWidth");
+			var heightProperty = properties.Find(property => property.Property is "System.Video.FrameHeight");
+			if (widthProperty is null || heightProperty is null)
+				return;
+
+			var insertIndex = properties.IndexOf(widthProperty);
+			var width = 0;
+			var height = 0;
+			var hasResolution = int.TryParse(widthProperty.Value?.ToString(), out width) && width > 0 &&
+				int.TryParse(heightProperty.Value?.ToString(), out height) && height > 0;
+			properties.Remove(widthProperty);
+			properties.Remove(heightProperty);
+			if (!hasResolution)
+				return;
+
+			properties.Insert(insertIndex, new FileProperty
+			{
+				NameResource = nameof(Strings.ResourceManagerVideoResolution),
+				Value = $"{width}x{height}",
+			});
+			properties.Insert(insertIndex + 1, new FileProperty
+			{
+				NameResource = nameof(Strings.ResourceManagerVideoQuality),
+				Value = GetResourceVideoQuality(width, height),
+			});
+		}
+
+		private static string GetResourceVideoQuality(int width, int height)
+		{
+			var longEdge = Math.Max(width, height);
+			var shortEdge = Math.Min(width, height);
+			var aspectRatio = (double)longEdge / shortEdge;
+			var standardFormats = new (int Width, int Height, string Label)[]
+			{
+				(7680, 4320, Strings.ResourceManagerVideoQuality8K.GetLocalizedResource()),
+				(3840, 2160, Strings.ResourceManagerVideoQuality4K.GetLocalizedResource()),
+				(2560, 1440, Strings.ResourceManagerVideoQualityQhd.GetLocalizedResource()),
+				(1920, 1080, Strings.ResourceManagerVideoQualityFullHd.GetLocalizedResource()),
+				(1280, 720, Strings.ResourceManagerVideoQualityHd.GetLocalizedResource()),
+			};
+
+			foreach (var format in standardFormats)
+			{
+				if (longEdge == format.Width && shortEdge == format.Height)
+					return $"{format.Height}P {format.Label}";
+			}
+
+			if (aspectRatio <= 2.5)
+			{
+				var nearest = standardFormats
+					.Where(format => Math.Abs(shortEdge - format.Height) / (double)format.Height <= 0.08 &&
+						longEdge >= format.Width * 0.8 && longEdge <= format.Width * 1.08)
+						.OrderBy(format => Math.Abs(shortEdge - format.Height) / (double)format.Height +
+							Math.Abs(longEdge - format.Width) / (double)format.Width)
+						.FirstOrDefault();
+				if (nearest.Height > 0)
+					return string.Format(Strings.ResourceManagerVideoQualityNear.GetLocalizedResource(), shortEdge, nearest.Height, nearest.Label);
+
+				foreach (var format in standardFormats)
+				{
+					if (Math.Abs(longEdge - format.Width) / (double)format.Width <= 0.08 &&
+						shortEdge >= format.Height * 0.65 && shortEdge < format.Height * 0.92)
+						return string.Format(Strings.ResourceManagerVideoQualityWide.GetLocalizedResource(), format.Label);
+				}
+			}
+
+			var qualityResource = shortEdge switch
+			{
+				>= 4320 => Strings.ResourceManagerVideoQuality8K,
+				>= 2160 => Strings.ResourceManagerVideoQuality4K,
+				>= 1440 => Strings.ResourceManagerVideoQualityQhd,
+				>= 1080 => Strings.ResourceManagerVideoQualityFullHd,
+				>= 720 => Strings.ResourceManagerVideoQualityHd,
+				_ => Strings.ResourceManagerVideoQualitySd,
+			};
+			return string.Format(Strings.ResourceManagerVideoQualityOther.GetLocalizedResource(), shortEdge, qualityResource.GetLocalizedResource());
 		}
 
 		private sealed partial class DetailsOnlyPreviewModel : BasePreviewModel

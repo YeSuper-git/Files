@@ -32,10 +32,8 @@ public sealed partial class ResourceManagerSettingsPage : Page
             .OfType<ComboBoxItem>()
             .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), selectedProvider, StringComparison.Ordinal))
             ?? TranslationProviderComboBox.Items.OfType<ComboBoxItem>().First();
+        RefreshCredentialFields();
         UpdateTranslationConfigVisibility();
-        MachineAccessKeyIdTextBox.PlaceholderText = GetCredentialPlaceholder(ResourceTitleTranslationCredentialStore.GetMachineAccessKeyId());
-        MachineAccessKeySecretPasswordBox.PlaceholderText = GetCredentialPlaceholder(ResourceTitleTranslationCredentialStore.GetMachineAccessKeySecret());
-        BailianApiKeyPasswordBox.PlaceholderText = GetCredentialPlaceholder(ResourceTitleTranslationCredentialStore.GetBailianApiKey());
         SnapshotsListView.ItemsSource = _snapshots;
         RefreshSnapshots();
         _isInitializing = false;
@@ -43,6 +41,9 @@ public sealed partial class ResourceManagerSettingsPage : Page
 
     private void TranslationProviderComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        _isEditingTranslationProvider = false;
+        if (!_isInitializing)
+            RefreshCredentialFields();
         UpdateTranslationConfigVisibility();
         if (!_isInitializing && TranslationProviderComboBox.SelectedItem is ComboBoxItem { Tag: string provider })
             _appSettings.ResourceManagerTranslationProvider = provider;
@@ -51,22 +52,40 @@ public sealed partial class ResourceManagerSettingsPage : Page
     private void EditTranslationProviderButton_Click(object sender, RoutedEventArgs e)
     {
         _isEditingTranslationProvider = !_isEditingTranslationProvider;
-        TranslationProviderEditPanel.Visibility = _isEditingTranslationProvider ? Visibility.Visible : Visibility.Collapsed;
-        EditTranslationProviderButton.Content = _isEditingTranslationProvider
-            ? Strings.ResourceManagerFinishEditing.GetLocalizedResource()
-            : Strings.Edit.GetLocalizedResource();
+        if (!_isEditingTranslationProvider)
+            RefreshCredentialFields();
         UpdateTranslationConfigVisibility();
+    }
+
+    private void RefreshCredentialFields()
+    {
+        MachineAccessKeyIdTextBox.Text = ResourceTitleTranslationCredentialStore.GetMachineAccessKeyId();
+        MachineAccessKeySecretPasswordBox.Password = ResourceTitleTranslationCredentialStore.GetMachineAccessKeySecret();
+        BailianApiKeyPasswordBox.Password = ResourceTitleTranslationCredentialStore.GetBailianApiKey();
+        MachineAccessKeyIdTextBox.PlaceholderText = GetCredentialPlaceholder(MachineAccessKeyIdTextBox.Text);
+        MachineAccessKeySecretPasswordBox.PlaceholderText = GetCredentialPlaceholder(MachineAccessKeySecretPasswordBox.Password);
+        BailianApiKeyPasswordBox.PlaceholderText = GetCredentialPlaceholder(BailianApiKeyPasswordBox.Password);
     }
 
     private void UpdateTranslationConfigVisibility()
     {
         var provider = (TranslationProviderComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString();
         MachineTranslationConfigPanel.Visibility = string.Equals(provider, "AliyunMachineTranslation", StringComparison.Ordinal)
-            ? (_isEditingTranslationProvider ? Visibility.Visible : Visibility.Collapsed)
-            : Visibility.Collapsed;
+            ? Visibility.Visible : Visibility.Collapsed;
         BailianTranslationConfigPanel.Visibility = string.Equals(provider, "BailianQwenMt", StringComparison.Ordinal)
-            ? (_isEditingTranslationProvider ? Visibility.Visible : Visibility.Collapsed)
-            : Visibility.Collapsed;
+            ? Visibility.Visible : Visibility.Collapsed;
+
+        MachineAccessKeyIdTextBox.IsReadOnly = !_isEditingTranslationProvider;
+        MachineAccessKeySecretPasswordBox.IsEnabled = _isEditingTranslationProvider;
+        BailianApiKeyPasswordBox.IsEnabled = _isEditingTranslationProvider;
+        var editVisibility = _isEditingTranslationProvider ? Visibility.Visible : Visibility.Collapsed;
+        SaveMachineCredentialsButton.Visibility = editVisibility;
+        RemoveMachineCredentialsButton.Visibility = editVisibility;
+        SaveBailianCredentialsButton.Visibility = editVisibility;
+        RemoveBailianCredentialsButton.Visibility = editVisibility;
+        EditTranslationProviderButton.Content = _isEditingTranslationProvider
+            ? Strings.ResourceManagerFinishEditing.GetLocalizedResource()
+            : Strings.Edit.GetLocalizedResource();
     }
 
     private void SaveMachineCredentialsButton_Click(object sender, RoutedEventArgs e)
@@ -87,10 +106,7 @@ public sealed partial class ResourceManagerSettingsPage : Page
         try
         {
             ResourceTitleTranslationCredentialStore.SaveMachineTranslationCredentials(accessKeyId, accessKeySecret);
-            MachineAccessKeyIdTextBox.Text = string.Empty;
-            MachineAccessKeySecretPasswordBox.Password = string.Empty;
-            MachineAccessKeyIdTextBox.PlaceholderText = Strings.ResourceManagerCredentialSaved.GetLocalizedResource();
-            MachineAccessKeySecretPasswordBox.PlaceholderText = Strings.ResourceManagerCredentialSaved.GetLocalizedResource();
+            RefreshCredentialFields();
             StatusTextBlock.Text = Strings.ResourceManagerCredentialsSaved.GetLocalizedResource();
         }
         catch (Exception ex)
@@ -102,8 +118,7 @@ public sealed partial class ResourceManagerSettingsPage : Page
     private void RemoveMachineCredentialsButton_Click(object sender, RoutedEventArgs e)
     {
         ResourceTitleTranslationCredentialStore.RemoveMachineTranslationCredentials();
-        MachineAccessKeyIdTextBox.PlaceholderText = Strings.ResourceManagerCredentialEmpty.GetLocalizedResource();
-        MachineAccessKeySecretPasswordBox.PlaceholderText = Strings.ResourceManagerCredentialEmpty.GetLocalizedResource();
+        RefreshCredentialFields();
         StatusTextBlock.Text = Strings.ResourceManagerCredentialsRemoved.GetLocalizedResource();
     }
 
@@ -121,8 +136,7 @@ public sealed partial class ResourceManagerSettingsPage : Page
         try
         {
             ResourceTitleTranslationCredentialStore.SaveBailianApiKey(apiKey);
-            BailianApiKeyPasswordBox.Password = string.Empty;
-            BailianApiKeyPasswordBox.PlaceholderText = Strings.ResourceManagerCredentialSaved.GetLocalizedResource();
+            RefreshCredentialFields();
             StatusTextBlock.Text = Strings.ResourceManagerCredentialsSaved.GetLocalizedResource();
         }
         catch (Exception ex)
@@ -134,7 +148,7 @@ public sealed partial class ResourceManagerSettingsPage : Page
     private void RemoveBailianCredentialsButton_Click(object sender, RoutedEventArgs e)
     {
         ResourceTitleTranslationCredentialStore.RemoveBailianApiKey();
-        BailianApiKeyPasswordBox.PlaceholderText = Strings.ResourceManagerCredentialEmpty.GetLocalizedResource();
+        RefreshCredentialFields();
         StatusTextBlock.Text = Strings.ResourceManagerCredentialsRemoved.GetLocalizedResource();
     }
 
@@ -147,6 +161,7 @@ public sealed partial class ResourceManagerSettingsPage : Page
         foreach (var snapshot in _workspace.ResourceToolSnapshots)
             _snapshots.Add(snapshot);
         SnapshotsEmptyTextBlock.Visibility = _snapshots.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        SnapshotsListView.Visibility = _snapshots.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
         SnapshotsListView.SelectedItem = null;
         UpdateSnapshotButtons();
     }

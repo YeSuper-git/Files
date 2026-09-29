@@ -19,6 +19,8 @@ public interface IResourceWorkspaceService
     void UpdateSettings(ResourceSettings settings);
     string? GetPosterOverride(string itemPath);
     void SetPosterOverride(string itemPath, string posterPath);
+    Task<string> ImportPosterAsync(string sourcePath, CancellationToken cancellationToken = default);
+    void DeleteImportedPosterIfUnused(string posterPath);
     ResourceActorDetails GetActorDetails(string actorFolderPath);
     void SetActorDetails(string actorFolderPath, ResourceActorDetails details);
     ResourceVideoWatchStatus GetVideoWatchStatus(string videoPath);

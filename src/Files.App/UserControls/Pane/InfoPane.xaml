@@ -553,6 +553,19 @@
 						</StackPanel>
 					</Button.Content>
 				</Button>
+				<Button
+					Margin="12,0,8,8"
+					HorizontalAlignment="Left"
+					Click="OpenResourceVideoProperties_Click"
+					ToolTipService.ToolTip="{helpers:ResourceString Name=Properties}"
+					Visibility="{x:Bind ViewModel.DetailsOpenResourceVideoPropertiesVisibility, Mode=OneWay}">
+					<Button.Content>
+						<StackPanel Orientation="Horizontal" Spacing="8">
+							<controls:ThemedIcon Style="{StaticResource App.ThemedIcons.Properties}" />
+							<TextBlock Text="{helpers:ResourceString Name=Properties}" />
+						</StackPanel>
+					</Button.Content>
+				</Button>
 			</StackPanel>
 		</ScrollViewer>
 
@@ -563,6 +576,9 @@
 						<triggers:IsEqualStateTrigger Value="{x:Bind ViewModel.PreviewPaneState, Mode=OneWay}" To="0" />
 						<triggers:IsNullOrEmptyStateTrigger Value="{x:Bind ViewModel, Mode=OneWay}" />
 					</VisualState.StateTriggers>
+					<VisualState.Setters>
+						<Setter Target="PreviewErrorText.Visibility" Value="Collapsed" />
+					</VisualState.Setters>
 				</VisualState>
 				<VisualState x:Name="NoPreviewAvailable">
 					<VisualState.StateTriggers>

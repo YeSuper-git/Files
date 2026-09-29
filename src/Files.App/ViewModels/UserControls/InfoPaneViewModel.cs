@@ -45,6 +45,7 @@ namespace Files.App.ViewModels.UserControls
 		/// TODO see about removing this and accessing it from the page context instead
 		/// </summary>
 		private ListedItem? selectedItem;
+		private int selectionUpdateVersion;
 		public ListedItem? SelectedItem
 		{
 			get => selectedItem;
@@ -62,6 +63,7 @@ namespace Files.App.ViewModels.UserControls
 					OnPropertyChanged(nameof(LoadTagsList));
 					OnPropertyChanged(nameof(DetailsTagsListVisibility));
 					OnPropertyChanged(nameof(DetailsOpenPropertiesVisibility));
+					OnPropertyChanged(nameof(DetailsOpenResourceVideoPropertiesVisibility));
 					RefreshResourceActorDetails();
 
 					if (value is not null)
@@ -112,6 +114,7 @@ namespace Files.App.ViewModels.UserControls
 					OnPropertyChanged(nameof(LoadTagsList));
 					OnPropertyChanged(nameof(DetailsTagsListVisibility));
 					OnPropertyChanged(nameof(DetailsOpenPropertiesVisibility));
+					OnPropertyChanged(nameof(DetailsOpenResourceVideoPropertiesVisibility));
 				}
 			}
 		}
@@ -157,11 +160,17 @@ namespace Files.App.ViewModels.UserControls
 				: LoadTagsList ? Visibility.Visible : Visibility.Collapsed;
 
 		public Visibility DetailsOpenPropertiesVisibility
-			=> SelectedItem is ResourceActorListedItem or ResourceVideoFolderListedItem
+			=> SelectedItem is ResourceActorListedItem or ResourceVideoFolderListedItem or ResourceVideoFileListedItem
 				? Visibility.Collapsed
 				: PreviewPaneState is PreviewPaneStates.NoPreviewAvailable or PreviewPaneStates.PreviewAndDetailsAvailable or PreviewPaneStates.DriveStorageDetailsAvailable
 					? Visibility.Visible
 					: Visibility.Collapsed;
+
+		public Visibility DetailsOpenResourceVideoPropertiesVisibility
+			=> SelectedItem is ResourceVideoFileListedItem &&
+				PreviewPaneState is PreviewPaneStates.NoPreviewAvailable or PreviewPaneStates.PreviewAndDetailsAvailable
+				? Visibility.Visible
+				: Visibility.Collapsed;
 
 		public string SelectedItemDisplayName
 			=> SelectedItem is ResourceActorListedItem actor && !string.IsNullOrWhiteSpace(actor.ActorDetails.Name)
@@ -306,19 +315,37 @@ namespace Files.App.ViewModels.UserControls
 			switch (e.PropertyName)
 			{
 				case nameof(IContentPageContext.Folder):
+					selectionUpdateVersion++;
+					CancelPreviewLoad();
+					SelectedItem = null;
+					PreviewPaneContent = null;
+					PreviewPaneState = PreviewPaneStates.NoItemSelected;
+					break;
 				case nameof(IContentPageContext.SelectedItem):
 
 					ListedItem? tempSelectedItem = null;
 					if (contentPageContext.SelectedItems.Count == 1)
 						tempSelectedItem = contentPageContext.SelectedItems.First();
 
-					// Don't update preview pane when the selected item changes too frequently
-					const int delayBeforeUpdatingPreviewPane = 100;
-					await Task.Delay(delayBeforeUpdatingPreviewPane);
-					if (tempSelectedItem is not null && !tempSelectedItem.Equals(contentPageContext.SelectedItem))
-						return;
+					var updateVersion = ++selectionUpdateVersion;
+					if (tempSelectedItem is not null)
+					{
+						// Don't update preview pane when the selected item changes too frequently
+						const int delayBeforeUpdatingPreviewPane = 100;
+						await Task.Delay(delayBeforeUpdatingPreviewPane);
+						if (updateVersion != selectionUpdateVersion ||
+							!tempSelectedItem.Equals(contentPageContext.SelectedItem))
+							return;
+					}
 
 					SelectedItem = tempSelectedItem;
+					if (tempSelectedItem is null)
+					{
+						CancelPreviewLoad();
+						PreviewPaneContent = null;
+						PreviewPaneState = PreviewPaneStates.NoItemSelected;
+						break;
+					}
 
 					try
 					{
@@ -576,42 +603,12 @@ namespace Files.App.ViewModels.UserControls
 					PreviewPaneState = PreviewPaneStates.NoPreviewOrDetailsAvailable;
 				}
 			}
-			else if (contentPageContext.SelectedItems.Count > 0)
-			{
-				PreviewPaneContent = null;
-				PreviewPaneState = PreviewPaneStates.NoPreviewOrDetailsAvailable;
-			}
 			else
 			{
 				SelectedItem?.FileDetails?.Clear();
-				var currentFolder = contentPageContext.Folder;
-
-				if (currentFolder is null)
-				{
-					PreviewPaneContent = null;
-					PreviewPaneState = PreviewPaneStates.NoItemSelected;
-					return;
-				}
-
-				var token = CreatePreviewLoadToken();
-
-				try
-				{
-					PreviewPaneState = PreviewPaneStates.LoadingPreview;
-
-					SelectedItem = currentFolder;
-					await LoadPreviewControlAsync(token, downloadItem);
-				}
-				catch (Exception e)
-				{
-					Debug.WriteLine(e);
-
-					if (token.IsCancellationRequested)
-						return;
-
-					PreviewPaneContent = null;
-					PreviewPaneState = PreviewPaneStates.NoPreviewOrDetailsAvailable;
-				}
+				SelectedItem = null;
+				PreviewPaneContent = null;
+				PreviewPaneState = PreviewPaneStates.NoItemSelected;
 			}
 		}
 
