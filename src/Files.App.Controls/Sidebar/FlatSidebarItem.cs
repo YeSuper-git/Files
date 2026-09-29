@@ -15,6 +15,8 @@ namespace Files.App.Controls
 		// Caller-supplied at construction; hidden filesystem items are dimmed to match the file list's dimming convention.
 		public double RowOpacity { get; }
 
+		public bool IsTopLevel => Depth == 0;
+
 		private static readonly PropertyChangedEventArgs SectionGapMarginChangedArgs = new(nameof(SectionGapMargin));
 
 		private bool _hasExpandedPredecessor;

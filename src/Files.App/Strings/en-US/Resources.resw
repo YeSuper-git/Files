@@ -4794,4 +4794,49 @@
   <data name="ResourceManagerCredentialsSaveFailed" xml:space="preserve">
     <value>Unable to save credentials.</value>
   </data>
+  <data name="ResourceManagerActorsCollected" xml:space="preserve">
+    <value>Collected actors: {0}</value>
+  </data>
+  <data name="ResourceManagerWorksCollected" xml:space="preserve">
+    <value>Collected works: {0}</value>
+  </data>
+  <data name="ResourceManagerVideoLength" xml:space="preserve">
+    <value>Length</value>
+  </data>
+  <data name="ResourceManagerVideoResolution" xml:space="preserve">
+    <value>Resolution</value>
+  </data>
+  <data name="ResourceManagerVideoFrameRate" xml:space="preserve">
+    <value>Frame rate</value>
+  </data>
+  <data name="ResourceManagerVideoQuality" xml:space="preserve">
+    <value>Quality tier</value>
+  </data>
+  <data name="ResourceManagerVideoQualitySd" xml:space="preserve">
+    <value>SD</value>
+  </data>
+  <data name="ResourceManagerVideoQualityHd" xml:space="preserve">
+    <value>HD</value>
+  </data>
+  <data name="ResourceManagerVideoQualityFullHd" xml:space="preserve">
+    <value>Full HD</value>
+  </data>
+  <data name="ResourceManagerVideoQualityQhd" xml:space="preserve">
+    <value>QHD</value>
+  </data>
+  <data name="ResourceManagerVideoQuality4K" xml:space="preserve">
+    <value>4K UHD</value>
+  </data>
+  <data name="ResourceManagerVideoQuality8K" xml:space="preserve">
+    <value>8K UHD</value>
+  </data>
+  <data name="ResourceManagerVideoQualityNear" xml:space="preserve">
+    <value>{0}p · near {1}p {2}</value>
+  </data>
+  <data name="ResourceManagerVideoQualityWide" xml:space="preserve">
+    <value>{0} class (widescreen)</value>
+  </data>
+  <data name="ResourceManagerVideoQualityOther" xml:space="preserve">
+    <value>{0}p {1} class</value>
+  </data>
 </root>

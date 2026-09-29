@@ -94,6 +94,14 @@ namespace Files.App.Controls
 		public static readonly DependencyProperty UseItemPresentationProperty =
 			DependencyProperty.Register(nameof(UseItemPresentation), typeof(bool), typeof(SidebarItem), new PropertyMetadata(false, OnPropertyChanged));
 
+		public bool IsTopLevel
+		{
+			get { return (bool)GetValue(IsTopLevelProperty); }
+			set { SetValue(IsTopLevelProperty, value); }
+		}
+		public static readonly DependencyProperty IsTopLevelProperty =
+			DependencyProperty.Register(nameof(IsTopLevel), typeof(bool), typeof(SidebarItem), new PropertyMetadata(false, OnPropertyChanged));
+
 		public bool UseReorderDrop
 		{
 			get { return (bool)GetValue(UseReorderDropProperty); }
@@ -154,6 +162,10 @@ namespace Files.App.Controls
 			else if (e.Property == ItemProperty)
 			{
 				item.HandleItemChange();
+			}
+			else if (e.Property == IsTopLevelProperty)
+			{
+				item.UpdateExpansionState();
 			}
 			else if (e.Property == UseItemPresentationProperty && item.UseItemPresentation)
 			{

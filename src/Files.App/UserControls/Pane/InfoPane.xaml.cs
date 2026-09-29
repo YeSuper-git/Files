@@ -4,6 +4,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Files.App.Data.Items.ResourceManager;
 using WinRT;
 
 namespace Files.App.UserControls
@@ -74,6 +75,12 @@ namespace Files.App.UserControls
 
 		private async void ToggleResourceVideoFolderTitle_Click(object sender, RoutedEventArgs e)
 			=> await ViewModel.ToggleResourceVideoFolderTitleAsync();
+
+		private void OpenResourceVideoProperties_Click(object sender, RoutedEventArgs e)
+		{
+			if (ViewModel.SelectedItem is ResourceVideoFileListedItem item && contentPageContext.ShellPage is { } shellPage)
+				FilePropertiesHelpers.OpenPropertiesWindow(item, shellPage);
+		}
 
 		[DynamicWindowsRuntimeCast(typeof(UserControl))]
 		private void FileTag_PointerEntered(object sender, PointerRoutedEventArgs e)

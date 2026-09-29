@@ -18,9 +18,11 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
 {
     private const int MaxRecentLibraries = 8;
     private const string StateFileName = "files-resource-workspace.json";
+    private const string PosterStorageFolderName = "ResourcePosters";
 
     private readonly ILogger<ResourceWorkspaceService> _logger;
     private readonly string _statePath;
+    private readonly string _posterStoragePath;
     private ResourceWorkspaceState _state;
 
     public ResourceWorkspaceService(ILogger<ResourceWorkspaceService> logger)
@@ -30,7 +32,9 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
             ApplicationData.Current.LocalFolder.Path,
             Constants.LocalSettings.SettingsFolderName,
             StateFileName);
+        _posterStoragePath = Path.Combine(Path.GetDirectoryName(_statePath)!, PosterStorageFolderName);
         _state = LoadState();
+        MigratePosterReferences();
     }
 
     public ResourceSettings Settings => _state.Settings;
@@ -590,6 +594,98 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
         {
             _logger.LogWarning(ex, "Unable to save poster override for {ItemPath}", itemPath);
         }
+    }
+
+    public async Task<string> ImportPosterAsync(string sourcePath, CancellationToken cancellationToken = default)
+    {
+        var normalizedSource = Path.GetFullPath(sourcePath);
+        if (!File.Exists(normalizedSource))
+            throw new FileNotFoundException("Poster source was not found.", normalizedSource);
+
+        Directory.CreateDirectory(_posterStoragePath);
+        var destination = Path.Combine(_posterStoragePath, $"{Guid.NewGuid():N}{Path.GetExtension(normalizedSource).ToLowerInvariant()}");
+        try
+        {
+            await using var source = new FileStream(normalizedSource, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.Asynchronous);
+            await using var target = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous);
+            await source.CopyToAsync(target, cancellationToken);
+            return destination;
+        }
+        catch
+        {
+            if (File.Exists(destination))
+                File.Delete(destination);
+            throw;
+        }
+    }
+
+    public void DeleteImportedPosterIfUnused(string posterPath)
+    {
+        try
+        {
+            var normalizedPath = Path.GetFullPath(posterPath);
+            if (!normalizedPath.StartsWith(_posterStoragePath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
+                _state.PosterOverrides.Values.Contains(normalizedPath, StringComparer.OrdinalIgnoreCase) ||
+                _state.ActorDetails.Values.Any(details => details.PosterPaths.Contains(normalizedPath, StringComparer.OrdinalIgnoreCase)))
+                return;
+
+            if (File.Exists(_statePath))
+            {
+                var persisted = JsonSerializer.Deserialize(
+                    File.ReadAllText(_statePath),
+                    ResourceManagerJsonSerializerContext.Default.ResourceWorkspaceState);
+                if (persisted is null ||
+                    persisted.PosterOverrides.Values.Contains(normalizedPath, StringComparer.OrdinalIgnoreCase) ||
+                    persisted.ActorDetails.Values.Any(details => details.PosterPaths.Contains(normalizedPath, StringComparer.OrdinalIgnoreCase)))
+                    return;
+            }
+
+            File.Delete(normalizedPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Unable to remove unused imported poster {PosterPath}", posterPath);
+        }
+    }
+
+    private void MigratePosterReferences()
+    {
+        var imported = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var changed = false;
+        string ImportExisting(string path)
+        {
+            if (path.StartsWith(_posterStoragePath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
+                !File.Exists(path))
+                return path;
+            if (imported.TryGetValue(path, out var existing))
+                return existing;
+
+            try
+            {
+                Directory.CreateDirectory(_posterStoragePath);
+                var destination = Path.Combine(_posterStoragePath, $"{Guid.NewGuid():N}{Path.GetExtension(path).ToLowerInvariant()}");
+                File.Copy(path, destination);
+                imported[path] = destination;
+                changed = true;
+                return destination;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Unable to migrate poster {PosterPath}", path);
+                return path;
+            }
+        }
+
+        foreach (var itemPath in _state.PosterOverrides.Keys.ToArray())
+            _state.PosterOverrides[itemPath] = ImportExisting(_state.PosterOverrides[itemPath]);
+        foreach (var details in _state.ActorDetails.Values)
+            details.PosterPaths = details.PosterPaths.Select(ImportExisting).ToList();
+        foreach (var details in _state.ActorDetails.Values)
+            details.ExcludedPosterPaths = details.ExcludedPosterPaths
+                .Select(path => imported.TryGetValue(path, out var importedPath) ? importedPath : path)
+                .ToList();
+        if (changed)
+            PersistState();
     }
 
     public bool IsActorFolderHidden(string itemPath)
