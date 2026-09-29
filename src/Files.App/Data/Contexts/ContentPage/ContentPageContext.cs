@@ -1,4 +1,4 @@
-﻿// Copyright (c) Files Community
+// Copyright (c) Files Community
 // Licensed under the MIT License.
 
 using Microsoft.Extensions.Logging;
@@ -151,8 +151,9 @@ namespace Files.App.Data.Contexts
 
 		private void InstanceViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{
-			switch (e.PropertyName)
+				switch (e.PropertyName)
 			{
+				case nameof(CurrentInstanceViewModel.IsPageTypeVideoEditor):
 				case nameof(CurrentInstanceViewModel.IsPageTypeNotHome):
 				case nameof(CurrentInstanceViewModel.IsPageTypeRecycleBin):
 				case nameof(CurrentInstanceViewModel.IsPageTypeZipFolder):
@@ -224,6 +225,7 @@ namespace Files.App.Data.Contexts
 			var type = ShellPage?.InstanceViewModel switch
 			{
 				null => ContentPageTypes.None,
+				{ IsPageTypeVideoEditor: true } => ContentPageTypes.VideoEditor,
 				{ IsPageTypeNotHome: false } => ContentPageTypes.Home,
 				{ IsPageTypeReleaseNotes: true } => ContentPageTypes.ReleaseNotes,
 				{ IsPageTypeRecycleBin: true } => ContentPageTypes.RecycleBin,
@@ -265,7 +267,8 @@ namespace Files.App.Data.Contexts
 				and not ContentPageTypes.SearchResults
 				and not ContentPageTypes.MtpDevice
 				and not ContentPageTypes.ReleaseNotes
-				and not ContentPageTypes.Settings;
+				and not ContentPageTypes.Settings
+				and not ContentPageTypes.VideoEditor;
 		}
 	}
 }

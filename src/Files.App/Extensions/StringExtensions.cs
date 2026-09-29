@@ -56,6 +56,22 @@ namespace Files.App.Extensions
 		}
 
 		private static readonly ResourceMap resourcesTree = new ResourceManager().MainResourceMap.TryGetSubtree("Resources");
+		// Sparse package identity can keep the identity package's older PRI in memory.
+		// Video editor strings live in the external payload's PRI, next to the exe.
+		private static readonly Lazy<ResourceMap?> videoEditorResourcesTree = new(() =>
+		{
+			var priPath = Path.Combine(AppContext.BaseDirectory, "resources.pri");
+			if (!File.Exists(priPath))
+				return null;
+			try
+			{
+				return new ResourceManager(priPath).MainResourceMap.TryGetSubtree("Resources");
+			}
+			catch
+			{
+				return null;
+			}
+		});
 
 		private static readonly ConcurrentDictionary<string, string> cachedResources = new();
 
@@ -97,12 +113,26 @@ namespace Files.App.Extensions
 
 		public static string GetLocalizedResource(this string resourceKey)
 		{
-			if (cachedResources.TryGetValue(resourceKey, out var value))
+			if (cachedResources.TryGetValue(resourceKey, out var value) && !string.IsNullOrWhiteSpace(value))
 			{
 				return value;
 			}
 
-			value = resourcesTree?.TryGetValue(resourceKey)?.ValueAsString;
+			value = resourceKey.StartsWith("VideoEditor", StringComparison.Ordinal)
+				? videoEditorResourcesTree.Value?.TryGetValue(resourceKey)?.ValueAsString
+				: null;
+			value ??= resourcesTree?.TryGetValue(resourceKey)?.ValueAsString;
+			if (string.IsNullOrWhiteSpace(value) && resourceKey.StartsWith("VideoEditor", StringComparison.Ordinal))
+			{
+				try
+				{
+					value = new Windows.ApplicationModel.Resources.ResourceLoader().GetString(resourceKey);
+				}
+				catch
+				{
+					value = null;
+				}
+			}
 
 			return cachedResources[resourceKey] = value ?? string.Empty;
 		}

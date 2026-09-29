@@ -25,6 +25,7 @@ namespace Files.App.Helpers
 			SectionType.FileTag => Resolve("Tags"),
 #if FILES_RESOURCE_MANAGER
 			SectionType.ResourceManager => Resolve("Home"),
+			SectionType.VideoEditor => Resolve("VideoEditor"),
 #endif
 			_ => null
 		};

@@ -44,6 +44,7 @@ namespace Files.App.Data.Contracts
 		FileTag
 #if FILES_RESOURCE_MANAGER
 		, ResourceManager
+		, VideoEditor
 #endif
 	}
 

@@ -4839,4 +4839,126 @@
   <data name="ResourceManagerVideoQualityOther" xml:space="preserve">
     <value>{0}p {1} class</value>
   </data>
+  <data name="VideoEditorTitle" xml:space="preserve"><value>Video Editor</value></data>
+  <data name="VideoEditorNavigationTitle" xml:space="preserve"><value>Video Editor</value></data>
+  <data name="VideoEditorOpenVideo" xml:space="preserve"><value>Choose video</value></data>
+  <data name="VideoEditorDropVideo" xml:space="preserve"><value>Drop a video here</value></data>
+  <data name="VideoEditorDroppedFileUnsupported" xml:space="preserve"><value>Drop a supported video file to open it.</value></data>
+  <data name="VideoEditorQueueTitle" xml:space="preserve"><value>Export queue</value></data>
+  <data name="VideoEditorQueueSummary" xml:space="preserve"><value>{0} queued jobs · total duration {1}</value></data>
+  <data name="VideoEditorFastCopyMode" xml:space="preserve"><value>Fast lossless cut (keyframe aligned)</value></data>
+  <data name="VideoEditorPreviousKeyframe" xml:space="preserve"><value>Previous keyframe</value></data>
+  <data name="VideoEditorNextKeyframe" xml:space="preserve"><value>Next keyframe</value></data>
+  <data name="VideoEditorPlay" xml:space="preserve"><value>Play</value></data>
+  <data name="VideoEditorPause" xml:space="preserve"><value>Pause</value></data>
+  <data name="VideoEditorTimelineHint" xml:space="preserve"><value>Drag the handles to choose the kept range. Cut points snap to keyframes.</value></data>
+  <data name="VideoEditorProcessing" xml:space="preserve"><value>Processing</value></data>
+  <data name="VideoEditorCompleted" xml:space="preserve"><value>Completed</value></data>
+  <data name="VideoEditorCancelOrRemove" xml:space="preserve"><value>Cancel / remove</value></data>
+  <data name="VideoEditorRetry" xml:space="preserve"><value>Retry</value></data>
+  <data name="VideoEditorPresets" xml:space="preserve"><value>Trim presets</value></data>
+  <data name="VideoEditorPresetApply" xml:space="preserve"><value>Apply and adjust</value></data>
+  <data name="VideoEditorPresetDelete" xml:space="preserve"><value>Delete</value></data>
+  <data name="VideoEditorSetTrimStart" xml:space="preserve"><value>Set start</value></data>
+  <data name="VideoEditorSetTrimEnd" xml:space="preserve"><value>Set end</value></data>
+  <data name="VideoEditorAddToQueue" xml:space="preserve"><value>Add to queue</value></data>
+  <data name="VideoEditorStartQueue" xml:space="preserve"><value>Start queue</value></data>
+  <data name="VideoEditorSaveReplace" xml:space="preserve"><value>Output and replace original</value></data>
+  <data name="VideoEditorOpenVideoHint" xml:space="preserve"><value>Choose a video and set the section you want to keep.</value></data>
+  <data name="VideoEditorNoVideo" xml:space="preserve"><value>No video selected yet</value></data>
+  <data name="VideoEditorPageSubtitle" xml:space="preserve"><value>Set the head or tail cut points, then keep the section you need.</value></data>
+  <data name="VideoEditorNoVideoHint" xml:space="preserve"><value>Choose where to cut the beginning or end. The middle section will be kept.</value></data>
+  <data name="VideoEditorStepChoose" xml:space="preserve"><value>1 Choose video</value></data>
+  <data name="VideoEditorStepTrim" xml:space="preserve"><value>2 Set cut points</value></data>
+  <data name="VideoEditorStepOutput" xml:space="preserve"><value>3 Save or queue</value></data>
+  <data name="VideoEditorKeepRange" xml:space="preserve"><value>Keep range</value></data>
+  <data name="VideoEditorChangeVideo" xml:space="preserve"><value>Change video</value></data>
+  <data name="VideoEditorTaskCenter" xml:space="preserve"><value>Cut jobs</value></data>
+  <data name="VideoEditorQueueHint" xml:space="preserve"><value>Active and waiting jobs replace originals in queue order.</value></data>
+  <data name="VideoEditorStatusWaiting" xml:space="preserve"><value>Waiting in queue</value></data>
+  <data name="VideoEditorStatusProcessing" xml:space="preserve"><value>Cutting</value></data>
+  <data name="VideoEditorStatusReplacing" xml:space="preserve"><value>Validated; replacing original</value></data>
+  <data name="VideoEditorStatusCompleted" xml:space="preserve"><value>Output complete</value></data>
+  <data name="VideoEditorStatusFailed" xml:space="preserve"><value>Failed</value></data>
+  <data name="VideoEditorStatusCancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="VideoEditorVideoQueuedCannotOpen" xml:space="preserve"><value>This video is queued or processing. Wait for it to finish before opening it.</value></data>
+  <data name="VideoEditorFileMissing" xml:space="preserve"><value>The original video file could not be found.</value></data>
+  <data name="VideoEditorReadingVideo" xml:space="preserve"><value>Reading video information and keyframes…</value></data>
+  <data name="VideoEditorLoadedMessage" xml:space="preserve"><value>Loaded: {0} × {1} · {2}</value></data>
+  <data name="VideoEditorOperationCancelled" xml:space="preserve"><value>Reading was cancelled.</value></data>
+  <data name="VideoEditorLoadFailed" xml:space="preserve"><value>Unable to read video: {0}</value></data>
+  <data name="VideoEditorInvalidTrimRange" xml:space="preserve"><value>Invalid trim range. Adjust the start and end points.</value></data>
+  <data name="VideoEditorTaskStarted" xml:space="preserve"><value>Output submitted. It will run in queue order.</value></data>
+  <data name="VideoEditorTaskQueued" xml:space="preserve"><value>Added to the queue and paused. Choose Start all to export in order.</value></data>
+  <data name="VideoEditorQueueFailed" xml:space="preserve"><value>Unable to add the cut to the queue.</value></data>
+  <data name="VideoEditorToolMissing" xml:space="preserve"><value>FFmpeg / FFprobe not found. Install FFmpeg and add it to PATH, or put it in the app's Tools folder.</value></data>
+  <data name="VideoEditorToolReady" xml:space="preserve"><value>FFmpeg: {0}</value></data>
+  <data name="VideoEditorPresetApplied" xml:space="preserve"><value>Preset points applied. Adjust them if needed, then choose an output option.</value></data>
+  <data name="VideoEditorPresetSaveFailed" xml:space="preserve"><value>The video was output successfully, but this trim preset could not be saved.</value></data>
+  <data name="VideoEditorPresetDeleteFailed" xml:space="preserve"><value>Unable to delete trim preset: {0}</value></data>
+  <data name="VideoEditorPresetHead" xml:space="preserve"><value>Trim head {0}</value></data>
+  <data name="VideoEditorPresetTail" xml:space="preserve"><value>Trim tail {0}</value></data>
+  <data name="VideoEditorPresetBoth" xml:space="preserve"><value>Head {0} + tail {1}</value></data>
+  <data name="VideoEditorPresetSummary" xml:space="preserve"><value>Head {0} · tail {1}</value></data>
+  <data name="VideoEditorPresetHint" xml:space="preserve"><value>Successful outputs are saved as trim presets. Apply one, adjust it, then choose how to output.</value></data>
+  <data name="VideoEditorOutputComplete" xml:space="preserve"><value>Output complete; the original was replaced. Choose a video to edit again.</value></data>
+  <data name="VideoEditorPreviewFailed" xml:space="preserve"><value>Unable to open video preview: {0}</value></data>
+  <data name="VideoEditorDuplicateVideo" xml:space="preserve"><value>This video is already queued or processing.</value></data>
+  <data name="VideoEditorCancelledOriginalKept" xml:space="preserve"><value>Task cancelled. The original video was not changed.</value></data>
+  <data name="VideoEditorInsufficientSpace" xml:space="preserve"><value>The temporary cut is estimated to need {0:0.0} GB of free space; only {1:0.0} GB is available. The original was not changed.</value></data>
+  <data name="VideoEditorUnknownExtension" xml:space="preserve"><value>The original video file extension could not be identified.</value></data>
+  <data name="VideoEditorSourceFolderUnavailable" xml:space="preserve"><value>The original video's folder could not be read.</value></data>
+  <data name="VideoEditorInvalidTemporaryFile" xml:space="preserve"><value>FFmpeg did not create a valid temporary video file.</value></data>
+  <data name="VideoEditorBackupCleanupWarning" xml:space="preserve"><value>The video was replaced, but the hidden backup could not be removed: {0}</value></data>
+  <data name="VideoEditorFfmpegStartFailed" xml:space="preserve"><value>Unable to start FFmpeg.</value></data>
+  <data name="VideoEditorFfmpegFailed" xml:space="preserve"><value>FFmpeg cut failed with exit code {0}.</value></data>
+  <data name="VideoEditorCodecMismatch" xml:space="preserve"><value>The temporary file's video codec does not match the original; replacement was cancelled.</value></data>
+  <data name="VideoEditorDurationMismatch" xml:space="preserve"><value>Temporary file duration check failed (expected {0:0.###} s, got {1:0.###} s). The original was not changed.</value></data>
+  <data name="VideoEditorDimensionsMismatch" xml:space="preserve"><value>The temporary file dimensions do not match the original; replacement was cancelled.</value></data>
+  <data name="VideoEditorProbeFailed" xml:space="preserve"><value>FFprobe could not read this video.</value></data>
+  <data name="VideoEditorNoVideoStream" xml:space="preserve"><value>The selected file has no video stream to cut.</value></data>
+  <data name="VideoEditorDurationUnavailable" xml:space="preserve"><value>Unable to read video duration.</value></data>
+  <data name="VideoEditorFfprobeStartFailed" xml:space="preserve"><value>Unable to start FFprobe.</value></data>
+  <data name="VideoEditorKeyframesFailed" xml:space="preserve"><value>Unable to read video keyframes.</value></data>
+  <data name="VideoEditorQueueEmpty" xml:space="preserve"><value>The queue is empty. Choose a video and set trim points to add a batch output.</value></data>
+  <data name="VideoEditorCompletedEmpty" xml:space="preserve"><value>No completed videos yet.</value></data>
+  <data name="VideoEditorPresetsEmpty" xml:space="preserve"><value>Trim points are saved here after a successful output.</value></data>
+  <data name="VideoEditorMenuFile" xml:space="preserve"><value>File</value></data>
+  <data name="VideoEditorMenuEdit" xml:space="preserve"><value>Edit</value></data>
+  <data name="VideoEditorMenuSegment" xml:space="preserve"><value>Segment</value></data>
+  <data name="VideoEditorMenuView" xml:space="preserve"><value>View</value></data>
+  <data name="VideoEditorMenuTools" xml:space="preserve"><value>Tools</value></data>
+  <data name="VideoEditorMenuHelp" xml:space="preserve"><value>Help</value></data>
+  <data name="VideoEditorSettingsTitle" xml:space="preserve"><value>Video editing</value></data>
+  <data name="VideoEditorExportMode" xml:space="preserve"><value>Export mode</value></data>
+  <data name="VideoEditorExportModeHint" xml:space="preserve"><value>Replace the original, or keep it and create an edited copy.</value></data>
+  <data name="VideoEditorReplaceOriginalOption" xml:space="preserve"><value>Replace original after export</value></data>
+  <data name="VideoEditorKeepOriginalOption" xml:space="preserve"><value>Keep original and create an edited copy</value></data>
+  <data name="VideoEditorExportLocation" xml:space="preserve"><value>Export location</value></data>
+  <data name="VideoEditorExportLocationHint" xml:space="preserve"><value>For edited copies, use the source folder or choose another folder.</value></data>
+  <data name="VideoEditorSourceFolderOption" xml:space="preserve"><value>Source video folder</value></data>
+  <data name="VideoEditorCustomFolderOption" xml:space="preserve"><value>Choose a folder</value></data>
+  <data name="VideoEditorNoFolderSelected" xml:space="preserve"><value>No export folder selected</value></data>
+  <data name="VideoEditorChooseFolder" xml:space="preserve"><value>Choose folder</value></data>
+  <data name="VideoEditorReplaceLocationHint" xml:space="preserve"><value>Replacing the original always happens in its source folder. The chosen folder is used for edited copies.</value></data>
+  <data name="VideoEditorExportFolderUnavailable" xml:space="preserve"><value>Export folder is missing or was not selected: {0}</value></data>
+  <data name="VideoEditorOutputNameUnavailable" xml:space="preserve"><value>Could not find an available name for the edited copy.</value></data>
+  <data name="VideoEditorStatusSaving" xml:space="preserve"><value>Saving</value></data>
+  <data name="VideoEditorCutBefore" xml:space="preserve"><value>Trim before</value></data>
+  <data name="VideoEditorCutAfter" xml:space="preserve"><value>Trim after</value></data>
+  <data name="VideoEditorRestore" xml:space="preserve"><value>Restore</value></data>
+  <data name="VideoEditorExport" xml:space="preserve"><value>Export</value></data>
+  <data name="VideoEditorCloseVideo" xml:space="preserve"><value>Close video</value></data>
+  <data name="VideoEditorExportComplete" xml:space="preserve"><value>Exported to: {0}</value></data>
+  <data name="VideoEditorExportGroup" xml:space="preserve"><value>Export</value></data>
+  <data name="VideoEditorExportNow" xml:space="preserve"><value>Export now</value></data>
+  <data name="VideoEditorExportLater" xml:space="preserve"><value>Add to queue</value></data>
+  <data name="VideoEditorPauseAll" xml:space="preserve"><value>Pause all</value></data>
+  <data name="VideoEditorStartAll" xml:space="preserve"><value>Start all</value></data>
+  <data name="VideoEditorPauseJob" xml:space="preserve"><value>Pause</value></data>
+  <data name="VideoEditorResume" xml:space="preserve"><value>Start</value></data>
+  <data name="VideoEditorReedit" xml:space="preserve"><value>Re-edit</value></data>
+  <data name="VideoEditorCancelExport" xml:space="preserve"><value>Cancel</value></data>
+  <data name="VideoEditorStatusPaused" xml:space="preserve"><value>Paused</value></data>
+  <data name="VideoEditorChooseFolderFailed" xml:space="preserve"><value>Unable to choose the export folder: {0}</value></data>
 </root>

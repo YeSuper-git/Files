@@ -1,4 +1,4 @@
-﻿// Copyright (c) Files Community
+// Copyright (c) Files Community
 // Licensed under the MIT License.
 
 namespace Files.App.Data.Contracts
@@ -25,5 +25,9 @@ namespace Files.App.Data.Contracts
 		/// Gets or sets the title translation provider used by Resource Manager.
 		/// </summary>
 		string ResourceManagerTranslationProvider { get; set; }
+
+		bool VideoEditorReplaceOriginal { get; set; }
+		bool VideoEditorExportToSourceFolder { get; set; }
+		string VideoEditorExportFolder { get; set; }
 	}
 }

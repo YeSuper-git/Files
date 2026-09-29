@@ -4833,4 +4833,126 @@
   <data name="ResourceManagerVideoQualityOther" xml:space="preserve">
     <value>{0}P {1}级</value>
   </data>
+  <data name="VideoEditorTitle" xml:space="preserve"><value>视频剪辑</value></data>
+  <data name="VideoEditorNavigationTitle" xml:space="preserve"><value>视频剪辑</value></data>
+  <data name="VideoEditorOpenVideo" xml:space="preserve"><value>选择视频</value></data>
+  <data name="VideoEditorDropVideo" xml:space="preserve"><value>拖放视频到这里</value></data>
+  <data name="VideoEditorDroppedFileUnsupported" xml:space="preserve"><value>请放入支持的视频文件。</value></data>
+  <data name="VideoEditorQueueTitle" xml:space="preserve"><value>导出队列</value></data>
+  <data name="VideoEditorQueueSummary" xml:space="preserve"><value>队列中 {0} 个任务 · 总时长 {1}</value></data>
+  <data name="VideoEditorFastCopyMode" xml:space="preserve"><value>快速无损剪切（关键帧对齐）</value></data>
+  <data name="VideoEditorPreviousKeyframe" xml:space="preserve"><value>上一关键帧</value></data>
+  <data name="VideoEditorNextKeyframe" xml:space="preserve"><value>下一关键帧</value></data>
+  <data name="VideoEditorPlay" xml:space="preserve"><value>播放</value></data>
+  <data name="VideoEditorPause" xml:space="preserve"><value>暂停</value></data>
+  <data name="VideoEditorTimelineHint" xml:space="preserve"><value>拖动两侧手柄选择保留区间；裁切点会对齐到关键帧。</value></data>
+  <data name="VideoEditorProcessing" xml:space="preserve"><value>处理中</value></data>
+  <data name="VideoEditorCompleted" xml:space="preserve"><value>已完成</value></data>
+  <data name="VideoEditorCancelOrRemove" xml:space="preserve"><value>取消 / 移除</value></data>
+  <data name="VideoEditorRetry" xml:space="preserve"><value>重试</value></data>
+  <data name="VideoEditorPresets" xml:space="preserve"><value>裁切预设</value></data>
+  <data name="VideoEditorPresetApply" xml:space="preserve"><value>套用并微调</value></data>
+  <data name="VideoEditorPresetDelete" xml:space="preserve"><value>删除</value></data>
+  <data name="VideoEditorSetTrimStart" xml:space="preserve"><value>设为起点</value></data>
+  <data name="VideoEditorSetTrimEnd" xml:space="preserve"><value>设为终点</value></data>
+  <data name="VideoEditorAddToQueue" xml:space="preserve"><value>加入待处理队列</value></data>
+  <data name="VideoEditorStartQueue" xml:space="preserve"><value>开始队列</value></data>
+  <data name="VideoEditorSaveReplace" xml:space="preserve"><value>输出并替换原视频</value></data>
+  <data name="VideoEditorOpenVideoHint" xml:space="preserve"><value>选择一个视频，然后设置要保留的片段。</value></data>
+  <data name="VideoEditorNoVideo" xml:space="preserve"><value>还没有选择视频</value></data>
+  <data name="VideoEditorPageSubtitle" xml:space="preserve"><value>快速设置片头、片尾裁切点，保留需要的视频片段。</value></data>
+  <data name="VideoEditorNoVideoHint" xml:space="preserve"><value>只需定位要剪掉的开头或结尾，视频中间的部分会保留下来。</value></data>
+  <data name="VideoEditorStepChoose" xml:space="preserve"><value>1 选择视频</value></data>
+  <data name="VideoEditorStepTrim" xml:space="preserve"><value>2 设置裁切点</value></data>
+  <data name="VideoEditorStepOutput" xml:space="preserve"><value>3 保存或排队</value></data>
+  <data name="VideoEditorKeepRange" xml:space="preserve"><value>保留区间</value></data>
+  <data name="VideoEditorChangeVideo" xml:space="preserve"><value>更换视频</value></data>
+  <data name="VideoEditorTaskCenter" xml:space="preserve"><value>剪切任务</value></data>
+  <data name="VideoEditorQueueHint" xml:space="preserve"><value>处理中和等待中的任务会按队列顺序保存并替换原视频。</value></data>
+  <data name="VideoEditorStatusWaiting" xml:space="preserve"><value>等待队列执行</value></data>
+  <data name="VideoEditorStatusProcessing" xml:space="preserve"><value>正在快速剪切</value></data>
+  <data name="VideoEditorStatusReplacing" xml:space="preserve"><value>校验通过，正在替换原视频</value></data>
+  <data name="VideoEditorStatusCompleted" xml:space="preserve"><value>输出完成</value></data>
+  <data name="VideoEditorStatusFailed" xml:space="preserve"><value>失败</value></data>
+  <data name="VideoEditorStatusCancelled" xml:space="preserve"><value>已取消</value></data>
+  <data name="VideoEditorVideoQueuedCannotOpen" xml:space="preserve"><value>这个视频已经在队列中或正在处理，请等任务完成后再打开。</value></data>
+  <data name="VideoEditorFileMissing" xml:space="preserve"><value>找不到原视频文件。</value></data>
+  <data name="VideoEditorReadingVideo" xml:space="preserve"><value>正在读取视频信息和关键帧…</value></data>
+  <data name="VideoEditorLoadedMessage" xml:space="preserve"><value>已读取：{0} × {1} · {2}</value></data>
+  <data name="VideoEditorOperationCancelled" xml:space="preserve"><value>读取已取消。</value></data>
+  <data name="VideoEditorLoadFailed" xml:space="preserve"><value>读取视频失败：{0}</value></data>
+  <data name="VideoEditorInvalidTrimRange" xml:space="preserve"><value>裁切范围无效，请调整起点和终点。</value></data>
+  <data name="VideoEditorTaskStarted" xml:space="preserve"><value>已提交输出；当前任务完成后会按队列顺序处理。</value></data>
+  <data name="VideoEditorTaskQueued" xml:space="preserve"><value>已加入队列并暂停。点击“全部开始”后按顺序导出。</value></data>
+  <data name="VideoEditorQueueFailed" xml:space="preserve"><value>无法加入裁切队列。</value></data>
+  <data name="VideoEditorToolMissing" xml:space="preserve"><value>未找到 FFmpeg / FFprobe。请安装 FFmpeg 并加入 PATH，或放入应用目录的 Tools 文件夹。</value></data>
+  <data name="VideoEditorToolReady" xml:space="preserve"><value>FFmpeg：{0}</value></data>
+  <data name="VideoEditorPresetApplied" xml:space="preserve"><value>已套用预设的裁切点；可继续微调，再选择输出方式。</value></data>
+  <data name="VideoEditorPresetSaveFailed" xml:space="preserve"><value>视频已成功输出，但未能保存本次裁切预设。</value></data>
+  <data name="VideoEditorPresetDeleteFailed" xml:space="preserve"><value>删除裁切预设失败：{0}</value></data>
+  <data name="VideoEditorPresetHead" xml:space="preserve"><value>裁掉片头 {0}</value></data>
+  <data name="VideoEditorPresetTail" xml:space="preserve"><value>裁掉片尾 {0}</value></data>
+  <data name="VideoEditorPresetBoth" xml:space="preserve"><value>片头 {0} + 片尾 {1}</value></data>
+  <data name="VideoEditorPresetSummary" xml:space="preserve"><value>片头裁掉 {0} · 片尾裁掉 {1}</value></data>
+  <data name="VideoEditorPresetHint" xml:space="preserve"><value>每次成功输出后会自动保存裁切点；套用后仍可微调并选择输出方式。</value></data>
+  <data name="VideoEditorOutputComplete" xml:space="preserve"><value>输出完成；原视频已替换。重新选择视频可继续编辑。</value></data>
+  <data name="VideoEditorPreviewFailed" xml:space="preserve"><value>无法打开视频预览：{0}</value></data>
+  <data name="VideoEditorDuplicateVideo" xml:space="preserve"><value>这个视频已经在队列中或正在处理，不能重复提交。</value></data>
+  <data name="VideoEditorCancelledOriginalKept" xml:space="preserve"><value>任务已取消，原视频没有改动。</value></data>
+  <data name="VideoEditorInsufficientSpace" xml:space="preserve"><value>临时裁切文件预计需要 {0:0.0} GB 可用空间，目前只有 {1:0.0} GB。原视频没有改动。</value></data>
+  <data name="VideoEditorUnknownExtension" xml:space="preserve"><value>无法识别原视频的文件扩展名。</value></data>
+  <data name="VideoEditorSourceFolderUnavailable" xml:space="preserve"><value>无法读取原视频所在的文件夹。</value></data>
+  <data name="VideoEditorInvalidTemporaryFile" xml:space="preserve"><value>FFmpeg 没有生成有效的临时视频文件。</value></data>
+  <data name="VideoEditorBackupCleanupWarning" xml:space="preserve"><value>视频已替换成功，但未能清理隐藏备份文件：{0}</value></data>
+  <data name="VideoEditorFfmpegStartFailed" xml:space="preserve"><value>无法启动 FFmpeg。</value></data>
+  <data name="VideoEditorFfmpegFailed" xml:space="preserve"><value>FFmpeg 剪切失败，退出代码 {0}。</value></data>
+  <data name="VideoEditorCodecMismatch" xml:space="preserve"><value>临时文件的视频编码与原视频不一致，已取消替换。</value></data>
+  <data name="VideoEditorDurationMismatch" xml:space="preserve"><value>临时文件时长校验失败（预期 {0:0.###} 秒，实际 {1:0.###} 秒），原视频没有改动。</value></data>
+  <data name="VideoEditorDimensionsMismatch" xml:space="preserve"><value>临时文件的视频尺寸与原视频不一致，已取消替换。</value></data>
+  <data name="VideoEditorProbeFailed" xml:space="preserve"><value>FFprobe 无法读取此视频。</value></data>
+  <data name="VideoEditorNoVideoStream" xml:space="preserve"><value>所选文件中没有可剪切的视频轨道。</value></data>
+  <data name="VideoEditorDurationUnavailable" xml:space="preserve"><value>无法读取视频时长。</value></data>
+  <data name="VideoEditorFfprobeStartFailed" xml:space="preserve"><value>无法启动 FFprobe。</value></data>
+  <data name="VideoEditorKeyframesFailed" xml:space="preserve"><value>无法读取视频关键帧。</value></data>
+  <data name="VideoEditorQueueEmpty" xml:space="preserve"><value>队列为空。选择视频并设置裁切点后，可加入队列批量输出。</value></data>
+  <data name="VideoEditorCompletedEmpty" xml:space="preserve"><value>暂无已完成的视频。</value></data>
+  <data name="VideoEditorPresetsEmpty" xml:space="preserve"><value>成功输出后，裁切点会自动保存在这里。</value></data>
+  <data name="VideoEditorMenuFile" xml:space="preserve"><value>文件</value></data>
+  <data name="VideoEditorMenuEdit" xml:space="preserve"><value>编辑</value></data>
+  <data name="VideoEditorMenuSegment" xml:space="preserve"><value>片段</value></data>
+  <data name="VideoEditorMenuView" xml:space="preserve"><value>查看</value></data>
+  <data name="VideoEditorMenuTools" xml:space="preserve"><value>工具</value></data>
+  <data name="VideoEditorMenuHelp" xml:space="preserve"><value>帮助</value></data>
+  <data name="VideoEditorSettingsTitle" xml:space="preserve"><value>视频编辑</value></data>
+  <data name="VideoEditorExportMode" xml:space="preserve"><value>导出方式</value></data>
+  <data name="VideoEditorExportModeHint" xml:space="preserve"><value>选择替换原视频，或保留原视频并生成修改版。</value></data>
+  <data name="VideoEditorReplaceOriginalOption" xml:space="preserve"><value>导出后替换原视频</value></data>
+  <data name="VideoEditorKeepOriginalOption" xml:space="preserve"><value>保留原视频，生成“原名-修改版”</value></data>
+  <data name="VideoEditorExportLocation" xml:space="preserve"><value>导出位置</value></data>
+  <data name="VideoEditorExportLocationHint" xml:space="preserve"><value>另存修改版时可使用原视频所在目录或指定文件夹。</value></data>
+  <data name="VideoEditorSourceFolderOption" xml:space="preserve"><value>原视频所在目录</value></data>
+  <data name="VideoEditorCustomFolderOption" xml:space="preserve"><value>指定文件夹</value></data>
+  <data name="VideoEditorNoFolderSelected" xml:space="preserve"><value>尚未选择导出文件夹</value></data>
+  <data name="VideoEditorChooseFolder" xml:space="preserve"><value>选择路径</value></data>
+  <data name="VideoEditorReplaceLocationHint" xml:space="preserve"><value>替换原视频时，始终在原视频所在目录安全替换；所选导出路径用于另存修改版。</value></data>
+  <data name="VideoEditorExportFolderUnavailable" xml:space="preserve"><value>导出文件夹不存在或未选择：{0}</value></data>
+  <data name="VideoEditorOutputNameUnavailable" xml:space="preserve"><value>无法为修改版生成可用文件名。</value></data>
+  <data name="VideoEditorStatusSaving" xml:space="preserve"><value>保存中</value></data>
+  <data name="VideoEditorCutBefore" xml:space="preserve"><value>裁切前段</value></data>
+  <data name="VideoEditorCutAfter" xml:space="preserve"><value>裁切后段</value></data>
+  <data name="VideoEditorRestore" xml:space="preserve"><value>恢复</value></data>
+  <data name="VideoEditorExport" xml:space="preserve"><value>导出</value></data>
+  <data name="VideoEditorCloseVideo" xml:space="preserve"><value>关闭视频</value></data>
+  <data name="VideoEditorExportComplete" xml:space="preserve"><value>已导出到：{0}</value></data>
+  <data name="VideoEditorExportGroup" xml:space="preserve"><value>导出</value></data>
+  <data name="VideoEditorExportNow" xml:space="preserve"><value>立即导出</value></data>
+  <data name="VideoEditorExportLater" xml:space="preserve"><value>先加入队列</value></data>
+  <data name="VideoEditorPauseAll" xml:space="preserve"><value>全部暂停</value></data>
+  <data name="VideoEditorStartAll" xml:space="preserve"><value>全部开始</value></data>
+  <data name="VideoEditorPauseJob" xml:space="preserve"><value>暂停</value></data>
+  <data name="VideoEditorResume" xml:space="preserve"><value>开始</value></data>
+  <data name="VideoEditorReedit" xml:space="preserve"><value>重新编辑</value></data>
+  <data name="VideoEditorCancelExport" xml:space="preserve"><value>取消</value></data>
+  <data name="VideoEditorStatusPaused" xml:space="preserve"><value>已暂停</value></data>
+  <data name="VideoEditorChooseFolderFailed" xml:space="preserve"><value>无法选择导出文件夹：{0}</value></data>
 </root>

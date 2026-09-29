@@ -115,7 +115,8 @@ namespace Files.App.ViewModels
 			AppearanceSettingsService.ShowToolbar &&
 			context.PageType is not ContentPageTypes.Home &&
 			context.PageType is not ContentPageTypes.ReleaseNotes &&
-			context.PageType is not ContentPageTypes.Settings;
+			context.PageType is not ContentPageTypes.Settings &&
+			context.PageType is not ContentPageTypes.VideoEditor;
 
 		private bool canShowPrompts;
 
