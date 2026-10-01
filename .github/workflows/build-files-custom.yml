@@ -37,7 +37,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Verify icon variants have no blue backplate
+      - name: Verify icons match the single rounded source
         shell: pwsh
         run: '& "$env:GITHUB_WORKSPACE\src\Files.App\Assets\AppTiles\Taskbar\Verify-TaskbarIcons.ps1"'
 

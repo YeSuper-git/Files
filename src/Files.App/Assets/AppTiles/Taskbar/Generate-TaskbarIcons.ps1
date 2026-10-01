@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 
-$sourcePath = Join-Path $PSScriptRoot 'CatTransparent.png'
+$sourcePath = Join-Path $PSScriptRoot 'FilesMaxIconSource.png'
 $source = [System.Drawing.Bitmap]::FromFile($sourcePath)
 $iconSizes = @(16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 80, 96, 128, 256)
 $logoNames = @('BadgeLogo', 'Large310x310Logo', 'Small71x71Logo', 'SplashScreen', 'Square150x150Logo', 'Square44x44Logo', 'StoreLogo', 'Wide310x150Logo')
