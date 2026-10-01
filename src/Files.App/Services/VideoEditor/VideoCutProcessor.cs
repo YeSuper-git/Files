@@ -27,6 +27,15 @@ public sealed class VideoCutProcessor(VideoToolchain toolchain, VideoProbeServic
 		if (job.StartSeconds < 0 || job.EndSeconds <= job.StartSeconds || job.EndSeconds > job.SourceDurationSeconds + 0.25)
 			throw new InvalidDataException(Strings.VideoEditorInvalidTrimRange.GetLocalizedResource());
 
+		if (job.Segments.Count == 0) throw new InvalidDataException(Strings.VideoEditorInvalidTrimRange.GetLocalizedResource());
+		double previousEnd = 0;
+		foreach (var segment in job.Segments)
+		{
+			if (!double.IsFinite(segment.StartSeconds) || !double.IsFinite(segment.EndSeconds) || segment.StartSeconds < previousEnd || segment.EndSeconds <= segment.StartSeconds || segment.EndSeconds > job.SourceDurationSeconds + 0.001)
+				throw new InvalidDataException(Strings.VideoEditorInvalidTrimRange.GetLocalizedResource());
+			previousEnd = segment.EndSeconds;
+		}
+
 		var source = new FileInfo(job.SourcePath);
 		var sourceAttributes = File.GetAttributes(job.SourcePath);
 		var extension = source.Extension;
@@ -40,7 +49,7 @@ public sealed class VideoCutProcessor(VideoToolchain toolchain, VideoProbeServic
 		var operationId = Guid.NewGuid();
 		var temporaryPath = Path.Combine(outputDirectory, $".{source.Name}.filesmax-{operationId:N}.tmp{extension}");
 		var backupPath = Path.Combine(directory, $".{source.Name}.filesmax-{operationId:N}.backup{extension}");
-		var expectedDuration = job.EndSeconds - job.StartSeconds;
+		var expectedDuration = job.OutputDurationSeconds;
 		string? warningMessage = null;
 
 		CheckAvailableSpace(source, outputDirectory, expectedDuration, job.SourceDurationSeconds);
@@ -50,7 +59,6 @@ public sealed class VideoCutProcessor(VideoToolchain toolchain, VideoProbeServic
 			using (File.Create(temporaryPath))
 			{
 			}
-			File.SetAttributes(temporaryPath, FileAttributes.Hidden);
 			await RunFfmpegAsync(job, temporaryPath, expectedDuration, reportProgress, cancellationToken).ConfigureAwait(false);
 			cancellationToken.ThrowIfCancellationRequested();
 
@@ -141,17 +149,45 @@ public sealed class VideoCutProcessor(VideoToolchain toolchain, VideoProbeServic
 			StandardErrorEncoding = Encoding.UTF8
 		};
 
+		var filters = new List<string>();
+		var concatInputs = new StringBuilder();
+		for (var index = 0; index < job.Segments.Count; index++)
+		{
+			var segment = job.Segments[index];
+			var start = FormatSeconds(segment.StartSeconds - job.StartSeconds);
+			var end = FormatSeconds(segment.EndSeconds - job.StartSeconds);
+			filters.Add($"[0:v:0]trim=start={start}:end={end},setpts=PTS-STARTPTS[v{index}]");
+			concatInputs.Append($"[v{index}]");
+			for (var audio = 0; audio < job.AudioStreamCount; audio++)
+			{
+				filters.Add($"[0:a:{audio}]atrim=start={start}:end={end},asetpts=PTS-STARTPTS[a{index}_{audio}]");
+				concatInputs.Append($"[a{index}_{audio}]");
+			}
+		}
+		var audioOutputs = string.Concat(Enumerable.Range(0, job.AudioStreamCount).Select(audio => $"[aout{audio}]"));
+		filters.Add($"{concatInputs}concat=n={job.Segments.Count}:v=1:a={job.AudioStreamCount}[vout]{audioOutputs}");
 		foreach (var argument in new[]
 		{
 			"-hide_banner", "-nostdin", "-y", "-loglevel", "error", "-progress", "pipe:1",
-			"-ss", FormatSeconds(job.StartSeconds),
-			"-i", job.SourcePath,
-			"-t", FormatSeconds(expectedDuration),
-			"-map", "0", "-map_metadata", "0", "-map_chapters", "0", "-c", "copy",
-			temporaryPath
-		})
-			startInfo.ArgumentList.Add(argument);
-
+			"-ss", FormatSeconds(job.StartSeconds), "-t", FormatSeconds(job.EndSeconds - job.StartSeconds), "-i", job.SourcePath,
+			"-filter_complex", string.Join(";", filters), "-map", "[vout]", "-map_metadata", "0", "-map_chapters", "-1",
+			"-c:v", GetVideoEncoder(job).Encoder, "-fps_mode", "vfr"
+		}) startInfo.ArgumentList.Add(argument);
+		if (GetVideoEncoder(job).Encoder is "libx264" or "libx265")
+		{
+			foreach (var argument in new[] { "-preset", "fast", "-crf", "18" }) startInfo.ArgumentList.Add(argument);
+		}
+		for (var audio = 0; audio < job.AudioStreamCount; audio++)
+		{
+			startInfo.ArgumentList.Add("-map");
+			startInfo.ArgumentList.Add($"[aout{audio}]");
+		}
+		if (job.AudioStreamCount > 0)
+		{
+			startInfo.ArgumentList.Add("-c:a");
+			startInfo.ArgumentList.Add(Path.GetExtension(temporaryPath).ToLowerInvariant() switch { ".webm" => "libopus", ".wmv" => "wmav2", _ => "aac" });
+		}
+		startInfo.ArgumentList.Add(temporaryPath);
 		using var process = new Process { StartInfo = startInfo };
 		if (!process.Start())
 			throw new InvalidOperationException(Strings.VideoEditorFfmpegStartFailed.GetLocalizedResource());
@@ -234,16 +270,29 @@ public sealed class VideoCutProcessor(VideoToolchain toolchain, VideoProbeServic
 
 	private static void ValidateOutput(VideoCutJob job, VideoMetadata result, double expectedDuration)
 	{
-		if (!string.Equals(job.SourceVideoCodec, result.VideoCodec, StringComparison.OrdinalIgnoreCase))
+		if (!string.Equals(GetVideoEncoder(job).Codec, result.VideoCodec, StringComparison.OrdinalIgnoreCase))
 			throw new InvalidDataException(Strings.VideoEditorCodecMismatch.GetLocalizedResource());
 
-		var tolerance = Math.Max(0.75, job.SourceFrameRate > 0 ? 3 / job.SourceFrameRate : 0.75);
+		var tolerance = Math.Max(0.1, job.SourceFrameRate > 0 ? 2 / job.SourceFrameRate : 0.1);
 		if (result.DurationSeconds <= 0 || Math.Abs(result.DurationSeconds - expectedDuration) > tolerance)
 			throw new InvalidDataException(string.Format(Strings.VideoEditorDurationMismatch.GetLocalizedResource(), expectedDuration, result.DurationSeconds));
 
 		if (result.Width != job.SourceWidth || result.Height != job.SourceHeight)
 			throw new InvalidDataException(Strings.VideoEditorDimensionsMismatch.GetLocalizedResource());
 	}
+
+	private static (string Encoder, string Codec) GetVideoEncoder(VideoCutJob job) => job.SourceVideoCodec.ToLowerInvariant() switch
+	{
+		"h264" => ("libx264", "h264"),
+		"hevc" => ("libx265", "hevc"),
+		"vp9" => ("libvpx-vp9", "vp9"),
+		"vp8" => ("libvpx", "vp8"),
+		"av1" => ("libsvtav1", "av1"),
+		"mpeg4" => ("mpeg4", "mpeg4"),
+		"mpeg2video" => ("mpeg2video", "mpeg2video"),
+		"wmv2" or "wmv3" => ("wmv2", "wmv2"),
+		_ => ("libx264", "h264")
+	};
 
 	private static void RestoreBackupIfNeeded(string sourcePath, string temporaryPath, string backupPath)
 	{

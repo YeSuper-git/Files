@@ -140,7 +140,11 @@ namespace Files.App.ViewModels.Previews
 				: null;
 
 			if (Item is ResourceVideoFileListedItem)
+			{
 				FormatResourceVideoDetails(list);
+				if (Item.FileSize is { Length: > 0 } size)
+					list.Insert(0, new FileProperty { NameResource = nameof(Strings.Size), Value = size });
+			}
 
 			return list.Where(i => i.ValueText is not null).ToList();
 		}

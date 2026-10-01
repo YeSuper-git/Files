@@ -32,6 +32,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using Windows.Storage;
+using Windows.ApplicationModel.DataTransfer;
 using WinRT;
 
 namespace Files.App.Views.ResourceManager;
@@ -56,6 +57,8 @@ public sealed partial class ResourceLibraryPage : Page
     private string? _selectedActorGroupName;
     private string? _selectedActorGroupActorPath;
     private readonly HashSet<string> _titleTranslationsInProgress = new(StringComparer.OrdinalIgnoreCase);
+    private Windows.Foundation.Point? _selectionDragOrigin;
+    private ResourceBrowserItemViewModel? _activeVideoItem;
 
     public System.Collections.ObjectModel.ObservableCollection<ResourceBrowserItemViewModel> BrowserItems { get; } = [];
     public string CurrentPath => _locations.Count > 0 ? _locations[^1].Path : _libraryPath;
@@ -66,6 +69,13 @@ public sealed partial class ResourceLibraryPage : Page
     {
         InitializeComponent();
         DataContext = this;
+        foreach (var list in new ListViewBase[] { BrowserGrid, VideoFileList })
+        {
+            list.AddHandler(PointerPressedEvent, new PointerEventHandler(BrowserGrid_PointerPressed), true);
+            list.AddHandler(PointerMovedEvent, new PointerEventHandler(BrowserGrid_PointerMoved), true);
+            list.AddHandler(PointerReleasedEvent, new PointerEventHandler(BrowserGrid_PointerReleased), true);
+            list.AddHandler(PointerCanceledEvent, new PointerEventHandler(BrowserGrid_PointerReleased), true);
+        }
         Unloaded += OnPageUnloaded;
     }
 
@@ -238,7 +248,11 @@ public sealed partial class ResourceLibraryPage : Page
     }
 
     public void SelectAllItems()
-        => BrowserGrid.SelectAll();
+        => ActiveBrowserList.SelectAll();
+
+    private ListViewBase ActiveBrowserList => _locations.Count > 0 && _locations[^1].Kind == ResourceBrowserLocationKind.VideoFolder
+        ? VideoFileList
+        : BrowserGrid;
 
     public async Task<bool> TryDeleteSelectedActorFoldersAsync(IReadOnlyList<ListedItem> selectedItems)
     {
@@ -332,8 +346,8 @@ public sealed partial class ResourceLibraryPage : Page
 
     public async Task RenameSelectedItemAsync()
     {
-        if (BrowserGrid.SelectedItems.Count != 1 ||
-            BrowserGrid.SelectedItems.OfType<ResourceBrowserItemViewModel>().FirstOrDefault() is not { } viewModel)
+        if (ActiveBrowserList.SelectedItems.Count != 1 ||
+            ActiveBrowserList.SelectedItems.OfType<ResourceBrowserItemViewModel>().FirstOrDefault() is not { } viewModel)
             return;
 
         await RenameResourceItemAsync(viewModel);
@@ -398,6 +412,10 @@ public sealed partial class ResourceLibraryPage : Page
             BrowserGrid.SelectedItems.Clear();
             LoadingRing.IsActive = true;
             BrowserItems.Clear();
+            VideoFileList.SelectedItems.Clear();
+            _activeVideoItem = null;
+            VideoDetailView.Visibility = location.Kind == ResourceBrowserLocationKind.VideoFolder ? Visibility.Visible : Visibility.Collapsed;
+            BrowserGrid.Visibility = location.Kind == ResourceBrowserLocationKind.VideoFolder ? Visibility.Collapsed : Visibility.Visible;
             EmptyText.Visibility = Visibility.Collapsed;
             ActorGroupButtons.Children.Clear();
             ActorGroupSelector.Visibility = Visibility.Collapsed;
@@ -451,6 +469,12 @@ public sealed partial class ResourceLibraryPage : Page
             }
 
             EmptyText.Visibility = BrowserItems.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (location.Kind == ResourceBrowserLocationKind.VideoFolder)
+            {
+                if (BrowserItems.Count > 0)
+                    VideoFileList.SelectedItem = BrowserItems[0];
+                await LoadVideoIllustrationsAsync(location.Path, cancellationToken);
+            }
             SetResourceStatusMessage(string.Empty);
             UpdateActorGridLayout();
             UpdateNativeResourceStatus();
@@ -478,6 +502,65 @@ public sealed partial class ResourceLibraryPage : Page
 
     private void BrowserGrid_SizeChanged(object sender, SizeChangedEventArgs e)
         => UpdateActorGridLayout();
+
+    private void BrowserGrid_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is not ListViewBase list || !e.GetCurrentPoint(list).Properties.IsLeftButtonPressed)
+            return;
+        for (var source = e.OriginalSource as DependencyObject; source is not null && source != list; source = VisualTreeHelper.GetParent(source))
+        {
+            if (source is GridViewItem or ListViewItem)
+                return;
+        }
+        _selectionDragOrigin = e.GetCurrentPoint(BrowserViewport).Position;
+        list.CapturePointer(e.Pointer);
+    }
+
+    private void BrowserGrid_PointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (_selectionDragOrigin is not { } origin || sender is not ListViewBase list || !e.GetCurrentPoint(list).Properties.IsLeftButtonPressed)
+            return;
+        var current = e.GetCurrentPoint(BrowserViewport).Position;
+        var left = Math.Min(origin.X, current.X);
+        var top = Math.Min(origin.Y, current.Y);
+        var width = Math.Abs(origin.X - current.X);
+        var height = Math.Abs(origin.Y - current.Y);
+        if (width < 4 && height < 4)
+            return;
+        SelectionMarquee.Visibility = Visibility.Visible;
+        SelectionMarquee.Margin = new Thickness(left, top, 0, 0);
+        SelectionMarquee.Width = width;
+        SelectionMarquee.Height = height;
+    }
+
+    private void BrowserGrid_PointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (_selectionDragOrigin is not { } origin)
+            return;
+        if (sender is not ListViewBase list)
+            return;
+        var current = e.GetCurrentPoint(BrowserViewport).Position;
+        var left = Math.Min(origin.X, current.X);
+        var top = Math.Min(origin.Y, current.Y);
+        var right = Math.Max(origin.X, current.X);
+        var bottom = Math.Max(origin.Y, current.Y);
+        var wasDragging = SelectionMarquee.Visibility == Visibility.Visible;
+        _selectionDragOrigin = null;
+        SelectionMarquee.Visibility = Visibility.Collapsed;
+        list.ReleasePointerCapture(e.Pointer);
+        if (!wasDragging)
+            return;
+        list.SelectedItems.Clear();
+        for (var index = 0; index < BrowserItems.Count; index++)
+        {
+            if (list.ContainerFromIndex(index) is not FrameworkElement container)
+                continue;
+            var point = container.TransformToVisual(BrowserViewport).TransformPoint(new Windows.Foundation.Point());
+            if (point.X < right && point.X + container.ActualWidth > left && point.Y < bottom && point.Y + container.ActualHeight > top)
+                list.SelectedItems.Add(BrowserItems[index]);
+        }
+        e.Handled = true;
+    }
 
     private void UpdateActorGridLayout()
     {
@@ -542,11 +625,66 @@ public sealed partial class ResourceLibraryPage : Page
         }
     }
 
+    private void ResourceVideos_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
+    {
+        var items = e.Items.OfType<ResourceBrowserItemViewModel>().Where(item => item.Kind is ResourceBrowserItemKind.VideoFile or ResourceBrowserItemKind.VideoFolder).ToArray();
+        if (items.Length == 0)
+        {
+            e.Cancel = true;
+            return;
+        }
+        e.Data.RequestedOperation = DataPackageOperation.Copy;
+        e.Data.SetDataProvider(StandardDataFormats.StorageItems, async request =>
+        {
+            var deferral = request.GetDeferral();
+            try
+            {
+                var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var item in items)
+                {
+                    if (item.Kind == ResourceBrowserItemKind.VideoFile)
+                        paths.Add(item.Path);
+                    else if (item.Kind == ResourceBrowserItemKind.VideoFolder)
+                    {
+                        var children = await _browser.GetChildrenAsync(item.Path, ResourceBrowserLocationKind.VideoFolder, _workspace.Settings, CancellationToken.None);
+                        foreach (var child in children.Where(child => child.Kind == ResourceBrowserItemKind.VideoFile))
+                            paths.Add(child.Path);
+                    }
+                }
+                var files = new List<StorageFile>();
+                foreach (var path in paths)
+                    files.Add(await StorageFile.GetFileFromPathAsync(path));
+                request.SetData(files.Cast<IStorageItem>().ToArray());
+            }
+            catch (Exception ex)
+            {
+                App.Logger.LogWarning(ex, "Could not prepare resource videos for drag and drop");
+            }
+            finally { deferral.Complete(); }
+            });
+    }
+
     private void OnBrowserSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_locations.Count > 0 && _locations[^1].Kind == ResourceBrowserLocationKind.VideoFolder)
+            return;
+        UpdateResourceSelection(BrowserGrid.SelectedItems.OfType<ResourceBrowserItemViewModel>());
+    }
+
+    private void VideoFileList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_locations.Count == 0 || _locations[^1].Kind != ResourceBrowserLocationKind.VideoFolder)
+            return;
+        _activeVideoItem = VideoFileList.SelectedItem as ResourceBrowserItemViewModel;
+        ShowActiveVideoDetails();
+        UpdateResourceSelection(VideoFileList.SelectedItems.OfType<ResourceBrowserItemViewModel>());
+    }
+
+    private void UpdateResourceSelection(IEnumerable<ResourceBrowserItemViewModel> selection)
     {
         ClearSelectedResourceItems();
         var selectedItems = new List<ListedItem>();
-        foreach (var viewModel in BrowserGrid.SelectedItems.OfType<ResourceBrowserItemViewModel>())
+        foreach (var viewModel in selection)
         {
             var listedItem = CreateListedItem(viewModel);
             _selectedResourceItems[listedItem.ItemPath ?? viewModel.Path] = (listedItem, viewModel);
@@ -556,6 +694,91 @@ public sealed partial class ResourceLibraryPage : Page
         SetNativeSelection(selectedItems.Count == 0 ? null : selectedItems);
     }
 
+    private void ShowActiveVideoDetails()
+    {
+        var item = _activeVideoItem;
+        VideoDetailPoster.Source = item?.Poster;
+        VideoDetailTitle.Text = _locations.Count > 0 ? _locations[^1].Title : string.Empty;
+        VideoDetailFileName.Text = item?.Name ?? Strings.ResourceVideoChooseFile.GetLocalizedResource();
+        VideoDetailPath.Text = item?.Path ?? string.Empty;
+        if (item is null)
+        {
+            VideoDetailFileSize.Text = string.Empty;
+            VideoDetailModified.Text = string.Empty;
+            return;
+        }
+        try
+        {
+            var info = new FileInfo(item.Path);
+            VideoDetailFileSize.Text = string.Format(CultureInfo.CurrentCulture, Strings.ResourceVideoFileSize.GetLocalizedResource(), info.Length.ToSizeString());
+            VideoDetailModified.Text = string.Format(CultureInfo.CurrentCulture, Strings.ResourceVideoModified.GetLocalizedResource(), info.LastWriteTime.ToString("g", CultureInfo.CurrentCulture));
+        }
+        catch (IOException)
+        {
+            VideoDetailFileSize.Text = string.Format(CultureInfo.CurrentCulture, Strings.ResourceVideoFileSize.GetLocalizedResource(), Strings.Unknown.GetLocalizedResource());
+            VideoDetailModified.Text = string.Empty;
+        }
+    }
+
+    private void VideoDetailPlay_Click(object sender, RoutedEventArgs e)
+    {
+        if (_activeVideoItem is null)
+            return;
+        try { Process.Start(new ProcessStartInfo { FileName = _activeVideoItem.Path, UseShellExecute = true }); }
+        catch (Exception ex) { SetResourceStatusMessage($"无法打开视频：{ex.Message}"); }
+    }
+
+    private async Task LoadVideoIllustrationsAsync(string folderPath, CancellationToken token)
+    {
+        var images = new List<BitmapImage>();
+        try
+        {
+            var extensions = _workspace.Settings.ImageExtensions.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var posterPaths = BrowserItems.Select(item => item.Model.PosterPath)
+                .Append(_workspace.GetPosterOverride(folderPath))
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var path in Directory.EnumerateFiles(folderPath)
+                .Where(path => extensions.Contains(Path.GetExtension(path).TrimStart('.')) && !posterPaths.Contains(path)))
+            {
+                token.ThrowIfCancellationRequested();
+                if (await LoadPosterAsync(path, token) is { } image)
+                    images.Add(image);
+            }
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { App.Logger.LogWarning(ex, "Unable to load video illustrations from {Folder}", folderPath); }
+        VideoIllustrations.ItemsSource = images;
+        VideoIllustrationsEmpty.Visibility = images.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async void AddVideoIllustration_Click(object sender, RoutedEventArgs e)
+    {
+        if (_locations.Count == 0 || _locations[^1].Kind != ResourceBrowserLocationKind.VideoFolder)
+            return;
+        var folder = _locations[^1].Path;
+        var picker = new Windows.Storage.Pickers.FileOpenPicker();
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, MainWindow.Instance.WindowHandle);
+        picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.PicturesLibrary;
+        foreach (var extension in _workspace.Settings.ImageExtensions)
+            picker.FileTypeFilter.Add($".{extension.TrimStart('.')}");
+        var files = await picker.PickMultipleFilesAsync();
+        if (files.Count == 0)
+            return;
+        try
+        {
+            foreach (var file in files)
+            {
+                if (PathEquals(Path.GetDirectoryName(file.Path) ?? string.Empty, folder))
+                    continue;
+                var destination = Path.Combine(folder, $"illustration-{Guid.NewGuid():N}{Path.GetExtension(file.Name)}");
+                File.Copy(file.Path, destination);
+            }
+            await LoadVideoIllustrationsAsync(folder, CancellationToken.None);
+        }
+        catch (Exception ex) { SetResourceStatusMessage($"添加插图失败：{ex.Message}"); }
+    }
+
     private void ClearSelectedResourceItems()
     {
         _selectedResourceItems.Clear();
@@ -563,6 +786,8 @@ public sealed partial class ResourceLibraryPage : Page
 
     private void SetNativeSelection(List<ListedItem>? items)
     {
+        if (_contentPageContext.ShellPage is ModernShellPage modernShellPage)
+            modernShellPage.UpdateResourceLibrarySelection(items ?? []);
         if (_contentPageContext.ShellPage is { } shellPage)
             shellPage.ToolbarViewModel.SelectedItems = items;
     }
@@ -1868,7 +2093,7 @@ public sealed partial class ResourceLibraryPage : Page
 
     private void RefreshNativeSelectionAvailability()
     {
-        var selectedItems = BrowserGrid.SelectedItems
+        var selectedItems = ActiveBrowserList.SelectedItems
             .OfType<ResourceBrowserItemViewModel>()
             .Select(CreateListedItem)
             .ToList();

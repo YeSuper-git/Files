@@ -17,18 +17,10 @@ public sealed partial class VideoEditorSettingsPage : Page
 	public VideoEditorSettingsPage()
 	{
 		InitializeComponent();
-		OutputModeComboBox.SelectedIndex = _settings.VideoEditorReplaceOriginal ? 0 : 1;
 		FolderModeComboBox.SelectedIndex = _settings.VideoEditorExportToSourceFolder ? 0 : 1;
 		SourceFolderModeComboBox.SelectedIndex = FolderModeComboBox.SelectedIndex;
 		FolderPathTextBox.Text = _settings.VideoEditorExportFolder;
 		_initializing = false;
-		UpdateFolderControls();
-	}
-
-	private void OutputModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-	{
-		if (!_initializing)
-			_settings.VideoEditorReplaceOriginal = OutputModeComboBox.SelectedIndex == 0;
 		UpdateFolderControls();
 	}
 
@@ -59,11 +51,9 @@ public sealed partial class VideoEditorSettingsPage : Page
 		LocationExpander.Visibility = customFolder ? Visibility.Visible : Visibility.Collapsed;
 		if (customFolder)
 			LocationExpander.IsExpanded = true;
-		FolderStatusText.Text = OutputModeComboBox.SelectedIndex == 0
-			? Strings.VideoEditorReplaceLocationHint.GetLocalizedResource()
-			: customFolder && string.IsNullOrWhiteSpace(_settings.VideoEditorExportFolder)
-				? Strings.VideoEditorNoFolderSelected.GetLocalizedResource()
-				: string.Empty;
+		FolderStatusText.Text = customFolder && string.IsNullOrWhiteSpace(_settings.VideoEditorExportFolder)
+			? Strings.VideoEditorNoFolderSelected.GetLocalizedResource()
+			: string.Empty;
 	}
 
 	private void ChooseFolderButton_Click(object sender, RoutedEventArgs e)

@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Files.App.Services.VideoEditor;
+using Microsoft.Extensions.Logging;
 
 namespace Files.App.ViewModels.VideoEditor;
 
@@ -13,9 +14,7 @@ public sealed class VideoEditorViewModel : ObservableObject
 	private readonly VideoProbeService _probeService;
 	private readonly VideoToolchain _toolchain;
 	private readonly VideoCutQueueService _queueService;
-	private readonly VideoCutPresetService _presetService;
 	private readonly IAppSettingsService _settings;
-	private IReadOnlyList<double> _allKeyframes = [];
 	private VideoMetadata? _metadata;
 	private string? _sourcePath;
 	private string _sourceName = string.Empty;
@@ -26,11 +25,24 @@ public sealed class VideoEditorViewModel : ObservableObject
 	private bool _isLoading;
 	private DateTimeOffset _videoLoadedAt;
 	private string _statusMessage = Strings.VideoEditorOpenVideoHint.GetLocalizedResource();
+	private readonly VideoTimeline _timeline = new();
+	public ObservableCollection<VideoSegment> Segments => _timeline.Segments;
+	public double TimelineToSource(double seconds) => _timeline.ToSource(seconds);
+	public double SourceToTimeline(double seconds) => _timeline.FromSource(seconds);
+	public void SplitAtPlayhead()
+	{
+		var sourcePosition = _timeline.ToSource(CurrentPositionSeconds);
+		var frameRate = _metadata?.FrameRate ?? 0;
+		if (frameRate > 0) sourcePosition = Math.Round(sourcePosition * frameRate) / frameRate;
+		var position = _timeline.FromSource(sourcePosition);
+		if (_timeline.Split(position, frameRate)) CurrentPositionSeconds = position;
+	}
+	public void RemoveSegment(VideoSegment segment) => Segments.Remove(segment);
+	public void KeepOnlySegment(VideoSegment segment) => _timeline.KeepOnly(segment);
 
-	public ObservableCollection<VideoKeyframeMarker> KeyframeMarkers { get; } = [];
+	public ObservableCollection<PendingVideo> PendingVideos { get; } = [];
 	public ObservableCollection<VideoCutJob> ProcessingJobs => _queueService.ProcessingJobs;
 	public ObservableCollection<VideoCutJob> CompletedJobs => _queueService.CompletedJobs;
-	public ObservableCollection<VideoCutPreset> Presets => _presetService.Presets;
 	public event Action<string>? SourceReserved
 	{
 		add => _queueService.SourceReserved += value;
@@ -44,13 +56,21 @@ public sealed class VideoEditorViewModel : ObservableObject
 	public string ToolStatus => _toolchain.StatusMessage;
 	public bool IsToolchainAvailable => _toolchain.IsAvailable;
 	public bool HasVideo => _metadata is not null && _sourcePath is not null;
-	public bool CanSave => HasVideo && IsToolchainAvailable && !IsLoading && TrimEndSeconds > TrimStartSeconds;
+	public bool CanSave => HasVideo && IsToolchainAvailable && !IsLoading && DurationSeconds > 0 && Segments.Count > 0;
 	public string SourceName => string.IsNullOrWhiteSpace(_sourceName) ? Strings.VideoEditorNoVideo.GetLocalizedResource() : _sourceName;
 	public string DurationText => FormatTime(DurationSeconds);
 	public string SourceDetails => _metadata is null
 		? string.Empty
 		: $"{_metadata.Width} × {_metadata.Height} · {DurationText} · {_metadata.VideoCodec}";
 	public string CurrentTimeText => FormatTime(CurrentPositionSeconds);
+	public double SourceDurationSeconds => _metadata?.DurationSeconds ?? 0;
+	public double VideoAspectRatio => _metadata is { Height: > 0 } metadata ? (double)metadata.Width / metadata.Height : 16d / 9;
+	public string PlaybackTimeText => $"{FormatTimelineTime(CurrentPositionSeconds)} / {FormatTimelineTime(DurationSeconds)}";
+	public static string FormatTimelineTime(double seconds)
+	{
+		var time = TimeSpan.FromSeconds(Math.Max(0, seconds));
+		return $"{(int)time.TotalMinutes}:{time.Seconds:D2}";
+	}
 	public string TrimStartText => FormatTime(TrimStartSeconds);
 	public string TrimEndText => FormatTime(TrimEndSeconds);
 
@@ -83,7 +103,10 @@ public sealed class VideoEditorViewModel : ObservableObject
 		private set
 		{
 			if (SetProperty(ref _durationSeconds, value))
+			{
 				OnPropertyChanged(nameof(DurationText));
+				OnPropertyChanged(nameof(PlaybackTimeText));
+			}
 		}
 	}
 
@@ -93,7 +116,10 @@ public sealed class VideoEditorViewModel : ObservableObject
 		set
 		{
 			if (SetProperty(ref _currentPositionSeconds, Math.Clamp(value, 0, Math.Max(0, DurationSeconds))))
+			{
 				OnPropertyChanged(nameof(CurrentTimeText));
+				OnPropertyChanged(nameof(PlaybackTimeText));
+			}
 		}
 	}
 
@@ -139,17 +165,46 @@ public sealed class VideoEditorViewModel : ObservableObject
 		private set => SetProperty(ref _statusMessage, value);
 	}
 
-	public VideoEditorViewModel(VideoProbeService probeService, VideoToolchain toolchain, VideoCutQueueService queueService, VideoCutPresetService presetService, IAppSettingsService settings)
+	public VideoEditorViewModel(VideoProbeService probeService, VideoToolchain toolchain, VideoCutQueueService queueService, IAppSettingsService settings)
 	{
 		_probeService = probeService;
 		_toolchain = toolchain;
 		_queueService = queueService;
-		_presetService = presetService;
 		_settings = settings;
+		Segments.CollectionChanged += (_, _) =>
+		{
+			DurationSeconds = _timeline.DurationSeconds;
+			CurrentPositionSeconds = Math.Min(CurrentPositionSeconds, DurationSeconds);
+			OnPropertyChanged(nameof(Segments));
+			OnPropertyChanged(nameof(CanSave));
+		};
+	}
+
+	public PendingVideo AddPendingVideo(string path)
+	{
+		var fullPath = Path.GetFullPath(path);
+		var existing = PendingVideos.FirstOrDefault(video => string.Equals(video.SourcePath, fullPath, StringComparison.OrdinalIgnoreCase));
+		if (existing is not null)
+			return existing;
+		var video = new PendingVideo(fullPath);
+		PendingVideos.Add(video);
+		return video;
+	}
+
+	public void SavePendingDraft()
+	{
+		var video = PendingVideos.FirstOrDefault(video => string.Equals(video.SourcePath, SourcePath, StringComparison.OrdinalIgnoreCase));
+		if (video is null || !HasVideo || IsLoading)
+			return;
+		video.TrimStartSeconds = TrimStartSeconds;
+		video.TrimEndSeconds = TrimEndSeconds;
+		video.CurrentPositionSeconds = CurrentPositionSeconds;
+		video.Segments = Segments.ToArray();
 	}
 
 	public async Task LoadVideoAsync(string path, CancellationToken cancellationToken = default)
 	{
+		SavePendingDraft();
 		if (!IsToolchainAvailable)
 		{
 			StatusMessage = ToolStatus;
@@ -168,10 +223,7 @@ public sealed class VideoEditorViewModel : ObservableObject
 		try
 		{
 			var metadata = await _probeService.ProbeAsync(fullPath, cancellationToken);
-			var keyframes = await _probeService.ReadKeyframesAsync(fullPath, cancellationToken);
-
 			_metadata = metadata;
-			_allKeyframes = keyframes;
 			SourcePath = fullPath;
 			SourceNameValue = Path.GetFileName(fullPath);
 			DurationSeconds = metadata.DurationSeconds;
@@ -180,8 +232,17 @@ public sealed class VideoEditorViewModel : ObservableObject
 			TrimStartSeconds = 0;
 			TrimEndSeconds = metadata.DurationSeconds;
 			CurrentPositionSeconds = 0;
-			BuildKeyframeMarkers(keyframes);
+			var pendingVideo = AddPendingVideo(fullPath);
+			if (pendingVideo.TrimStartSeconds is { } start && pendingVideo.TrimEndSeconds is { } end)
+			{
+				TrimStartSeconds = Math.Clamp(start, 0, metadata.DurationSeconds);
+				TrimEndSeconds = Math.Clamp(end, TrimStartSeconds, metadata.DurationSeconds);
+				CurrentPositionSeconds = pendingVideo.CurrentPositionSeconds;
+			}
+			_timeline.Restore(pendingVideo.Segments ?? [new VideoSegment(TrimStartSeconds, TrimEndSeconds)]);
+			CurrentPositionSeconds = pendingVideo.CurrentPositionSeconds;
 			StatusMessage = string.Format(Strings.VideoEditorLoadedMessage.GetLocalizedResource(), metadata.Width, metadata.Height, metadata.VideoCodec);
+
 		}
 		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
 		{
@@ -191,6 +252,7 @@ public sealed class VideoEditorViewModel : ObservableObject
 		{
 			StatusMessage = string.Format(Strings.VideoEditorLoadFailed.GetLocalizedResource(), ex.Message);
 			_metadata = null;
+			_timeline.Reset(0);
 			OnPropertyChanged(nameof(SourceDetails));
 			SourcePath = null;
 			SourceNameValue = string.Empty;
@@ -198,8 +260,6 @@ public sealed class VideoEditorViewModel : ObservableObject
 			CurrentPositionSeconds = 0;
 			TrimStartSeconds = 0;
 			TrimEndSeconds = 0;
-			_allKeyframes = [];
-			KeyframeMarkers.Clear();
 		}
 		finally
 		{
@@ -207,81 +267,38 @@ public sealed class VideoEditorViewModel : ObservableObject
 		}
 	}
 
-	public void SetTrimStart(double seconds)
-	{
-		if (!HasVideo)
-			return;
-
-		var snapped = FindNearestKeyframe(seconds);
-		if (snapped >= TrimEndSeconds)
-			snapped = FindPreviousKeyframe(TrimEndSeconds);
-		TrimStartSeconds = Math.Max(0, snapped);
-	}
-
-	public void SetTrimEnd(double seconds)
-	{
-		if (!HasVideo)
-			return;
-
-		var snapped = FindNearestKeyframe(seconds);
-		if (snapped <= TrimStartSeconds)
-			snapped = FindNextKeyframe(TrimStartSeconds);
-		TrimEndSeconds = Math.Min(DurationSeconds, Math.Max(TrimStartSeconds, snapped));
-	}
-
 	public void RestoreTrim()
 	{
 		if (!HasVideo)
 			return;
 		TrimStartSeconds = 0;
-		TrimEndSeconds = DurationSeconds;
+		TrimEndSeconds = _metadata!.DurationSeconds;
+		_timeline.Reset(_metadata.DurationSeconds);
+		CurrentPositionSeconds = 0;
 	}
 
 	public void CloseVideo()
 	{
 		_metadata = null;
+		_timeline.Reset(0);
 		SourcePath = null;
 		SourceNameValue = string.Empty;
 		DurationSeconds = 0;
 		CurrentPositionSeconds = 0;
 		TrimStartSeconds = 0;
 		TrimEndSeconds = 0;
-		_allKeyframes = [];
-		KeyframeMarkers.Clear();
 		OnPropertyChanged(nameof(SourceDetails));
 		StatusMessage = Strings.VideoEditorOpenVideoHint.GetLocalizedResource();
 	}
 
-	public double SnapToNearestKeyframe(double seconds) => FindNearestKeyframe(seconds);
-
-	public double FindPreviousKeyframe(double seconds)
+	public void ExportCurrent(bool replaceOriginal)
 	{
-		for (var index = _allKeyframes.Count - 1; index >= 0; index--)
-		{
-			if (_allKeyframes[index] < seconds - 0.001)
-				return _allKeyframes[index];
-		}
-		return 0;
+		EnqueueCurrent(startImmediately: true, replaceOriginal);
 	}
 
-	public double FindNextKeyframe(double seconds)
+	public void AddCurrentToQueue(bool replaceOriginal)
 	{
-		foreach (var keyframe in _allKeyframes)
-		{
-			if (keyframe > seconds + 0.001)
-				return keyframe;
-		}
-		return DurationSeconds;
-	}
-
-	public void ExportCurrent()
-	{
-		EnqueueCurrent(startImmediately: true);
-	}
-
-	public void AddCurrentToQueue()
-	{
-		EnqueueCurrent(startImmediately: false);
+		EnqueueCurrent(startImmediately: false, replaceOriginal);
 	}
 
 	public void StartQueue() => _queueService.StartQueue();
@@ -292,9 +309,8 @@ public sealed class VideoEditorViewModel : ObservableObject
 	public Task<bool> CancelForReeditAsync(VideoCutJob job) => _queueService.CancelForReeditAsync(job);
 	public void ApplyJobRange(VideoCutJob job)
 	{
-		SetTrimStart(job.StartSeconds);
-		SetTrimEnd(job.EndSeconds);
-		CurrentPositionSeconds = TrimStartSeconds;
+		_timeline.Restore(job.Segments);
+		CurrentPositionSeconds = 0;
 	}
 
 	public bool IsSourceReserved(string path) => _queueService.IsSourceReserved(path);
@@ -313,35 +329,6 @@ public sealed class VideoEditorViewModel : ObservableObject
 		OnPropertyChanged(nameof(CanSave));
 	}
 
-	public void ApplyPreset(VideoCutPreset preset)
-	{
-		if (!HasVideo)
-		{
-			StatusMessage = Strings.VideoEditorOpenVideoHint.GetLocalizedResource();
-			return;
-		}
-
-		var requestedStart = preset.HeadTrimSeconds < 0.05 ? 0 : Math.Min(preset.HeadTrimSeconds, DurationSeconds);
-		var requestedEnd = preset.TailTrimSeconds < 0.05 ? DurationSeconds : Math.Max(0, DurationSeconds - preset.TailTrimSeconds);
-		TrimEndSeconds = DurationSeconds;
-		SetTrimStart(requestedStart);
-		SetTrimEnd(Math.Max(TrimStartSeconds, requestedEnd));
-		CurrentPositionSeconds = TrimStartSeconds;
-		StatusMessage = Strings.VideoEditorPresetApplied.GetLocalizedResource();
-	}
-
-	public async Task DeletePresetAsync(VideoCutPreset preset)
-	{
-		try
-		{
-			await _presetService.DeleteAsync(preset);
-		}
-		catch (Exception ex)
-		{
-			StatusMessage = string.Format(Strings.VideoEditorPresetDeleteFailed.GetLocalizedResource(), ex.Message);
-		}
-	}
-
 	public void SetStatusMessage(string message) => StatusMessage = message;
 
 	public bool InvalidateAfterOutput(VideoCutJob job)
@@ -351,6 +338,7 @@ public sealed class VideoEditorViewModel : ObservableObject
 			return false;
 
 		_metadata = null;
+		_timeline.Reset(0);
 		OnPropertyChanged(nameof(SourceDetails));
 		SourcePath = null;
 		SourceNameValue = string.Empty;
@@ -358,13 +346,11 @@ public sealed class VideoEditorViewModel : ObservableObject
 		CurrentPositionSeconds = 0;
 		TrimStartSeconds = 0;
 		TrimEndSeconds = 0;
-		_allKeyframes = [];
-		KeyframeMarkers.Clear();
 		StatusMessage = Strings.VideoEditorOutputComplete.GetLocalizedResource();
 		return true;
 	}
 
-	private void EnqueueCurrent(bool startImmediately)
+	private void EnqueueCurrent(bool startImmediately, bool replaceOriginal)
 	{
 		if (_sourcePath is null || _metadata is null)
 		{
@@ -372,14 +358,13 @@ public sealed class VideoEditorViewModel : ObservableObject
 			return;
 		}
 
-		if (TrimEndSeconds - TrimStartSeconds < 0.05)
+		if (DurationSeconds < 0.05 || Segments.Count == 0)
 		{
 			StatusMessage = Strings.VideoEditorInvalidTrimRange.GetLocalizedResource();
 			return;
 		}
 
 		var sourceDirectory = Path.GetDirectoryName(_sourcePath)!;
-		var replaceOriginal = _settings.VideoEditorReplaceOriginal;
 		var exportDirectory = replaceOriginal || _settings.VideoEditorExportToSourceFolder
 			? sourceDirectory
 			: _settings.VideoEditorExportFolder;
@@ -388,9 +373,12 @@ public sealed class VideoEditorViewModel : ObservableObject
 			StatusMessage = string.Format(Strings.VideoEditorExportFolderUnavailable.GetLocalizedResource(), exportDirectory);
 			return;
 		}
-		var job = new VideoCutJob(_sourcePath, TrimStartSeconds, TrimEndSeconds, _metadata, replaceOriginal, exportDirectory);
+		var job = new VideoCutJob(_sourcePath, Segments.First().StartSeconds, Segments.Last().EndSeconds, _metadata, replaceOriginal, exportDirectory, Segments);
 		if (_queueService.TryEnqueue(job, startImmediately, out var error))
 		{
+			var pendingVideo = PendingVideos.FirstOrDefault(video => string.Equals(video.SourcePath, job.SourcePath, StringComparison.OrdinalIgnoreCase));
+			if (pendingVideo is not null)
+				PendingVideos.Remove(pendingVideo);
 			StatusMessage = startImmediately
 				? Strings.VideoEditorTaskStarted.GetLocalizedResource()
 				: Strings.VideoEditorTaskQueued.GetLocalizedResource();
@@ -398,63 +386,6 @@ public sealed class VideoEditorViewModel : ObservableObject
 		}
 		else
 			StatusMessage = error ?? Strings.VideoEditorQueueFailed.GetLocalizedResource();
-	}
-
-	private double FindNearestKeyframe(double seconds)
-	{
-		if (_allKeyframes.Count == 0)
-			return Math.Clamp(seconds, 0, DurationSeconds);
-
-		var target = Math.Clamp(seconds, 0, DurationSeconds);
-		if (target <= 0.001 || DurationSeconds - target <= 0.001)
-			return target <= 0.001 ? 0 : DurationSeconds;
-		var index = BinarySearch(_allKeyframes, target);
-		if (index >= 0)
-			return _allKeyframes[index];
-
-		index = ~index;
-		if (index == 0)
-			return _allKeyframes[0];
-		if (index >= _allKeyframes.Count)
-			return _allKeyframes[^1];
-
-		var before = _allKeyframes[index - 1];
-		var after = _allKeyframes[index];
-		return target - before <= after - target ? before : after;
-	}
-
-	private static int BinarySearch(IReadOnlyList<double> values, double target)
-	{
-		var low = 0;
-		var high = values.Count - 1;
-		while (low <= high)
-		{
-			var middle = low + ((high - low) / 2);
-			var comparison = values[middle].CompareTo(target);
-			if (comparison == 0)
-				return middle;
-			if (comparison < 0)
-				low = middle + 1;
-			else
-				high = middle - 1;
-		}
-		return ~low;
-	}
-
-	private void BuildKeyframeMarkers(IReadOnlyList<double> keyframes)
-	{
-		KeyframeMarkers.Clear();
-		if (keyframes.Count == 0)
-			return;
-
-		const int maxMarkers = 180;
-		var stride = Math.Max(1, (int)Math.Ceiling(keyframes.Count / (double)maxMarkers));
-		for (var index = 0; index < keyframes.Count; index += stride)
-			KeyframeMarkers.Add(new VideoKeyframeMarker(keyframes[index], FormatTime(keyframes[index])));
-
-		var last = keyframes[^1];
-		if (KeyframeMarkers.Count == 0 || Math.Abs(KeyframeMarkers[^1].Seconds - last) > 0.001)
-			KeyframeMarkers.Add(new VideoKeyframeMarker(last, FormatTime(last)));
 	}
 
 	private static string FormatTime(double seconds) => VideoCutJob.FormatTime(seconds);

@@ -357,7 +357,9 @@ namespace Files.App.ViewModels.UserControls
 				if (node.Depth != 0)
 					continue;
 				node.HasExpandedPredecessor = !IsCompactDisplayMode && prevWasExpanded;
-				prevWasExpanded = node.Item.Children is null ? true : node.Item.IsExpanded;
+				prevWasExpanded = node.Item.Children is null
+					? node.Item is LocationItem { Section: SectionType.Home }
+					: node.Item.IsExpanded;
 			}
 		}
 

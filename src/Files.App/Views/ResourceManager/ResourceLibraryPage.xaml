@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:helpers="using:Files.App.Helpers"
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
@@ -29,7 +30,7 @@
                         Visibility="Collapsed">
                         <StackPanel x:Name="ActorGroupButtons" Orientation="Horizontal" Spacing="8" />
                     </ScrollViewer>
-                    <Grid Grid.Row="1">
+                    <Grid x:Name="BrowserViewport" Grid.Row="1">
                     <ProgressRing x:Name="LoadingRing" Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" IsActive="False" />
                     <GridView
                         x:Name="BrowserGrid"
@@ -38,6 +39,8 @@
                         IsItemClickEnabled="False"
                         ItemsSource="{Binding BrowserItems, Mode=OneWay}"
                         SelectionChanged="OnBrowserSelectionChanged"
+                        CanDragItems="True"
+                        DragItemsStarting="ResourceVideos_DragItemsStarting"
                         SelectionMode="Extended">
                     <GridView.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -113,6 +116,53 @@
                         </DataTemplate>
                     </GridView.ItemTemplate>
                     </GridView>
+                    <Border x:Name="SelectionMarquee" Background="#330078D4" BorderBrush="#0078D4" BorderThickness="1" Visibility="Collapsed" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Top" Canvas.ZIndex="5" />
+                    <ScrollViewer x:Name="VideoDetailView" Visibility="Collapsed" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Padding="24" Spacing="24">
+                            <Grid ColumnSpacing="28">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="2*" />
+                                    <ColumnDefinition Width="*" MinWidth="260" />
+                                </Grid.ColumnDefinitions>
+                                <Border Height="400" Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="12">
+                                    <Image x:Name="VideoDetailPoster" Stretch="Uniform" />
+                                </Border>
+                                <StackPanel Grid.Column="1" Spacing="14">
+                                    <TextBlock x:Name="VideoDetailTitle" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
+                                    <TextBlock Text="{helpers:ResourceString Name=ResourceVideoInfo}" Style="{StaticResource SubtitleTextBlockStyle}" />
+                                    <TextBlock x:Name="VideoDetailFileName" TextWrapping="Wrap" />
+                                    <TextBlock x:Name="VideoDetailFileSize" />
+                                    <TextBlock x:Name="VideoDetailModified" />
+                                    <TextBlock x:Name="VideoDetailPath" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <Button Content="{helpers:ResourceString Name=ResourceVideoPlay}" Click="VideoDetailPlay_Click" HorizontalAlignment="Left" />
+                                </StackPanel>
+                            </Grid>
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="{helpers:ResourceString Name=ResourceVideoFiles}" Style="{StaticResource SubtitleTextBlockStyle}" />
+                                <ListView x:Name="VideoFileList" ItemsSource="{Binding BrowserItems, Mode=OneWay}" SelectionMode="Extended" SelectionChanged="VideoFileList_SelectionChanged" MaxHeight="200" CanDragItems="True" DragItemsStarting="ResourceVideos_DragItemsStarting">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border RightTapped="OnBrowserItemRightTapped" DoubleTapped="OnBrowserItemDoubleTapped">
+                                                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
+                            <StackPanel Spacing="10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <TextBlock Text="{helpers:ResourceString Name=ResourceVideoIllustrations}" Style="{StaticResource SubtitleTextBlockStyle}" />
+                                    <Button Grid.Column="1" Content="{helpers:ResourceString Name=ResourceVideoAddIllustration}" Click="AddVideoIllustration_Click" />
+                                </Grid>
+                                <ItemsControl x:Name="VideoIllustrations">
+                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><ItemsWrapGrid Orientation="Horizontal" ItemWidth="210" ItemHeight="160" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate><DataTemplate><Border Margin="0,0,10,10" Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="8"><Image Source="{Binding}" Stretch="UniformToFill" /></Border></DataTemplate></ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="VideoIllustrationsEmpty" Text="{helpers:ResourceString Name=ResourceVideoNoIllustration}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
                     <TextBlock x:Name="EmptyText" HorizontalAlignment="Center" VerticalAlignment="Center" Text="当前层级没有可展示的资源" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed" />
                     </Grid>
                 </Grid>
