@@ -16,6 +16,21 @@
 			Style="{StaticResource App.Theme.SubtitleTextBlockStyle}"
 			Text="{helpers:ResourceString Name=ResourceManagerTranslationSettingsTitle}" />
 
+        <wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ResourceSettingsLibraryPath}">
+            <wctcontrols:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8B7;" /></wctcontrols:SettingsCard.HeaderIcon>
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock x:Name="LibraryPathText" MaxWidth="400" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <Button Content="{helpers:ResourceString Name=ResourceSettingsChangePath}" Click="ChangeLibraryPath_Click" />
+            </StackPanel>
+        </wctcontrols:SettingsCard>
+        <wctcontrols:SettingsExpander Header="{helpers:ResourceString Name=ResourceSettingsImport}" IsExpanded="False">
+            <wctcontrols:SettingsExpander.HeaderIcon><FontIcon Glyph="&#xE8B5;" /></wctcontrols:SettingsExpander.HeaderIcon>
+            <wctcontrols:SettingsExpander.ItemsHeader>
+                <wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ResourceSettingsImportActors}">
+                    <Button x:Name="ImportActorsButton" Content="{helpers:ResourceString Name=ResourceSettingsImportActors}" Click="ImportActors_Click" />
+                </wctcontrols:SettingsCard>
+            </wctcontrols:SettingsExpander.ItemsHeader>
+        </wctcontrols:SettingsExpander>
 		<wctcontrols:SettingsExpander
 			Header="{helpers:ResourceString Name=ResourceManagerTranslationProvider}"
 			IsExpanded="False">

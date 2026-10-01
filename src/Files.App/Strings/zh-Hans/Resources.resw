@@ -4975,4 +4975,42 @@
   <data name="VideoEditorSplit" xml:space="preserve"><value>分割</value></data>
   <data name="VideoEditorRemoveSegment" xml:space="preserve"><value>移除片段</value></data>
   <data name="VideoEditorKeepOnlySegment" xml:space="preserve"><value>仅保留此片段</value></data>
+  <data name="ResourceSettingsLibraryPath" xml:space="preserve"><value>资源路径</value></data>
+  <data name="ResourceSettingsChangePath" xml:space="preserve"><value>更换资源路径</value></data>
+  <data name="ResourceSettingsImport" xml:space="preserve"><value>导入</value></data>
+  <data name="ResourceSettingsImportActors" xml:space="preserve"><value>导入演员</value></data>
+  <data name="ResourceSettingsChooseLibraryFirst" xml:space="preserve"><value>请先设置有效的资源路径。</value></data>
+  <data name="ResourceDetailTranslate" xml:space="preserve"><value>翻译标题</value></data>
+  <data name="ResourceDetailOriginal" xml:space="preserve"><value>显示原文</value></data>
+  <data name="ResourceDetailTranslation" xml:space="preserve"><value>显示译文</value></data>
+  <data name="ResourceIllustrationPreview" xml:space="preserve"><value>插图预览</value></data>
+  <data name="ResourcePreviousIllustration" xml:space="preserve"><value>上一张</value></data>
+  <data name="ResourceNextIllustration" xml:space="preserve"><value>下一张</value></data>
+  <data name="ResourceVideoNoFiles" xml:space="preserve"><value>暂无视频文件</value></data>
+  <data name="VideoEditorShortcutSettings" xml:space="preserve"><value>快捷键</value></data>
+  <data name="VideoEditorShortcutHint" xml:space="preserve"><value>点击编辑后按下快捷键组合，Esc 取消。仅在视频编辑工作区生效，输入文字时不触发。</value></data>
+  <data name="VideoEditorShortcutDefaults" xml:space="preserve"><value>恢复默认快捷键</value></data>
+  <data name="VideoEditorShortcutCapture" xml:space="preserve"><value>请按快捷键组合…</value></data>
+  <data name="VideoEditorShortcutDisabled" xml:space="preserve"><value>已禁用</value></data>
+  <data name="VideoEditorShortcutDisable" xml:space="preserve"><value>禁用</value></data>
+  <data name="VideoEditorShortcutConflict" xml:space="preserve"><value>该组合已被其他视频编辑操作使用，请重新设置。</value></data>
+  <data name="VideoEditorShortcutReserved" xml:space="preserve"><value>该组合保留给系统或应用导航，请选择其他按键。</value></data>
+  <data name="VideoEditorShortcutSaved" xml:space="preserve"><value>快捷键已保存，立即生效。</value></data>
+  <data name="VideoEditorShortcutPlay" xml:space="preserve"><value>播放 / 暂停</value></data>
+  <data name="VideoEditorShortcutSplit" xml:space="preserve"><value>分割片段</value></data>
+  <data name="VideoEditorShortcutStart" xml:space="preserve"><value>搜寻到开头</value></data>
+  <data name="VideoEditorShortcutOpen" xml:space="preserve"><value>添加视频</value></data>
+  <data name="VideoEditorShortcutReset" xml:space="preserve"><value>重置编辑</value></data>
+  <data name="VideoEditorShortcutExport" xml:space="preserve"><value>打开导出菜单</value></data>
+  <data name="VideoEditorShortcutClose" xml:space="preserve"><value>关闭视频</value></data>
+  <data name="VideoEditorShortcutZoomIn" xml:space="preserve"><value>放大时间轴</value></data>
+  <data name="VideoEditorShortcutZoomOut" xml:space="preserve"><value>缩小时间轴</value></data>
+  <data name="VideoEditorShortcutFit" xml:space="preserve"><value>时间轴适应窗口</value></data>
+  <data name="ResourceFormatNoChanges" xml:space="preserve"><value>没有需要修改的项目。</value></data>
+  <data name="ResourceFormatAddSubtitleTag" xml:space="preserve"><value>{0}：添加中文字幕标签</value></data>
+  <data name="ResourceFormatRemoveSubtitleTag" xml:space="preserve"><value>{0}：移除中文字幕标签</value></data>
+  <data name="ResourceFormatRenameCount" xml:space="preserve"><value>改名 {0} 个视频</value></data>
+  <data name="ResourceFormatMoveCount" xml:space="preserve"><value>移动 {0} 个文件夹</value></data>
+  <data name="ResourceFormatAddTagCount" xml:space="preserve"><value>添加标签 {0} 部</value></data>
+  <data name="ResourceFormatRemoveTagCount" xml:space="preserve"><value>移除标签 {0} 部</value></data>
 </root>

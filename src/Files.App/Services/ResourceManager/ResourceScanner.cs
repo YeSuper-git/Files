@@ -91,7 +91,7 @@ public sealed class ResourceScanner : IResourceScanner
         var name = dir.Name;
         var code = _codeParser.ParseCode(name);
         int vc = 0, pc = 0, lq = 0;
-        bool hasSub = _codeParser.HasChineseSubtitle(name, settings.SubtitleKeywords);
+        bool hasSub = _codeParser.HasChineseSubtitle(name, []);
         ScanFolderFast(dir, 0, settings, ref vc, ref pc, ref lq, ref hasSub, ct);
 
         var problems = new List<string>();
@@ -126,7 +126,7 @@ public sealed class ResourceScanner : IResourceScanner
                 else if (entry is FileInfo f)
                 {
                     var ext = f.Extension.TrimStart('.').ToLowerInvariant();
-                    if (s.VideoExtensions.Contains(ext)) { vc++; if (_codeParser.HasChineseSubtitle(f.Name, s.SubtitleKeywords)) hasSub = true; }
+                    if (s.VideoExtensions.Contains(ext)) vc++;
                     else if (s.ImageExtensions.Contains(ext)) { pc++; if (f.Length < s.PosterQualityKb * 1024) lq++; }
                 }
             }

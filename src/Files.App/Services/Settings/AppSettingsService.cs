@@ -53,6 +53,12 @@ namespace Files.App.Services.Settings
 			set => Set(value);
 		}
 
+        public string VideoEditorShortcuts
+        {
+            get => Get(string.Empty);
+            set => Set(value);
+        }
+
 		protected override void RaiseOnSettingChangedEvent(object sender, SettingChangedEventArgs e)
 		{
 			base.RaiseOnSettingChangedEvent(sender, e);

@@ -50,6 +50,12 @@ public sealed partial class ResourceToolsDialog : UserControl
         _scopeItems = scopeItems;
     }
 
+    public void ConfigureSize(Windows.Foundation.Size windowSize)
+    {
+        DialogSurface.Width = Math.Max(320, Math.Min(980, windowSize.Width - 64));
+        DialogSurface.MaxHeight = Math.Max(240, windowSize.Height - 80);
+    }
+
     public void StartFormatOptimizationPreview()
         => PreviewFormatOptimization_Click(this, new RoutedEventArgs());
 
@@ -68,32 +74,26 @@ public sealed partial class ResourceToolsDialog : UserControl
             var moves = new List<ResourceFileOperation>();
             var tagPaths = new List<string>();
             var tagRemovals = new List<TagRemovalMutation>();
-            var summaries = new Dictionary<string, OrganizationActorSummary>(StringComparer.OrdinalIgnoreCase);
-            var videoExtensions = settings.VideoExtensions.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var actorNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var folder in folders)
             {
                 var actorName = GetActorName(folder.Path);
-                var summary = GetOrAddSummary(summaries, actorName);
-                var hasChineseSubtitle = _codeParser.HasChineseSubtitle(folder.Name, settings.SubtitleKeywords)
-                    || HasChineseSubtitleInFolder(folder.Path, settings, videoExtensions, 0);
+                actorNames.Add(actorName);
+                var hasChineseSubtitle = _codeParser.HasChineseSubtitle(folder.Name, []);
 
                 if (hasChineseSubtitle)
                 {
-                    summary.ChineseSubtitleWorks++;
                     if (tagId is null || !_workspace.GetResourceTagIds(folder.Path).Contains(tagId, StringComparer.OrdinalIgnoreCase))
                     {
                         tagPaths.Add(folder.Path);
-                        summary.ChineseSubtitleWorksToTag++;
                     }
                     continue;
                 }
 
-                summary.NoSubtitleWorks++;
                 var parent = Directory.GetParent(folder.Path);
                 if (parent is null || string.Equals(parent.Name, NoSubtitleFolderName, StringComparison.OrdinalIgnoreCase))
                 {
-                    summary.AlreadyOrganizedWorks++;
                     if (tagId is not null && _workspace.GetResourceTagIds(folder.Path).Contains(tagId, StringComparer.OrdinalIgnoreCase))
                         tagRemovals.Add(new TagRemovalMutation(folder.Path, folder.Path));
                     continue;
@@ -112,7 +112,6 @@ public sealed partial class ResourceToolsDialog : UserControl
                         ? null
                         : "目标已存在，将保留两者并为该文件夹添加序号"
                 });
-                summary.NoSubtitleWorksToMove++;
                 if (tagId is not null && _workspace.GetResourceTagIds(folder.Path).Contains(tagId, StringComparer.OrdinalIgnoreCase))
                     tagRemovals.Add(new TagRemovalMutation(targetPath, folder.Path));
             }
@@ -122,17 +121,7 @@ public sealed partial class ResourceToolsDialog : UserControl
                 folders.Select(folder => folder.Path),
                 settings);
             foreach (var operation in renameOperations)
-            {
-                var actorSummary = GetOrAddSummary(
-                    summaries,
-                    GetActorName(Path.GetDirectoryName(operation.Source) ?? _libraryPath));
-                if (operation.Status == "ready")
-                    actorSummary.VideoFilesToRename++;
-                else if (operation.Status == "conflict")
-                    actorSummary.VideoRenameConflicts++;
-                else if (operation.Status == "skip")
-                    actorSummary.VideoRenameSkipped++;
-            }
+                actorNames.Add(GetActorName(Path.GetDirectoryName(operation.Source) ?? _libraryPath));
 
             // Rename files while their video folders still have their original paths, then move no-subtitle folders.
             _pendingOperations = renameOperations.Concat(moves).ToList();
@@ -140,26 +129,26 @@ public sealed partial class ResourceToolsDialog : UserControl
             _pendingTagRemovals = tagRemovals;
             _pendingTagId = tagId;
 
-            var chineseCount = summaries.Values.Sum(summary => summary.ChineseSubtitleWorks);
-            var noSubtitleCount = summaries.Values.Sum(summary => summary.NoSubtitleWorks);
-            var alreadyOrganizedCount = summaries.Values.Sum(summary => summary.AlreadyOrganizedWorks);
             var renameCount = renameOperations.Count(operation => operation.Status == "ready");
-            var renameConflictCount = renameOperations.Count(operation => operation.Status == "conflict");
-            var renameSkippedCount = renameOperations.Count(operation => operation.Status == "skip");
-            var lines = summaries
-                .Where(pair => pair.Value.ChineseSubtitleWorks > 0 ||
-                    pair.Value.NoSubtitleWorks > 0 ||
-                    pair.Value.VideoFilesToRename > 0 ||
-                    pair.Value.VideoRenameConflicts > 0 ||
-                    pair.Value.VideoRenameSkipped > 0)
-                .OrderBy(pair => pair.Key, StringComparer.CurrentCultureIgnoreCase)
-                .Select(pair => FormatOptimizationSummary(pair.Key, pair.Value));
-            foreach (var line in lines)
-                PreviewItems.Add(line);
-
-            StatusText.Text = folders.Count == 0
-                ? "没有找到可优化的视频文件夹。"
-                : $"格式检查完成：识别 {folders.Count} 部，有中字 {chineseCount} 部（待贴标 {tagPaths.Count}）；无中字 {noSubtitleCount} 部（待移 {moves.Count}，已归档 {alreadyOrganizedCount}）；视频文件待改名 {renameCount} 个，冲突 {renameConflictCount} 个，未识别番号 {renameSkippedCount} 个。";
+            foreach (var actor in actorNames.OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase))
+            {
+                var actorOperations = _pendingOperations.Where(op => op.Status == "ready" &&
+                    GetActorName(Path.GetDirectoryName(op.Source) ?? _libraryPath) == actor).ToList();
+                var additions = tagPaths.Where(path => GetActorName(path) == actor).ToList();
+                var removals = tagRemovals.Where(change => GetActorName(change.RollbackPath) == actor).ToList();
+                if (actorOperations.Count + additions.Count + removals.Count == 0) continue;
+                var changes = new List<string>();
+                changes.AddRange(actorOperations.Select(op => $"{Path.GetFileName(op.Source)} → {Path.GetRelativePath(_libraryPath, op.Target)}"));
+                changes.AddRange(additions.Select(path => string.Format(Strings.ResourceFormatAddSubtitleTag.GetLocalizedResource(), Path.GetFileName(path))));
+                changes.AddRange(removals.Select(change => string.Format(Strings.ResourceFormatRemoveSubtitleTag.GetLocalizedResource(), Path.GetFileName(change.RollbackPath))));
+                PreviewItems.Add($"{actor}\n{string.Join("\n", changes)}");
+            }
+            var counts = new List<string>();
+            if (renameCount > 0) counts.Add(string.Format(Strings.ResourceFormatRenameCount.GetLocalizedResource(), renameCount));
+            if (moves.Count > 0) counts.Add(string.Format(Strings.ResourceFormatMoveCount.GetLocalizedResource(), moves.Count));
+            if (tagPaths.Count > 0) counts.Add(string.Format(Strings.ResourceFormatAddTagCount.GetLocalizedResource(), tagPaths.Count));
+            if (tagRemovals.Count > 0) counts.Add(string.Format(Strings.ResourceFormatRemoveTagCount.GetLocalizedResource(), tagRemovals.Count));
+            StatusText.Text = counts.Count == 0 ? Strings.ResourceFormatNoChanges.GetLocalizedResource() : string.Join(" · ", counts);
             PreviewList.Visibility = PreviewItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             ExecuteButton.IsEnabled = renameCount > 0 || moves.Count > 0 || tagPaths.Count > 0 || tagRemovals.Count > 0;
             ExecuteButton.Content = "确认并执行";
@@ -376,52 +365,6 @@ public sealed partial class ResourceToolsDialog : UserControl
             await VisitFolderAsync(child, settings, videoFolders);
     }
 
-    private bool HasChineseSubtitleInFolder(
-        string folderPath,
-        ResourceSettings settings,
-        IReadOnlySet<string> videoExtensions,
-        int depth)
-    {
-        if (depth > 2)
-            return false;
-
-        try
-        {
-            var directory = new DirectoryInfo(folderPath);
-            foreach (var file in directory.EnumerateFiles())
-            {
-                if (videoExtensions.Contains(file.Extension.TrimStart('.'))
-                    && _codeParser.HasChineseSubtitle(file.Name, settings.SubtitleKeywords))
-                    return true;
-            }
-
-            foreach (var child in directory.EnumerateDirectories())
-            {
-                if (child.Name.StartsWith('.') || child.Name.Equals("@eaDir", StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                try
-                {
-                    if (child.Attributes.HasFlag(FileAttributes.ReparsePoint))
-                        continue;
-                }
-                catch
-                {
-                    // Keep scanning folders whose attributes cannot be read.
-                }
-
-                if (HasChineseSubtitleInFolder(child.FullName, settings, videoExtensions, depth + 1))
-                    return true;
-            }
-        }
-        catch
-        {
-            // An inaccessible nested folder does not prevent the remaining resources from being classified.
-        }
-
-        return false;
-    }
-
     private string GetActorName(string videoFolderPath)
     {
         try
@@ -436,33 +379,6 @@ public sealed partial class ResourceToolsDialog : UserControl
         {
             return Path.GetFileName(Path.GetDirectoryName(videoFolderPath)) ?? videoFolderPath;
         }
-    }
-
-    private static OrganizationActorSummary GetOrAddSummary(
-        IDictionary<string, OrganizationActorSummary> summaries,
-        string actorName)
-    {
-        if (!summaries.TryGetValue(actorName, out var summary))
-            summaries[actorName] = summary = new OrganizationActorSummary();
-        return summary;
-    }
-
-    private static string FormatOptimizationSummary(string actorName, OrganizationActorSummary summary)
-    {
-        var parts = new List<string>();
-        if (summary.ChineseSubtitleWorks > 0)
-            parts.Add($"中字待标 {summary.ChineseSubtitleWorksToTag}/{summary.ChineseSubtitleWorks}");
-        if (summary.NoSubtitleWorksToMove > 0)
-            parts.Add($"无中字待移 {summary.NoSubtitleWorksToMove}");
-        if (summary.AlreadyOrganizedWorks > 0)
-            parts.Add($"已整理 {summary.AlreadyOrganizedWorks}");
-        if (summary.VideoFilesToRename > 0)
-            parts.Add($"视频待改名 {summary.VideoFilesToRename}");
-        if (summary.VideoRenameConflicts > 0)
-            parts.Add($"改名冲突 {summary.VideoRenameConflicts}");
-        if (summary.VideoRenameSkipped > 0)
-            parts.Add($"未识别番号 {summary.VideoRenameSkipped}");
-        return $"{actorName}：{string.Join("；", parts)}";
     }
 
     private IEnumerable<string> BuildExecutedSummaries(int taggedCount, int removedTagCount)
@@ -550,18 +466,6 @@ public sealed partial class ResourceToolsDialog : UserControl
         if (_isBusy)
             return;
         RequestClose?.Invoke(this, EventArgs.Empty);
-    }
-
-    private sealed class OrganizationActorSummary
-    {
-        public int ChineseSubtitleWorks { get; set; }
-        public int ChineseSubtitleWorksToTag { get; set; }
-        public int NoSubtitleWorks { get; set; }
-        public int NoSubtitleWorksToMove { get; set; }
-        public int AlreadyOrganizedWorks { get; set; }
-        public int VideoFilesToRename { get; set; }
-        public int VideoRenameConflicts { get; set; }
-        public int VideoRenameSkipped { get; set; }
     }
 
     private sealed class ExecutionActorSummary

@@ -186,11 +186,7 @@ namespace Files.App.UserControls
 				"ResourceManageHiddenActors",
 				new RichGlyph(themedIconStyle: "App.ThemedIcons.Status.Hidden"),
 				async _ => await resourcePage.ManageHiddenActorsAsync());
-			AddResourceAction(
-				"更换资源路径",
-				"ResourceChangeLibraryPath",
-				new RichGlyph(themedIconStyle: "App.ThemedIcons.Omnibar.Path"),
-				async _ => await resourcePage.ChooseLibraryAsync());
+
 			AddResourceAction(
 				"格式优化",
 				"ResourceFormatOptimization",
@@ -200,11 +196,7 @@ namespace Files.App.UserControls
 					resourcePage.ShowFormatOptimization(anchor);
 					return Task.CompletedTask;
 				});
-			AddResourceAction(
-				"导入演员",
-				"ResourceImportActors",
-				new RichGlyph("\uE8D4", "SymbolThemeFontFamily"),
-				async _ => await resourcePage.ImportActorsAsync());
+
 		}
 
 		private void AddResourceAction(string label, string automationId, RichGlyph glyph, Func<FrameworkElement, Task> execute)

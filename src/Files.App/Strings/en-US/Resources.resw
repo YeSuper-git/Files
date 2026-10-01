@@ -4981,4 +4981,42 @@
   <data name="VideoEditorSplit" xml:space="preserve"><value>Split</value></data>
   <data name="VideoEditorRemoveSegment" xml:space="preserve"><value>Remove segment</value></data>
   <data name="VideoEditorKeepOnlySegment" xml:space="preserve"><value>Keep only this segment</value></data>
+  <data name="ResourceSettingsLibraryPath" xml:space="preserve"><value>Resource library path</value></data>
+  <data name="ResourceSettingsChangePath" xml:space="preserve"><value>Change library path</value></data>
+  <data name="ResourceSettingsImport" xml:space="preserve"><value>Import</value></data>
+  <data name="ResourceSettingsImportActors" xml:space="preserve"><value>Import actors</value></data>
+  <data name="ResourceSettingsChooseLibraryFirst" xml:space="preserve"><value>Choose an available resource library first.</value></data>
+  <data name="ResourceDetailTranslate" xml:space="preserve"><value>Translate title</value></data>
+  <data name="ResourceDetailOriginal" xml:space="preserve"><value>Show original</value></data>
+  <data name="ResourceDetailTranslation" xml:space="preserve"><value>Show translation</value></data>
+  <data name="ResourceIllustrationPreview" xml:space="preserve"><value>Illustration preview</value></data>
+  <data name="ResourcePreviousIllustration" xml:space="preserve"><value>Previous illustration</value></data>
+  <data name="ResourceNextIllustration" xml:space="preserve"><value>Next illustration</value></data>
+  <data name="ResourceVideoNoFiles" xml:space="preserve"><value>No video files</value></data>
+  <data name="VideoEditorShortcutSettings" xml:space="preserve"><value>Keyboard shortcuts</value></data>
+  <data name="VideoEditorShortcutHint" xml:space="preserve"><value>Choose Edit and press a key combination. Esc cancels. Active only in the video workspace, outside text input.</value></data>
+  <data name="VideoEditorShortcutDefaults" xml:space="preserve"><value>Restore default shortcuts</value></data>
+  <data name="VideoEditorShortcutCapture" xml:space="preserve"><value>Press a key combination…</value></data>
+  <data name="VideoEditorShortcutDisabled" xml:space="preserve"><value>Disabled</value></data>
+  <data name="VideoEditorShortcutDisable" xml:space="preserve"><value>Disable</value></data>
+  <data name="VideoEditorShortcutConflict" xml:space="preserve"><value>This combination is assigned to another video action.</value></data>
+  <data name="VideoEditorShortcutReserved" xml:space="preserve"><value>This combination is reserved for system or app navigation.</value></data>
+  <data name="VideoEditorShortcutSaved" xml:space="preserve"><value>Shortcuts saved and active immediately.</value></data>
+  <data name="VideoEditorShortcutPlay" xml:space="preserve"><value>Play / pause</value></data>
+  <data name="VideoEditorShortcutSplit" xml:space="preserve"><value>Split segment</value></data>
+  <data name="VideoEditorShortcutStart" xml:space="preserve"><value>Seek to start</value></data>
+  <data name="VideoEditorShortcutOpen" xml:space="preserve"><value>Add videos</value></data>
+  <data name="VideoEditorShortcutReset" xml:space="preserve"><value>Reset edits</value></data>
+  <data name="VideoEditorShortcutExport" xml:space="preserve"><value>Open export menu</value></data>
+  <data name="VideoEditorShortcutClose" xml:space="preserve"><value>Close video</value></data>
+  <data name="VideoEditorShortcutZoomIn" xml:space="preserve"><value>Zoom in timeline</value></data>
+  <data name="VideoEditorShortcutZoomOut" xml:space="preserve"><value>Zoom out timeline</value></data>
+  <data name="VideoEditorShortcutFit" xml:space="preserve"><value>Fit timeline to window</value></data>
+  <data name="ResourceFormatNoChanges" xml:space="preserve"><value>No changes are needed.</value></data>
+  <data name="ResourceFormatAddSubtitleTag" xml:space="preserve"><value>{0}: add Chinese subtitle tag</value></data>
+  <data name="ResourceFormatRemoveSubtitleTag" xml:space="preserve"><value>{0}: remove Chinese subtitle tag</value></data>
+  <data name="ResourceFormatRenameCount" xml:space="preserve"><value>Rename {0} videos</value></data>
+  <data name="ResourceFormatMoveCount" xml:space="preserve"><value>Move {0} folders</value></data>
+  <data name="ResourceFormatAddTagCount" xml:space="preserve"><value>Add tags to {0} works</value></data>
+  <data name="ResourceFormatRemoveTagCount" xml:space="preserve"><value>Remove tags from {0} works</value></data>
 </root>

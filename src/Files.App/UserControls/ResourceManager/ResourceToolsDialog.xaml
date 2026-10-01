@@ -9,7 +9,8 @@
 	mc:Ignorable="d">
 
 	<Border
-		Width="400"
+		x:Name="DialogSurface"
+        Width="980"
 		MaxHeight="760"
 		Padding="16"
 		Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
@@ -48,7 +49,8 @@
 					ToolTipService.ToolTip="关闭" />
 			</Grid>
 
-			<ItemsControl
+			<ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl
 				x:Name="PreviewList"
 				Grid.Row="1"
 				HorizontalAlignment="Stretch"
@@ -57,19 +59,18 @@
 				Visibility="Collapsed">
 				<ItemsControl.ItemsPanel>
 					<ItemsPanelTemplate>
-						<WrapGrid ItemWidth="180" Orientation="Horizontal" />
+						<StackPanel />
 					</ItemsPanelTemplate>
 				</ItemsControl.ItemsPanel>
 				<ItemsControl.ItemTemplate>
 					<DataTemplate>
-						<TextBlock
-							Margin="0,2,8,8"
-							FontSize="11"
-							Text="{Binding}"
-							TextWrapping="WrapWholeWords" />
+                        <Border Padding="16" Margin="0,0,0,12" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                            <TextBlock FontSize="14" LineHeight="24" Text="{Binding}" TextWrapping="WrapWholeWords" />
+                        </Border>
 					</DataTemplate>
 				</ItemsControl.ItemTemplate>
 			</ItemsControl>
+            </ScrollViewer>
 
 			<StackPanel Grid.Row="2" Spacing="10">
 				<TextBlock

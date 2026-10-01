@@ -32,11 +32,33 @@ public sealed partial class ResourceManagerSettingsPage : Page
             .OfType<ComboBoxItem>()
             .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), selectedProvider, StringComparison.Ordinal))
             ?? TranslationProviderComboBox.Items.OfType<ComboBoxItem>().First();
+        LibraryPathText.Text = _workspace.LibraryPath;
         RefreshCredentialFields();
         UpdateTranslationConfigVisibility();
         SnapshotsListView.ItemsSource = _snapshots;
         RefreshSnapshots();
         _isInitializing = false;
+    }
+
+    private async void ChangeLibraryPath_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new Windows.Storage.Pickers.FolderPicker();
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, MainWindow.Instance.WindowHandle);
+        picker.FileTypeFilter.Add("*");
+        var folder = await picker.PickSingleFolderAsync();
+        if (folder is null) return;
+        _workspace.SetLibraryPath(folder.Path);
+        LibraryPathText.Text = _workspace.LibraryPath;
+        if (Ioc.Default.GetRequiredService<IContentPageContext>().ShellPage is Files.App.Views.Shells.ModernShellPage { CurrentResourceLibraryPage: not null } shell)
+            shell.NavigateToResourceManager();
+    }
+
+    private async void ImportActors_Click(object sender, RoutedEventArgs e)
+    {
+        ImportActorsButton.IsEnabled = false;
+        try { await Files.App.Helpers.ResourceActorImportWorkflow.ImportAsync(_workspace.LibraryPath, _workspace, XamlRoot, text => StatusTextBlock.Text = text); }
+        catch (Exception ex) { StatusTextBlock.Text = ex.Message; }
+        finally { ImportActorsButton.IsEnabled = true; }
     }
 
     private void TranslationProviderComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -76,6 +98,7 @@ public sealed partial class ResourceManagerSettingsPage : Page
             ? Visibility.Visible : Visibility.Collapsed;
 
         MachineAccessKeyIdTextBox.IsReadOnly = !_isEditingTranslationProvider;
+        MachineAccessKeyIdTextBox.IsEnabled = _isEditingTranslationProvider;
         MachineAccessKeySecretPasswordBox.IsEnabled = _isEditingTranslationProvider;
         BailianApiKeyPasswordBox.IsEnabled = _isEditingTranslationProvider;
         var editVisibility = _isEditingTranslationProvider ? Visibility.Visible : Visibility.Collapsed;
