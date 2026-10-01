@@ -335,7 +335,6 @@ namespace Files.App.Helpers
 					.AddSingleton<Files.App.Services.VideoEditor.VideoToolchain>()
 					.AddSingleton<Files.App.Services.VideoEditor.VideoProbeService>()
 					.AddSingleton<Files.App.Services.VideoEditor.VideoCutProcessor>()
-					.AddSingleton<Files.App.Services.VideoEditor.VideoCutPresetService>()
 					.AddSingleton<Files.App.Services.VideoEditor.VideoCutQueueService>()
 					.AddSingleton<Files.App.ViewModels.VideoEditor.VideoEditorViewModel>()
 					// Resource Manager

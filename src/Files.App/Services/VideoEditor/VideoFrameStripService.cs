@@ -20,7 +20,7 @@ public sealed class VideoFrameStripService(VideoToolchain toolchain)
 		var signature = $"{sourcePath}|{File.GetLastWriteTimeUtc(sourcePath).Ticks}|{new FileInfo(sourcePath).Length}";
 		var cacheKey = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(signature)));
 		var directory = Path.Combine(Path.GetTempPath(), "FilesVideoFrameStrip", cacheKey);
-		var outputPath = Path.Combine(directory, $"{index:D2}-{Math.Round(seconds * 1000):F0}.jpg");
+		var outputPath = Path.Combine(directory, $"frame-v2-{Math.Round(seconds * 1000):F0}.jpg");
 		if (File.Exists(outputPath))
 			return outputPath;
 
@@ -35,7 +35,7 @@ public sealed class VideoFrameStripService(VideoToolchain toolchain)
 		foreach (var argument in new[]
 		{
 			"-hide_banner", "-nostdin", "-loglevel", "error", "-threads", "1", "-ss", seconds.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture),
-			"-i", sourcePath, "-frames:v", "1", "-vf", "scale=160:90:force_original_aspect_ratio=decrease,pad=160:90:(ow-iw)/2:(oh-ih)/2",
+			"-i", sourcePath, "-frames:v", "1", "-vf", "scale=640:108:force_original_aspect_ratio=decrease",
 			"-q:v", "5", "-y", temporaryPath
 		})
 			startInfo.ArgumentList.Add(argument);

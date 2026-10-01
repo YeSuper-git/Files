@@ -54,7 +54,8 @@ public sealed class VideoProbeService(VideoToolchain toolchain)
 		var height = ReadInt(videoStream, "height");
 		var frameRate = ParseRate(ReadString(videoStream, "avg_frame_rate"));
 
-		return new VideoMetadata(duration, codec, width, height, frameRate);
+		var audioCount = streams.EnumerateArray().Count(stream => stream.TryGetProperty("codec_type", out var type) && type.GetString() == "audio");
+		return new VideoMetadata(duration, codec, width, height, frameRate, audioCount);
 	}
 
 	public async Task<IReadOnlyList<double>> ReadKeyframesAsync(string path, CancellationToken cancellationToken = default)

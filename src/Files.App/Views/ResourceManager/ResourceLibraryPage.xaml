@@ -39,6 +39,8 @@
                         IsItemClickEnabled="False"
                         ItemsSource="{Binding BrowserItems, Mode=OneWay}"
                         SelectionChanged="OnBrowserSelectionChanged"
+                        CanDragItems="True"
+                        DragItemsStarting="ResourceVideos_DragItemsStarting"
                         SelectionMode="Extended">
                     <GridView.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -137,7 +139,7 @@
                             </Grid>
                             <StackPanel Spacing="10">
                                 <TextBlock Text="{helpers:ResourceString Name=ResourceVideoFiles}" Style="{StaticResource SubtitleTextBlockStyle}" />
-                                <ListView x:Name="VideoFileList" ItemsSource="{Binding BrowserItems, Mode=OneWay}" SelectionMode="Extended" SelectionChanged="VideoFileList_SelectionChanged" MaxHeight="200">
+                                <ListView x:Name="VideoFileList" ItemsSource="{Binding BrowserItems, Mode=OneWay}" SelectionMode="Extended" SelectionChanged="VideoFileList_SelectionChanged" MaxHeight="200" CanDragItems="True" DragItemsStarting="ResourceVideos_DragItemsStarting">
                                     <ListView.ItemTemplate>
                                         <DataTemplate>
                                             <Border RightTapped="OnBrowserItemRightTapped" DoubleTapped="OnBrowserItemDoubleTapped">

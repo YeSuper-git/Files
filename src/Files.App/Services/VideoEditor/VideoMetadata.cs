@@ -8,4 +8,5 @@ public sealed record VideoMetadata(
 	string VideoCodec,
 	int Width,
 	int Height,
-	double FrameRate);
+	double FrameRate,
+	int AudioStreamCount = 0);

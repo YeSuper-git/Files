@@ -7,13 +7,12 @@ using Microsoft.Extensions.Logging;
 
 namespace Files.App.Services.VideoEditor;
 
-public sealed class VideoCutQueueService(VideoCutProcessor processor, VideoCutPresetService presetService)
+public sealed class VideoCutQueueService(VideoCutProcessor processor)
 {
 	private readonly object _syncRoot = new();
 	private readonly Queue<VideoCutJob> _waitingQueue = new();
 	private readonly HashSet<string> _reservedPaths = new(StringComparer.OrdinalIgnoreCase);
 	private readonly VideoCutProcessor _processor = processor;
-	private readonly VideoCutPresetService _presetService = presetService;
 	private CancellationTokenSource? _currentCancellation;
 	private Guid? _currentJobId;
 	private bool _workerRunning;
@@ -252,19 +251,6 @@ public sealed class VideoCutQueueService(VideoCutProcessor processor, VideoCutPr
 					progress => RunOnUi(() => job.Progress = progress),
 					() => RunOnUiAndWait(() => { if (job.ReplaceOriginal) SourceReserved?.Invoke(job.SourcePath); job.Status = VideoCutJobStatus.Replacing; }),
 					cancellation.Token).ConfigureAwait(false);
-				string? presetWarning = null;
-				try
-				{
-					presetWarning = await _presetService.RecordSuccessfulCutAsync(job).ConfigureAwait(false);
-				}
-				catch (Exception ex)
-				{
-					App.Logger.LogWarning(ex, "Video was exported but its trim preset could not be saved");
-					presetWarning = Strings.VideoEditorPresetSaveFailed.GetLocalizedResource();
-				}
-				if (!string.IsNullOrWhiteSpace(presetWarning))
-					warning = string.IsNullOrWhiteSpace(warning) ? presetWarning : $"{warning}{Environment.NewLine}{presetWarning}";
-
 				lock (_syncRoot)
 					_reservedPaths.Remove(job.SourcePath);
 				job.CompletedAt = DateTimeOffset.Now;

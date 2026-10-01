@@ -32,6 +32,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using Windows.Storage;
+using Windows.ApplicationModel.DataTransfer;
 using WinRT;
 
 namespace Files.App.Views.ResourceManager;
@@ -622,6 +623,45 @@ public sealed partial class ResourceLibraryPage : Page
         {
             return null;
         }
+    }
+
+    private void ResourceVideos_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
+    {
+        var items = e.Items.OfType<ResourceBrowserItemViewModel>().Where(item => item.Kind is ResourceBrowserItemKind.VideoFile or ResourceBrowserItemKind.VideoFolder).ToArray();
+        if (items.Length == 0)
+        {
+            e.Cancel = true;
+            return;
+        }
+        e.Data.RequestedOperation = DataPackageOperation.Copy;
+        e.Data.SetDataProvider(StandardDataFormats.StorageItems, async request =>
+        {
+            var deferral = request.GetDeferral();
+            try
+            {
+                var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var item in items)
+                {
+                    if (item.Kind == ResourceBrowserItemKind.VideoFile)
+                        paths.Add(item.Path);
+                    else if (item.Kind == ResourceBrowserItemKind.VideoFolder)
+                    {
+                        var children = await _browser.GetChildrenAsync(item.Path, ResourceBrowserLocationKind.VideoFolder, _workspace.Settings, CancellationToken.None);
+                        foreach (var child in children.Where(child => child.Kind == ResourceBrowserItemKind.VideoFile))
+                            paths.Add(child.Path);
+                    }
+                }
+                var files = new List<StorageFile>();
+                foreach (var path in paths)
+                    files.Add(await StorageFile.GetFileFromPathAsync(path));
+                request.SetData(files.Cast<IStorageItem>().ToArray());
+            }
+            catch (Exception ex)
+            {
+                App.Logger.LogWarning(ex, "Could not prepare resource videos for drag and drop");
+            }
+            finally { deferral.Complete(); }
+            });
     }
 
     private void OnBrowserSelectionChanged(object sender, SelectionChangedEventArgs e)

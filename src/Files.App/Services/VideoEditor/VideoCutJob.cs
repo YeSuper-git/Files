@@ -23,20 +23,36 @@ public sealed class VideoCutJob : ObservableObject
 	private double _progress;
 	private string? _errorMessage;
 	private string? _warningMessage;
+	private string? _outputPath;
 
 	public Guid Id { get; } = Guid.NewGuid();
 	public string SourcePath { get; }
 	public string FileName => Path.GetFileName(SourcePath);
 	public bool ReplaceOriginal { get; }
 	public string ExportDirectory { get; }
-	public string? OutputPath { get; set; }
+	public string? OutputPath
+	{
+		get => _outputPath;
+		set
+		{
+			if (SetProperty(ref _outputPath, value))
+			{
+				OnPropertyChanged(nameof(CompletedFileName));
+				OnPropertyChanged(nameof(JobDetails));
+			}
+		}
+	}
+	public string CompletedFileName => Path.GetFileName(OutputPath ?? SourcePath);
 	public double StartSeconds { get; }
 	public double EndSeconds { get; }
+	public IReadOnlyList<VideoSegment> Segments { get; }
+	public double OutputDurationSeconds => Segments.Sum(segment => segment.DurationSeconds);
 	public double SourceDurationSeconds { get; }
 	public string SourceVideoCodec { get; }
 	public int SourceWidth { get; }
 	public int SourceHeight { get; }
 	public double SourceFrameRate { get; }
+	public int AudioStreamCount { get; }
 	public DateTimeOffset CreatedAt { get; } = DateTimeOffset.Now;
 	public DateTimeOffset? CompletedAt { get; set; }
 
@@ -114,18 +130,20 @@ public sealed class VideoCutJob : ObservableObject
 	public string JobDetails => string.Join(Environment.NewLine, new[] { TrimSummary, OutputPath, ErrorMessage, WarningMessage }
 		.Where(static detail => !string.IsNullOrWhiteSpace(detail)));
 
-	public VideoCutJob(string sourcePath, double startSeconds, double endSeconds, VideoMetadata sourceMetadata, bool replaceOriginal, string exportDirectory)
+	public VideoCutJob(string sourcePath, double startSeconds, double endSeconds, VideoMetadata sourceMetadata, bool replaceOriginal, string exportDirectory, IEnumerable<VideoSegment>? segments = null)
 	{
 		SourcePath = Path.GetFullPath(sourcePath);
 		ReplaceOriginal = replaceOriginal;
 		ExportDirectory = Path.GetFullPath(exportDirectory);
 		StartSeconds = startSeconds;
 		EndSeconds = endSeconds;
+		Segments = (segments ?? [new VideoSegment(startSeconds, endSeconds)]).ToArray();
 		SourceDurationSeconds = sourceMetadata.DurationSeconds;
 		SourceVideoCodec = sourceMetadata.VideoCodec;
 		SourceWidth = sourceMetadata.Width;
 		SourceHeight = sourceMetadata.Height;
 		SourceFrameRate = sourceMetadata.FrameRate;
+		AudioStreamCount = sourceMetadata.AudioStreamCount;
 	}
 
 	public static string FormatTime(double seconds)
