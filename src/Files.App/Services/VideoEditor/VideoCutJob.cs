@@ -49,6 +49,7 @@ public sealed class VideoCutJob : ObservableObject
 			{
 				OnPropertyChanged(nameof(StatusText));
 				OnPropertyChanged(nameof(PauseActionText));
+				OnPropertyChanged(nameof(PauseActionGlyph));
 				OnPropertyChanged(nameof(CanPauseResume));
 				OnPropertyChanged(nameof(CanCancel));
 			}
@@ -58,26 +59,38 @@ public sealed class VideoCutJob : ObservableObject
 	public double Progress
 	{
 		get => _progress;
-		set => SetProperty(ref _progress, Math.Clamp(value, 0, 1));
+		set
+		{
+			if (SetProperty(ref _progress, Math.Clamp(value, 0, 1)))
+				OnPropertyChanged(nameof(StatusText));
+		}
 	}
 
 	public string? ErrorMessage
 	{
 		get => _errorMessage;
-		set => SetProperty(ref _errorMessage, value);
+		set
+		{
+			if (SetProperty(ref _errorMessage, value))
+				OnPropertyChanged(nameof(JobDetails));
+		}
 	}
 
 	public string? WarningMessage
 	{
 		get => _warningMessage;
-		set => SetProperty(ref _warningMessage, value);
+		set
+		{
+			if (SetProperty(ref _warningMessage, value))
+				OnPropertyChanged(nameof(JobDetails));
+		}
 	}
 
 	public string StatusText => Status switch
 	{
 		VideoCutJobStatus.Waiting => Strings.VideoEditorStatusWaiting.GetLocalizedResource(),
 		VideoCutJobStatus.Paused => Strings.VideoEditorStatusPaused.GetLocalizedResource(),
-		VideoCutJobStatus.Processing => Strings.VideoEditorStatusProcessing.GetLocalizedResource(),
+		VideoCutJobStatus.Processing => $"{Strings.VideoEditorStatusProcessing.GetLocalizedResource()} {Progress:P0}",
 		VideoCutJobStatus.Replacing => ReplaceOriginal
 			? Strings.VideoEditorStatusReplacing.GetLocalizedResource()
 			: Strings.VideoEditorStatusSaving.GetLocalizedResource(),
@@ -90,10 +103,13 @@ public sealed class VideoCutJob : ObservableObject
 	public string PauseActionText => Status == VideoCutJobStatus.Paused
 		? Strings.VideoEditorResume.GetLocalizedResource()
 		: Strings.VideoEditorPauseJob.GetLocalizedResource();
+	public string PauseActionGlyph => Status == VideoCutJobStatus.Paused ? "\uE768" : "\uE769";
 	public bool CanPauseResume => Status is VideoCutJobStatus.Waiting or VideoCutJobStatus.Processing or VideoCutJobStatus.Paused;
 	public bool CanCancel => Status != VideoCutJobStatus.Replacing;
 
 	public string TrimSummary => $"{FormatTime(StartSeconds)} – {FormatTime(EndSeconds)}";
+	public string JobDetails => string.Join(Environment.NewLine, new[] { TrimSummary, OutputPath, ErrorMessage, WarningMessage }
+		.Where(static detail => !string.IsNullOrWhiteSpace(detail)));
 
 	public VideoCutJob(string sourcePath, double startSeconds, double endSeconds, VideoMetadata sourceMetadata, bool replaceOriginal, string exportDirectory)
 	{

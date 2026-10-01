@@ -8,7 +8,6 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Shapes;
 using System.Collections.Specialized;
 using System.IO;
 using Windows.Media.Core;
@@ -24,13 +23,10 @@ public sealed partial class VideoEditorPage : Page
 {
 	private static readonly string[] SupportedVideoExtensions = [".mp4", ".mkv", ".mov", ".avi", ".m4v", ".ts", ".webm", ".wmv", ".mxf", ".mts", ".m2ts", ".flv", ".vob", ".mpg", ".mpeg", ".3gp", ".ogv"];
 	private readonly DispatcherTimer _playbackTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
-	private readonly List<Rectangle> _keyframeMarkers = [];
 	private MediaSource? _mediaSource;
 	private bool _isSeeking;
 	private bool _seekTrackClick;
 	private bool _isUpdatingControls;
-	private double _pendingTrimStart;
-	private double _pendingTrimEnd;
 
 	public VideoEditorViewModel ViewModel { get; }
 
@@ -109,7 +105,6 @@ public sealed partial class VideoEditorPage : Page
 			SeekSlider.Maximum = Math.Max(0.1, ViewModel.DurationSeconds);
 			SeekTo(ViewModel.CurrentPositionSeconds);
 			_playbackTimer.Start();
-			UpdateTimelineVisuals();
 		}
 		catch (Exception ex)
 		{
@@ -121,8 +116,6 @@ public sealed partial class VideoEditorPage : Page
 	{
 		ViewModel.PropertyChanged -= ViewModel_PropertyChanged;
 		ViewModel.PropertyChanged += ViewModel_PropertyChanged;
-		ViewModel.KeyframeMarkers.CollectionChanged -= KeyframeMarkers_CollectionChanged;
-		ViewModel.KeyframeMarkers.CollectionChanged += KeyframeMarkers_CollectionChanged;
 		ViewModel.SourceReserved -= ViewModel_SourceReserved;
 		ViewModel.SourceReserved += ViewModel_SourceReserved;
 		ViewModel.SourceReservationReleased -= ViewModel_SourceReservationReleased;
@@ -141,9 +134,7 @@ public sealed partial class VideoEditorPage : Page
 			job.PropertyChanged -= Job_PropertyChanged;
 			job.PropertyChanged += Job_PropertyChanged;
 		}
-		KeyframeMarkers_CollectionChanged(null, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
 		_playbackTimer.Start();
-		UpdateTimelineVisuals();
 		foreach (var completedJob in ViewModel.CompletedJobs)
 		{
 			if (ViewModel.InvalidateAfterOutput(completedJob))
@@ -160,7 +151,6 @@ public sealed partial class VideoEditorPage : Page
 	{
 		_playbackTimer.Stop();
 		ViewModel.PropertyChanged -= ViewModel_PropertyChanged;
-		ViewModel.KeyframeMarkers.CollectionChanged -= KeyframeMarkers_CollectionChanged;
 		foreach (var job in ViewModel.ProcessingJobs)
 			job.PropertyChanged -= Job_PropertyChanged;
 		ViewModel.SourceReserved -= ViewModel_SourceReserved;
@@ -199,7 +189,6 @@ public sealed partial class VideoEditorPage : Page
 			if (ViewModel.InvalidateAfterOutput(job))
 			{
 				ReleasePlayerSource();
-				UpdateTimelineVisuals();
 				break;
 			}
 		}
@@ -237,10 +226,6 @@ public sealed partial class VideoEditorPage : Page
 		AllQueueButton.Content = ViewModel.ProcessingJobs.Any(job => job.Status is VideoCutJobStatus.Waiting or VideoCutJobStatus.Processing)
 			? Strings.VideoEditorPauseAll.GetLocalizedResource()
 			: Strings.VideoEditorStartAll.GetLocalizedResource();
-		QueueSummary.Text = string.Format(
-			Strings.VideoEditorQueueSummary.GetLocalizedResource(),
-			ViewModel.ProcessingJobs.Count,
-			VideoCutJob.FormatTime(ViewModel.ProcessingJobs.Sum(job => job.EndSeconds - job.StartSeconds)));
 		EmptyVideoState.Visibility = ViewModel.HasVideo ? Visibility.Collapsed : Visibility.Visible;
 		VideoPlayerContainer.Visibility = ViewModel.HasVideo ? Visibility.Visible : Visibility.Collapsed;
 		VideoEditorSurface.Visibility = Visibility.Visible;
@@ -272,39 +257,8 @@ public sealed partial class VideoEditorPage : Page
 			UpdateEmptyStates();
 		if (e.PropertyName == nameof(VideoEditorViewModel.IsLoading))
 			UpdateEmptyStates();
-		if (e.PropertyName is nameof(VideoEditorViewModel.TrimStartSeconds) or nameof(VideoEditorViewModel.TrimEndSeconds) or nameof(VideoEditorViewModel.DurationSeconds))
-			UpdateTimelineVisuals();
 		if (e.PropertyName == nameof(VideoEditorViewModel.DurationSeconds))
 			SeekSlider.Maximum = Math.Max(0.1, ViewModel.DurationSeconds);
-	}
-
-	private void KeyframeMarkers_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-	{
-		foreach (var marker in _keyframeMarkers)
-			TimelineCanvas.Children.Remove(marker);
-		_keyframeMarkers.Clear();
-
-		var markerBrush = Application.Current.Resources.TryGetValue("TextFillColorSecondaryBrush", out var brush)
-			? brush as Brush
-			: null;
-		if (markerBrush is null)
-			return;
-
-		foreach (var keyframe in ViewModel.KeyframeMarkers)
-		{
-			var marker = new Rectangle
-			{
-				Width = 1,
-				Height = 6,
-				Fill = markerBrush,
-				Opacity = 0.7,
-				IsHitTestVisible = false
-			};
-			_keyframeMarkers.Add(marker);
-			Canvas.SetTop(marker, 15);
-			TimelineCanvas.Children.Insert(1, marker);
-		}
-		UpdateTimelineVisuals();
 	}
 
 	private void PlaybackTimer_Tick(object? sender, object e)
@@ -323,7 +277,6 @@ public sealed partial class VideoEditorPage : Page
 		PlayButton.Content = session.PlaybackState == MediaPlaybackState.Playing
 			? Strings.VideoEditorPause.GetLocalizedResource()
 			: Strings.VideoEditorPlay.GetLocalizedResource();
-		UpdateTimelineVisuals();
 	}
 
 	private void PlayPause_Click(object sender, RoutedEventArgs e)
@@ -404,19 +357,16 @@ public sealed partial class VideoEditorPage : Page
 	private void SetTrimStart_Click(object sender, RoutedEventArgs e)
 	{
 		ViewModel.SetTrimStart(ViewModel.CurrentPositionSeconds);
-		UpdateTimelineVisuals();
 	}
 
 	private void SetTrimEnd_Click(object sender, RoutedEventArgs e)
 	{
 		ViewModel.SetTrimEnd(ViewModel.CurrentPositionSeconds);
-		UpdateTimelineVisuals();
 	}
 
 	private void RestoreTrim_Click(object sender, RoutedEventArgs e)
 	{
 		ViewModel.RestoreTrim();
-		UpdateTimelineVisuals();
 	}
 
 	private void CloseVideo_Click(object sender, RoutedEventArgs e)
@@ -426,7 +376,6 @@ public sealed partial class VideoEditorPage : Page
 		SeekSlider.Maximum = 1;
 		SeekSlider.Value = 0;
 		UpdateEmptyStates();
-		UpdateTimelineVisuals();
 	}
 
 	private void AllQueue_Click(object sender, RoutedEventArgs e)
@@ -490,96 +439,12 @@ public sealed partial class VideoEditorPage : Page
 			return;
 		ViewModel.ApplyPreset(preset);
 		SeekTo(ViewModel.CurrentPositionSeconds);
-		UpdateTimelineVisuals();
 	}
 
 	private async void DeletePreset_Click(object sender, RoutedEventArgs e)
 	{
 		if ((sender as FrameworkElement)?.DataContext is VideoCutPreset preset)
 			await ViewModel.DeletePresetAsync(preset);
-	}
-
-	private void TimelineCanvas_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateTimelineVisuals();
-
-	private void TimelineCanvas_PointerPressed(object sender, PointerRoutedEventArgs e)
-	{
-		if (!ViewModel.HasVideo || TimelineCanvas.ActualWidth <= 0)
-			return;
-		var point = e.GetCurrentPoint(TimelineCanvas).Position;
-		var seconds = Math.Clamp(point.X / TimelineCanvas.ActualWidth, 0, 1) * ViewModel.DurationSeconds;
-		SeekTo(seconds);
-	}
-
-	private void TrimStartThumb_DragDelta(object sender, DragDeltaEventArgs e)
-	{
-		_pendingTrimStart = MoveThumb(TrimStartThumb, e.HorizontalChange);
-		UpdateSelectedTrack();
-	}
-
-	private void TrimEndThumb_DragDelta(object sender, DragDeltaEventArgs e)
-	{
-		_pendingTrimEnd = MoveThumb(TrimEndThumb, e.HorizontalChange);
-		UpdateSelectedTrack();
-	}
-
-	private void TrimStartThumb_DragCompleted(object sender, DragCompletedEventArgs e)
-	{
-		ViewModel.SetTrimStart(_pendingTrimStart);
-		UpdateTimelineVisuals();
-	}
-
-	private void TrimEndThumb_DragCompleted(object sender, DragCompletedEventArgs e)
-	{
-		ViewModel.SetTrimEnd(_pendingTrimEnd);
-		UpdateTimelineVisuals();
-	}
-
-	private double MoveThumb(Thumb thumb, double horizontalChange)
-	{
-		var width = TimelineCanvas.ActualWidth;
-		if (width <= 24 || ViewModel.DurationSeconds <= 0)
-			return 0;
-		var left = Math.Clamp(Canvas.GetLeft(thumb) + horizontalChange, 12 - thumb.Width / 2, width - 12 - thumb.Width / 2);
-		Canvas.SetLeft(thumb, left);
-		return Math.Clamp((left + thumb.Width / 2 - 12) / (width - 24), 0, 1) * ViewModel.DurationSeconds;
-	}
-
-	private void UpdateTimelineVisuals()
-	{
-		if (TimelineCanvas is null)
-			return;
-		var width = TimelineCanvas.ActualWidth;
-		var duration = ViewModel.DurationSeconds;
-		TimelineTrack.Width = width;
-		if (width <= 0 || duration <= 0)
-		{
-			SelectedRangeTrack.Width = 0;
-			Canvas.SetLeft(TrimStartThumb, 0);
-			Canvas.SetLeft(TrimEndThumb, 0);
-			Canvas.SetLeft(PlayheadLine, 0);
-			return;
-		}
-
-		var trackWidth = Math.Max(0, width - 24);
-		foreach (var pair in _keyframeMarkers.Zip(ViewModel.KeyframeMarkers))
-			Canvas.SetLeft(pair.First, 12 + Math.Clamp(pair.Second.Seconds / duration * trackWidth, 0, trackWidth));
-		Canvas.SetLeft(TrimStartThumb, 12 + Math.Clamp(ViewModel.TrimStartSeconds / duration * trackWidth, 0, trackWidth) - TrimStartThumb.Width / 2);
-		Canvas.SetLeft(TrimEndThumb, 12 + Math.Clamp(ViewModel.TrimEndSeconds / duration * trackWidth, 0, trackWidth) - TrimEndThumb.Width / 2);
-		Canvas.SetLeft(PlayheadLine, 12 + Math.Clamp(ViewModel.CurrentPositionSeconds / duration * trackWidth, 0, trackWidth));
-		UpdateSelectedTrack();
-	}
-
-	private void UpdateSelectedTrack()
-	{
-		if (ViewModel.DurationSeconds <= 0 || TimelineCanvas.ActualWidth <= 0)
-		{
-			SelectedRangeTrack.Width = 0;
-			return;
-		}
-		var start = Canvas.GetLeft(TrimStartThumb) + TrimStartThumb.Width / 2;
-		var end = Canvas.GetLeft(TrimEndThumb) + TrimEndThumb.Width / 2;
-		Canvas.SetLeft(SelectedRangeTrack, start);
-		SelectedRangeTrack.Width = Math.Max(0, end - start);
 	}
 
 	private void SeekTo(double seconds)
@@ -594,7 +459,6 @@ public sealed partial class VideoEditorPage : Page
 			SeekSlider.Value = Math.Clamp(seconds, SeekSlider.Minimum, SeekSlider.Maximum);
 			_isUpdatingControls = false;
 		}
-		UpdateTimelineVisuals();
 	}
 
 	private void ReleasePlayerSource()
