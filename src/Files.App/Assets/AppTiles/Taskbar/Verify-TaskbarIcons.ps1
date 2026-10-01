@@ -10,6 +10,22 @@ $sourcePath = Join-Path $PSScriptRoot 'FilesMaxIconSource.png'
 $source = [System.Drawing.Bitmap]::FromFile($sourcePath)
 $expectedHashes = @{}
 
+# A qualified manifest path bypasses the targetsize/unplated resource family.
+# Windows then paints a square behind the taskbar image instead of selecting
+# the transparent unplated variant from resources.pri.
+$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..\..\..')).Path
+foreach ($manifestRelativePath in @(
+    'src\Files.App\Package.appxmanifest',
+    '.github\installer\ExternalLocation.AppxManifest',
+    '.github\installer\ExternalLocation.Files.AppxManifest'
+)) {
+    $manifestPath = Join-Path $repositoryRoot $manifestRelativePath
+    $manifestText = Get-Content -LiteralPath $manifestPath -Raw
+    if ($manifestText -notmatch 'Square44x44Logo="Assets\\AppTiles\\Dev\\Square44x44Logo\.png"') {
+        throw "$manifestRelativePath must reference the unqualified Square44x44Logo.png resource name."
+    }
+}
+
 function Assert-TransparentCorners([System.Drawing.Bitmap]$bitmap, [string]$label) {
     foreach ($point in @(
         @(0, 0),
