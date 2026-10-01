@@ -50,7 +50,6 @@ public sealed class VideoCutProcessor(VideoToolchain toolchain, VideoProbeServic
 			using (File.Create(temporaryPath))
 			{
 			}
-			File.SetAttributes(temporaryPath, FileAttributes.Hidden);
 			await RunFfmpegAsync(job, temporaryPath, expectedDuration, reportProgress, cancellationToken).ConfigureAwait(false);
 			cancellationToken.ThrowIfCancellationRequested();
 

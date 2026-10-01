@@ -4948,6 +4948,11 @@
   <data name="VideoEditorCutAfter" xml:space="preserve"><value>Trim after</value></data>
   <data name="VideoEditorRestore" xml:space="preserve"><value>Reset</value></data>
   <data name="VideoEditorExport" xml:space="preserve"><value>Export</value></data>
+  <data name="VideoEditorExportOnly" xml:space="preserve"><value>Export as new</value></data>
+  <data name="VideoEditorReplaceAndExport" xml:space="preserve"><value>Replace and export</value></data>
+  <data name="VideoEditorPending" xml:space="preserve"><value>Pending</value></data>
+  <data name="VideoEditorPendingEmpty" xml:space="preserve"><value>No pending tasks.</value></data>
+  <data name="VideoEditorExportingEmpty" xml:space="preserve"><value>No exports in progress.</value></data>
   <data name="VideoEditorCloseVideo" xml:space="preserve"><value>Close video</value></data>
   <data name="VideoEditorExportComplete" xml:space="preserve"><value>Exported to: {0}</value></data>
   <data name="VideoEditorExportGroup" xml:space="preserve"><value>Export</value></data>

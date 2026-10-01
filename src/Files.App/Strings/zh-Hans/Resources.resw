@@ -4942,6 +4942,11 @@
   <data name="VideoEditorCutAfter" xml:space="preserve"><value>裁切后段</value></data>
   <data name="VideoEditorRestore" xml:space="preserve"><value>重置</value></data>
   <data name="VideoEditorExport" xml:space="preserve"><value>导出</value></data>
+  <data name="VideoEditorExportOnly" xml:space="preserve"><value>仅导出</value></data>
+  <data name="VideoEditorReplaceAndExport" xml:space="preserve"><value>替换并导出</value></data>
+  <data name="VideoEditorPending" xml:space="preserve"><value>待处理</value></data>
+  <data name="VideoEditorPendingEmpty" xml:space="preserve"><value>暂无待处理任务。</value></data>
+  <data name="VideoEditorExportingEmpty" xml:space="preserve"><value>暂无导出中的任务。</value></data>
   <data name="VideoEditorCloseVideo" xml:space="preserve"><value>关闭视频</value></data>
   <data name="VideoEditorExportComplete" xml:space="preserve"><value>已导出到：{0}</value></data>
   <data name="VideoEditorExportGroup" xml:space="preserve"><value>导出</value></data>

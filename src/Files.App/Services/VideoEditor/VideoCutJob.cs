@@ -100,11 +100,14 @@ public sealed class VideoCutJob : ObservableObject
 		_ => string.Empty
 	};
 
-	public string PauseActionText => Status == VideoCutJobStatus.Paused
-		? Strings.VideoEditorResume.GetLocalizedResource()
-		: Strings.VideoEditorPauseJob.GetLocalizedResource();
-	public string PauseActionGlyph => Status == VideoCutJobStatus.Paused ? "\uE768" : "\uE769";
-	public bool CanPauseResume => Status is VideoCutJobStatus.Waiting or VideoCutJobStatus.Processing or VideoCutJobStatus.Paused;
+	public string PauseActionText => Status switch
+	{
+		VideoCutJobStatus.Paused => Strings.VideoEditorResume.GetLocalizedResource(),
+		VideoCutJobStatus.Failed or VideoCutJobStatus.Cancelled => Strings.VideoEditorRetry.GetLocalizedResource(),
+		_ => Strings.VideoEditorPauseJob.GetLocalizedResource()
+	};
+	public string PauseActionGlyph => Status is VideoCutJobStatus.Paused or VideoCutJobStatus.Failed or VideoCutJobStatus.Cancelled ? "\uE768" : "\uE769";
+	public bool CanPauseResume => Status is VideoCutJobStatus.Waiting or VideoCutJobStatus.Processing or VideoCutJobStatus.Paused or VideoCutJobStatus.Failed or VideoCutJobStatus.Cancelled;
 	public bool CanCancel => Status != VideoCutJobStatus.Replacing;
 
 	public string TrimSummary => $"{FormatTime(StartSeconds)} – {FormatTime(EndSeconds)}";

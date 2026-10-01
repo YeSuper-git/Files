@@ -299,14 +299,14 @@ public sealed class VideoEditorViewModel : ObservableObject
 		return DurationSeconds;
 	}
 
-	public void ExportCurrent()
+	public void ExportCurrent(bool replaceOriginal)
 	{
-		EnqueueCurrent(startImmediately: true);
+		EnqueueCurrent(startImmediately: true, replaceOriginal);
 	}
 
-	public void AddCurrentToQueue()
+	public void AddCurrentToQueue(bool replaceOriginal)
 	{
-		EnqueueCurrent(startImmediately: false);
+		EnqueueCurrent(startImmediately: false, replaceOriginal);
 	}
 
 	public void StartQueue() => _queueService.StartQueue();
@@ -389,7 +389,7 @@ public sealed class VideoEditorViewModel : ObservableObject
 		return true;
 	}
 
-	private void EnqueueCurrent(bool startImmediately)
+	private void EnqueueCurrent(bool startImmediately, bool replaceOriginal)
 	{
 		if (_sourcePath is null || _metadata is null)
 		{
@@ -404,7 +404,6 @@ public sealed class VideoEditorViewModel : ObservableObject
 		}
 
 		var sourceDirectory = Path.GetDirectoryName(_sourcePath)!;
-		var replaceOriginal = _settings.VideoEditorReplaceOriginal;
 		var exportDirectory = replaceOriginal || _settings.VideoEditorExportToSourceFolder
 			? sourceDirectory
 			: _settings.VideoEditorExportFolder;

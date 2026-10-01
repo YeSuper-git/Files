@@ -6,6 +6,7 @@
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:primitives="using:Microsoft.UI.Xaml.Controls.Primitives"
 	xmlns:video="using:Files.App.Services.VideoEditor"
 	d:DesignHeight="760"
 	d:DesignWidth="1280"
@@ -13,6 +14,33 @@
 	Loaded="Page_Loaded"
 	Unloaded="Page_Unloaded"
 	Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+	<Page.Resources>
+		<DataTemplate x:Key="QueueJobTemplate" x:DataType="video:VideoCutJob">
+			<Border Padding="6" Margin="0,2,0,4" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" ToolTipService.ToolTip="{x:Bind JobDetails, Mode=OneWay}">
+				<Grid ColumnSpacing="3" VerticalAlignment="Center">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="*" />
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="Auto" />
+					</Grid.ColumnDefinitions>
+					<TextBlock Text="{x:Bind FileName}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold" VerticalAlignment="Center" />
+					<TextBlock Grid.Column="1" Text="{x:Bind StatusText, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+					<Button Grid.Column="2" Width="30" Height="30" Padding="0" Click="PauseResumeJob_Click" IsEnabled="{x:Bind CanPauseResume, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind PauseActionText, Mode=OneWay}" AutomationProperties.Name="{x:Bind PauseActionText, Mode=OneWay}">
+						<FontIcon Glyph="{x:Bind PauseActionGlyph, Mode=OneWay}" FontSize="13" />
+					</Button>
+					<Button Grid.Column="3" Width="30" Height="30" Padding="0" Click="ReeditJob_Click" IsEnabled="{x:Bind CanCancel, Mode=OneWay}" ToolTipService.ToolTip="{video:VideoEditorText Name=VideoEditorReedit}" AutomationProperties.Name="{video:VideoEditorText Name=VideoEditorReedit}">
+						<FontIcon Glyph="&#xE70F;" FontSize="13" />
+					</Button>
+					<Button Grid.Column="4" Width="30" Height="30" Padding="0" Click="CancelJob_Click" IsEnabled="{x:Bind CanCancel, Mode=OneWay}" ToolTipService.ToolTip="{video:VideoEditorText Name=VideoEditorCancelExport}" AutomationProperties.Name="{video:VideoEditorText Name=VideoEditorCancelExport}">
+						<FontIcon Glyph="&#xE8BB;" FontSize="13" />
+					</Button>
+				</Grid>
+			</Border>
+		</DataTemplate>
+	</Page.Resources>
 
 	<Grid Padding="8">
 		<Grid ColumnSpacing="12">
@@ -25,6 +53,7 @@
 				<Grid RowSpacing="5">
 					<Grid.RowDefinitions>
 						<RowDefinition Height="*" MinHeight="230" />
+						<RowDefinition Height="Auto" />
 						<RowDefinition Height="Auto" />
 						<RowDefinition Height="Auto" />
 						<RowDefinition Height="Auto" />
@@ -68,14 +97,27 @@
 						<TextBlock Grid.Column="2" Text="{x:Bind ViewModel.DurationText, Mode=OneWay}" VerticalAlignment="Center" FontFamily="Consolas" />
 					</Grid>
 
-					<StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+					<Grid x:Name="StoryboardSurface" Grid.Row="2" Height="64" SizeChanged="Storyboard_SizeChanged" Visibility="Collapsed">
+						<Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" />
+						<StackPanel x:Name="StoryboardStrip" Orientation="Horizontal" HorizontalAlignment="Stretch" />
+						<Canvas x:Name="StoryboardOverlay" Background="Transparent" PointerPressed="Storyboard_PointerPressed">
+							<Border x:Name="TrimLeftMask" Height="64" Background="#99000000" IsHitTestVisible="False" />
+							<Border x:Name="TrimRightMask" Height="64" Background="#99000000" IsHitTestVisible="False" />
+							<Border x:Name="TrimSelectionOutline" Height="64" BorderBrush="{ThemeResource AccentFillColorDefaultBrush}" BorderThickness="2" IsHitTestVisible="False" />
+							<Border x:Name="StoryboardPlayhead" Width="2" Height="64" Background="White" IsHitTestVisible="False" />
+							<primitives:Thumb x:Name="TrimStartThumb" Width="12" Height="64" Background="{ThemeResource AccentFillColorDefaultBrush}" DragDelta="TrimStartThumb_DragDelta" DragCompleted="TrimStartThumb_DragCompleted" ToolTipService.ToolTip="{video:VideoEditorText Name=VideoEditorCutBefore}" />
+							<primitives:Thumb x:Name="TrimEndThumb" Width="12" Height="64" Background="{ThemeResource AccentFillColorDefaultBrush}" DragDelta="TrimEndThumb_DragDelta" DragCompleted="TrimEndThumb_DragCompleted" ToolTipService.ToolTip="{video:VideoEditorText Name=VideoEditorCutAfter}" />
+						</Canvas>
+					</Grid>
+
+					<StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
 						<TextBlock Text="{video:VideoEditorText Name=VideoEditorKeepRange}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 						<TextBlock Text="{x:Bind ViewModel.TrimStartText, Mode=OneWay}" FontFamily="Consolas" FontWeight="SemiBold" />
 						<TextBlock Text="—" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
 						<TextBlock Text="{x:Bind ViewModel.TrimEndText, Mode=OneWay}" FontFamily="Consolas" FontWeight="SemiBold" />
 					</StackPanel>
 
-					<StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+					<StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
 						<Button Content="{video:VideoEditorText Name=VideoEditorPresets}" IsEnabled="{x:Bind ViewModel.HasVideo, Mode=OneWay}">
 							<Button.Flyout>
 								<Flyout Placement="Top">
@@ -101,9 +143,11 @@
 						<Button x:Name="PlayButton" Content="{video:VideoEditorText Name=VideoEditorPlay}" Click="PlayPause_Click" IsEnabled="{x:Bind ViewModel.HasVideo, Mode=OneWay}" Style="{StaticResource AccentButtonStyle}" />
 						<Button Content="{video:VideoEditorText Name=VideoEditorCutAfter}" Click="SetTrimEnd_Click" IsEnabled="{x:Bind ViewModel.HasVideo, Mode=OneWay}" />
 						<Button Content="{video:VideoEditorText Name=VideoEditorCloseVideo}" Click="CloseVideo_Click" IsEnabled="{x:Bind ViewModel.HasVideo, Mode=OneWay}" />
+						<Button Content="{video:VideoEditorText Name=VideoEditorExportOnly}" Click="ExportOnly_Click" IsEnabled="{x:Bind ViewModel.CanSave, Mode=OneWay}" Style="{StaticResource AccentButtonStyle}" Margin="14,0,0,0" />
+						<Button Content="{video:VideoEditorText Name=VideoEditorReplaceAndExport}" Click="ReplaceAndExport_Click" IsEnabled="{x:Bind ViewModel.CanSave, Mode=OneWay}" />
 					</StackPanel>
 
-					<TextBlock Grid.Row="4" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+					<TextBlock Grid.Row="5" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
 				</Grid>
 			</Border>
 
@@ -111,91 +155,77 @@
 				<Grid RowSpacing="10">
 					<Grid.RowDefinitions>
 						<RowDefinition Height="Auto" />
-						<RowDefinition Height="Auto" />
 						<RowDefinition Height="*" />
 					</Grid.RowDefinitions>
 
-					<Grid Grid.Row="0" ColumnSpacing="10">
+					<Grid Grid.Row="0" ColumnSpacing="4">
 						<Grid.ColumnDefinitions>
 							<ColumnDefinition Width="*" />
 							<ColumnDefinition Width="Auto" />
-							<ColumnDefinition Width="Auto" />
 						</Grid.ColumnDefinitions>
-						<TextBlock Text="{video:VideoEditorText Name=VideoEditorQueueTitle}" Style="{StaticResource SubtitleTextBlockStyle}" VerticalAlignment="Center" />
-						<Button Grid.Column="1" Content="{video:VideoEditorText Name=VideoEditorExport}" IsEnabled="{x:Bind ViewModel.CanSave, Mode=OneWay}" Style="{StaticResource AccentButtonStyle}">
-							<Button.Flyout>
-								<MenuFlyout Placement="Bottom">
-									<MenuFlyoutItem Text="{video:VideoEditorText Name=VideoEditorExportNow}" Click="ExportNow_Click" />
-									<MenuFlyoutItem Text="{video:VideoEditorText Name=VideoEditorExportLater}" Click="ExportLater_Click" />
-								</MenuFlyout>
-							</Button.Flyout>
-						</Button>
-						<Button x:Name="AllQueueButton" Grid.Column="2" Click="AllQueue_Click" IsEnabled="False" />
-					</Grid>
-
-					<StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="18">
+						<StackPanel Orientation="Horizontal" Spacing="2">
+							<Grid RowSpacing="0">
+								<Grid.RowDefinitions>
+									<RowDefinition Height="Auto" />
+									<RowDefinition Height="2" />
+								</Grid.RowDefinitions>
+								<Button x:Name="PendingTabButton" Tag="Pending" Click="QueueTab_Click" Padding="4,8" Background="Transparent" BorderThickness="0" CornerRadius="0" FontSize="16">
+									<StackPanel Orientation="Horizontal" Spacing="3">
+										<TextBlock Text="{video:VideoEditorText Name=VideoEditorPending}" FontSize="18" FontWeight="{Binding FontWeight, ElementName=PendingTabButton}" />
+										<TextBlock x:Name="PendingCount" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+									</StackPanel>
+								</Button>
+								<Border x:Name="PendingTabUnderline" Grid.Row="1" Background="{ThemeResource TextFillColorPrimaryBrush}" IsHitTestVisible="False" />
+							</Grid>
 						<Grid RowSpacing="0">
 							<Grid.RowDefinitions>
 								<RowDefinition Height="Auto" />
 								<RowDefinition Height="2" />
 							</Grid.RowDefinitions>
-							<Button x:Name="ProcessingTabButton" Tag="Processing" Click="QueueTab_Click" Padding="6,8" Background="Transparent" BorderThickness="0" CornerRadius="0">
-								<StackPanel Orientation="Horizontal" Spacing="5">
-									<TextBlock Text="{video:VideoEditorText Name=VideoEditorProcessing}" />
-									<TextBlock x:Name="ProcessingCount" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+							<Button x:Name="ProcessingTabButton" Tag="Processing" Click="QueueTab_Click" Padding="4,8" Background="Transparent" BorderThickness="0" CornerRadius="0" FontSize="16">
+								<StackPanel Orientation="Horizontal" Spacing="3">
+									<TextBlock Text="{video:VideoEditorText Name=VideoEditorProcessing}" FontSize="18" FontWeight="{Binding FontWeight, ElementName=ProcessingTabButton}" />
+									<TextBlock x:Name="ProcessingCount" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 								</StackPanel>
 							</Button>
-							<Border x:Name="ProcessingTabUnderline" Grid.Row="1" Background="{ThemeResource TextFillColorPrimaryBrush}" IsHitTestVisible="False" />
+							<Border x:Name="ProcessingTabUnderline" Grid.Row="1" Background="{ThemeResource TextFillColorPrimaryBrush}" Visibility="Collapsed" IsHitTestVisible="False" />
 						</Grid>
 						<Grid RowSpacing="0">
 							<Grid.RowDefinitions>
 								<RowDefinition Height="Auto" />
 								<RowDefinition Height="2" />
 							</Grid.RowDefinitions>
-							<Button x:Name="CompletedTabButton" Tag="Completed" Click="QueueTab_Click" Padding="6,8" Background="Transparent" BorderThickness="0" CornerRadius="0">
-								<StackPanel Orientation="Horizontal" Spacing="5">
-									<TextBlock Text="{video:VideoEditorText Name=VideoEditorCompleted}" />
-									<TextBlock x:Name="CompletedCount" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+							<Button x:Name="CompletedTabButton" Tag="Completed" Click="QueueTab_Click" Padding="4,8" Background="Transparent" BorderThickness="0" CornerRadius="0" FontSize="16">
+								<StackPanel Orientation="Horizontal" Spacing="3">
+									<TextBlock Text="{video:VideoEditorText Name=VideoEditorCompleted}" FontSize="18" FontWeight="{Binding FontWeight, ElementName=CompletedTabButton}" />
+									<TextBlock x:Name="CompletedCount" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 								</StackPanel>
 							</Button>
 							<Border x:Name="CompletedTabUnderline" Grid.Row="1" Background="{ThemeResource TextFillColorPrimaryBrush}" Visibility="Collapsed" IsHitTestVisible="False" />
 						</Grid>
-					</StackPanel>
+						</StackPanel>
+						<Button x:Name="AllQueueButton" Grid.Column="1" Width="32" Height="32" Padding="0" Click="AllQueue_Click" IsEnabled="False" HorizontalAlignment="Right" VerticalAlignment="Top">
+							<FontIcon x:Name="AllQueueIcon" Glyph="&#xE768;" FontSize="14" />
+						</Button>
+					</Grid>
 
-					<Grid Grid.Row="2">
-						<Grid x:Name="ProcessingPanel" Visibility="Visible">
+					<Grid Grid.Row="1">
+						<Grid x:Name="PendingPanel" Visibility="Visible">
 							<Grid>
-								<ListView ItemsSource="{x:Bind ViewModel.ProcessingJobs, Mode=OneWay}" SelectionMode="None" Padding="0" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Auto">
-									<ListView.ItemTemplate>
-										<DataTemplate x:DataType="video:VideoCutJob">
-											<Border Padding="6" Margin="0,2,0,4" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" ToolTipService.ToolTip="{x:Bind JobDetails, Mode=OneWay}">
-												<Grid ColumnSpacing="3" VerticalAlignment="Center">
-													<Grid.ColumnDefinitions>
-														<ColumnDefinition Width="*" />
-														<ColumnDefinition Width="Auto" />
-														<ColumnDefinition Width="Auto" />
-														<ColumnDefinition Width="Auto" />
-														<ColumnDefinition Width="Auto" />
-													</Grid.ColumnDefinitions>
-													<TextBlock Text="{x:Bind FileName}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold" VerticalAlignment="Center" />
-													<TextBlock Grid.Column="1" Text="{x:Bind StatusText, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
-													<Button Grid.Column="2" Width="30" Height="30" Padding="0" Click="PauseResumeJob_Click" IsEnabled="{x:Bind CanPauseResume, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind PauseActionText, Mode=OneWay}" AutomationProperties.Name="{x:Bind PauseActionText, Mode=OneWay}">
-														<FontIcon Glyph="{x:Bind PauseActionGlyph, Mode=OneWay}" FontSize="13" />
-													</Button>
-													<Button Grid.Column="3" Width="30" Height="30" Padding="0" Click="ReeditJob_Click" IsEnabled="{x:Bind CanCancel, Mode=OneWay}" ToolTipService.ToolTip="{video:VideoEditorText Name=VideoEditorReedit}" AutomationProperties.Name="{video:VideoEditorText Name=VideoEditorReedit}">
-														<FontIcon Glyph="&#xE70F;" FontSize="13" />
-													</Button>
-													<Button Grid.Column="4" Width="30" Height="30" Padding="0" Click="CancelJob_Click" IsEnabled="{x:Bind CanCancel, Mode=OneWay}" ToolTipService.ToolTip="{video:VideoEditorText Name=VideoEditorCancelExport}" AutomationProperties.Name="{video:VideoEditorText Name=VideoEditorCancelExport}">
-														<FontIcon Glyph="&#xE8BB;" FontSize="13" />
-													</Button>
-												</Grid>
-											</Border>
-										</DataTemplate>
-									</ListView.ItemTemplate>
-								</ListView>
+								<ListView ItemsSource="{x:Bind PendingJobs, Mode=OneWay}" ItemTemplate="{StaticResource QueueJobTemplate}" SelectionMode="None" Padding="0" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Auto" />
+								<StackPanel x:Name="PendingEmptyState" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="250" Spacing="10" Visibility="Visible">
+									<FontIcon Glyph="&#xE823;" FontSize="28" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+									<TextBlock Text="{video:VideoEditorText Name=VideoEditorPendingEmpty}" TextWrapping="Wrap" TextAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+								</StackPanel>
+							</Grid>
+						</Grid>
+
+						<Grid x:Name="ProcessingPanel" Visibility="Collapsed">
+							<Grid>
+								<ListView ItemsSource="{x:Bind ExportingJobs, Mode=OneWay}" ItemTemplate="{StaticResource QueueJobTemplate}" SelectionMode="None" Padding="0" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Auto" />
 								<StackPanel x:Name="ProcessingEmptyState" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="250" Spacing="10" Visibility="Visible">
 									<FontIcon Glyph="&#xE823;" FontSize="28" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-									<TextBlock Text="{video:VideoEditorText Name=VideoEditorQueueEmpty}" TextWrapping="Wrap" TextAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+									<TextBlock Text="{video:VideoEditorText Name=VideoEditorExportingEmpty}" TextWrapping="Wrap" TextAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 								</StackPanel>
 							</Grid>
 						</Grid>
