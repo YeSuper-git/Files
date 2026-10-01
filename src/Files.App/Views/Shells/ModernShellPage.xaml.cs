@@ -8,11 +8,13 @@ using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Navigation;
 using Microsoft.Extensions.Logging;
 using Files.App.Data.Models;
+using Files.App.Data.Enums;
 using Files.App.ViewModels.UserControls;
 using System.IO;
 using Windows.System;
 #if FILES_RESOURCE_MANAGER
 using Files.App.Data.Models.ResourceManager;
+using Files.App.Data.Items.ResourceManager;
 using Files.App.Helpers;
 using Files.App.Services.ResourceManager;
 #endif
@@ -32,6 +34,17 @@ namespace Files.App.Views.Shells
 		private readonly SelectedItemsPropertiesViewModel _resourceLibrarySelectionPropertiesViewModel = new();
 		public StatusBarViewModel ResourceLibraryStatusBarViewModel => _resourceLibraryStatusBarViewModel ??= new StatusBarViewModel();
 		public ResourceManager.ResourceLibraryPage? CurrentResourceLibraryPage => ItemDisplayFrame?.Content as ResourceManager.ResourceLibraryPage;
+		public void UpdateResourceLibrarySelection(IReadOnlyList<ListedItem> items)
+		{
+			var selection = _resourceLibrarySelectionPropertiesViewModel;
+			selection.IsItemSelected = items.Count > 0;
+			selection.SelectedItemsCount = items.Count;
+			selection.SelectedItemsCountString = Strings.SelectedItems.GetLocalizedFormatResource(items.Count);
+			var files = items.OfType<ResourceVideoFileListedItem>().ToArray();
+			selection.ItemSizeVisibility = files.Length > 0;
+			selection.ItemSizeBytes = files.Sum(item => (decimal)item.FileSizeBytes);
+			selection.ItemSize = files.Length > 0 ? selection.ItemSizeBytes.ToSizeString() : string.Empty;
+		}
 #endif
 
 		private NavigationParams? _NavParams;

@@ -66,10 +66,9 @@ public sealed class VideoProbeService(VideoToolchain toolchain)
 		foreach (var argument in new[]
 		{
 			"-v", "error",
-			"-skip_frame", "nokey",
 			"-select_streams", "v:0",
-			"-show_frames",
-			"-show_entries", "frame=best_effort_timestamp_time",
+			"-show_packets",
+			"-show_entries", "packet=pts_time,flags",
 			"-of", "csv=p=0",
 			path
 		})
@@ -85,7 +84,10 @@ public sealed class VideoProbeService(VideoToolchain toolchain)
 		{
 			while (await process.StandardOutput.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
 			{
-				var value = line.Split(',', StringSplitOptions.TrimEntries)[0];
+				var fields = line.Split(',', StringSplitOptions.TrimEntries);
+				if (fields.Length < 2 || !fields[1].Contains('K'))
+					continue;
+				var value = fields[0];
 				if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) &&
 					double.IsFinite(seconds) && seconds >= 0)
 					keyframes.Add(seconds);

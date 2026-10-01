@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Files.App.Services.VideoEditor;
+using Microsoft.Extensions.Logging;
 
 namespace Files.App.ViewModels.VideoEditor;
 
@@ -16,6 +17,7 @@ public sealed class VideoEditorViewModel : ObservableObject
 	private readonly VideoCutPresetService _presetService;
 	private readonly IAppSettingsService _settings;
 	private IReadOnlyList<double> _allKeyframes = [];
+	private CancellationTokenSource? _keyframeLoadCancellation;
 	private VideoMetadata? _metadata;
 	private string? _sourcePath;
 	private string _sourceName = string.Empty;
@@ -150,6 +152,9 @@ public sealed class VideoEditorViewModel : ObservableObject
 
 	public async Task LoadVideoAsync(string path, CancellationToken cancellationToken = default)
 	{
+		_keyframeLoadCancellation?.Cancel();
+		_keyframeLoadCancellation?.Dispose();
+		_keyframeLoadCancellation = null;
 		if (!IsToolchainAvailable)
 		{
 			StatusMessage = ToolStatus;
@@ -168,10 +173,8 @@ public sealed class VideoEditorViewModel : ObservableObject
 		try
 		{
 			var metadata = await _probeService.ProbeAsync(fullPath, cancellationToken);
-			var keyframes = await _probeService.ReadKeyframesAsync(fullPath, cancellationToken);
-
 			_metadata = metadata;
-			_allKeyframes = keyframes;
+			_allKeyframes = [];
 			SourcePath = fullPath;
 			SourceNameValue = Path.GetFileName(fullPath);
 			DurationSeconds = metadata.DurationSeconds;
@@ -180,8 +183,10 @@ public sealed class VideoEditorViewModel : ObservableObject
 			TrimStartSeconds = 0;
 			TrimEndSeconds = metadata.DurationSeconds;
 			CurrentPositionSeconds = 0;
-			BuildKeyframeMarkers(keyframes);
+			KeyframeMarkers.Clear();
 			StatusMessage = string.Format(Strings.VideoEditorLoadedMessage.GetLocalizedResource(), metadata.Width, metadata.Height, metadata.VideoCodec);
+			_keyframeLoadCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+			_ = LoadKeyframesInBackgroundAsync(fullPath, _keyframeLoadCancellation.Token);
 		}
 		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
 		{
@@ -204,6 +209,23 @@ public sealed class VideoEditorViewModel : ObservableObject
 		finally
 		{
 			IsLoading = false;
+		}
+	}
+
+	private async Task LoadKeyframesInBackgroundAsync(string path, CancellationToken cancellationToken)
+	{
+		try
+		{
+			var keyframes = await _probeService.ReadKeyframesAsync(path, cancellationToken);
+			if (cancellationToken.IsCancellationRequested || !string.Equals(SourcePath, path, StringComparison.OrdinalIgnoreCase))
+				return;
+			_allKeyframes = keyframes;
+			BuildKeyframeMarkers(keyframes);
+		}
+		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+		catch (Exception ex)
+		{
+			App.Logger.LogWarning(ex, "Unable to read video keyframes for {Path}", path);
 		}
 	}
 
@@ -239,6 +261,9 @@ public sealed class VideoEditorViewModel : ObservableObject
 
 	public void CloseVideo()
 	{
+		_keyframeLoadCancellation?.Cancel();
+		_keyframeLoadCancellation?.Dispose();
+		_keyframeLoadCancellation = null;
 		_metadata = null;
 		SourcePath = null;
 		SourceNameValue = string.Empty;

@@ -4833,8 +4833,8 @@
   <data name="ResourceManagerVideoQualityOther" xml:space="preserve">
     <value>{0}P {1}级</value>
   </data>
-  <data name="VideoEditorTitle" xml:space="preserve"><value>视频剪辑</value></data>
-  <data name="VideoEditorNavigationTitle" xml:space="preserve"><value>视频剪辑</value></data>
+  <data name="VideoEditorTitle" xml:space="preserve"><value>视频编辑</value></data>
+  <data name="VideoEditorNavigationTitle" xml:space="preserve"><value>视频编辑</value></data>
   <data name="VideoEditorOpenVideo" xml:space="preserve"><value>选择视频</value></data>
   <data name="VideoEditorDropVideo" xml:space="preserve"><value>拖放视频到这里</value></data>
   <data name="VideoEditorDroppedFileUnsupported" xml:space="preserve"><value>请放入支持的视频文件。</value></data>
@@ -4846,11 +4846,11 @@
   <data name="VideoEditorPlay" xml:space="preserve"><value>播放</value></data>
   <data name="VideoEditorPause" xml:space="preserve"><value>暂停</value></data>
   <data name="VideoEditorTimelineHint" xml:space="preserve"><value>拖动两侧手柄选择保留区间；裁切点会对齐到关键帧。</value></data>
-  <data name="VideoEditorProcessing" xml:space="preserve"><value>处理中</value></data>
+  <data name="VideoEditorProcessing" xml:space="preserve"><value>导出中</value></data>
   <data name="VideoEditorCompleted" xml:space="preserve"><value>已完成</value></data>
   <data name="VideoEditorCancelOrRemove" xml:space="preserve"><value>取消 / 移除</value></data>
   <data name="VideoEditorRetry" xml:space="preserve"><value>重试</value></data>
-  <data name="VideoEditorPresets" xml:space="preserve"><value>裁切预设</value></data>
+  <data name="VideoEditorPresets" xml:space="preserve"><value>预设</value></data>
   <data name="VideoEditorPresetApply" xml:space="preserve"><value>套用并微调</value></data>
   <data name="VideoEditorPresetDelete" xml:space="preserve"><value>删除</value></data>
   <data name="VideoEditorSetTrimStart" xml:space="preserve"><value>设为起点</value></data>
@@ -4940,7 +4940,7 @@
   <data name="VideoEditorStatusSaving" xml:space="preserve"><value>保存中</value></data>
   <data name="VideoEditorCutBefore" xml:space="preserve"><value>裁切前段</value></data>
   <data name="VideoEditorCutAfter" xml:space="preserve"><value>裁切后段</value></data>
-  <data name="VideoEditorRestore" xml:space="preserve"><value>恢复</value></data>
+  <data name="VideoEditorRestore" xml:space="preserve"><value>重置</value></data>
   <data name="VideoEditorExport" xml:space="preserve"><value>导出</value></data>
   <data name="VideoEditorCloseVideo" xml:space="preserve"><value>关闭视频</value></data>
   <data name="VideoEditorExportComplete" xml:space="preserve"><value>已导出到：{0}</value></data>
@@ -4955,4 +4955,13 @@
   <data name="VideoEditorCancelExport" xml:space="preserve"><value>取消</value></data>
   <data name="VideoEditorStatusPaused" xml:space="preserve"><value>已暂停</value></data>
   <data name="VideoEditorChooseFolderFailed" xml:space="preserve"><value>无法选择导出文件夹：{0}</value></data>
+  <data name="ResourceVideoInfo" xml:space="preserve"><value>视频信息</value></data>
+  <data name="ResourceVideoFiles" xml:space="preserve"><value>视频文件</value></data>
+  <data name="ResourceVideoPlay" xml:space="preserve"><value>播放视频</value></data>
+  <data name="ResourceVideoIllustrations" xml:space="preserve"><value>视频插图</value></data>
+  <data name="ResourceVideoAddIllustration" xml:space="preserve"><value>添加插图</value></data>
+  <data name="ResourceVideoNoIllustration" xml:space="preserve"><value>暂无插图，可添加图片。</value></data>
+  <data name="ResourceVideoChooseFile" xml:space="preserve"><value>请选择视频</value></data>
+  <data name="ResourceVideoFileSize" xml:space="preserve"><value>文件大小：{0}</value></data>
+  <data name="ResourceVideoModified" xml:space="preserve"><value>修改时间：{0}</value></data>
 </root>

@@ -4852,11 +4852,11 @@
   <data name="VideoEditorPlay" xml:space="preserve"><value>Play</value></data>
   <data name="VideoEditorPause" xml:space="preserve"><value>Pause</value></data>
   <data name="VideoEditorTimelineHint" xml:space="preserve"><value>Drag the handles to choose the kept range. Cut points snap to keyframes.</value></data>
-  <data name="VideoEditorProcessing" xml:space="preserve"><value>Processing</value></data>
+  <data name="VideoEditorProcessing" xml:space="preserve"><value>Exporting</value></data>
   <data name="VideoEditorCompleted" xml:space="preserve"><value>Completed</value></data>
   <data name="VideoEditorCancelOrRemove" xml:space="preserve"><value>Cancel / remove</value></data>
   <data name="VideoEditorRetry" xml:space="preserve"><value>Retry</value></data>
-  <data name="VideoEditorPresets" xml:space="preserve"><value>Trim presets</value></data>
+  <data name="VideoEditorPresets" xml:space="preserve"><value>Presets</value></data>
   <data name="VideoEditorPresetApply" xml:space="preserve"><value>Apply and adjust</value></data>
   <data name="VideoEditorPresetDelete" xml:space="preserve"><value>Delete</value></data>
   <data name="VideoEditorSetTrimStart" xml:space="preserve"><value>Set start</value></data>
@@ -4946,7 +4946,7 @@
   <data name="VideoEditorStatusSaving" xml:space="preserve"><value>Saving</value></data>
   <data name="VideoEditorCutBefore" xml:space="preserve"><value>Trim before</value></data>
   <data name="VideoEditorCutAfter" xml:space="preserve"><value>Trim after</value></data>
-  <data name="VideoEditorRestore" xml:space="preserve"><value>Restore</value></data>
+  <data name="VideoEditorRestore" xml:space="preserve"><value>Reset</value></data>
   <data name="VideoEditorExport" xml:space="preserve"><value>Export</value></data>
   <data name="VideoEditorCloseVideo" xml:space="preserve"><value>Close video</value></data>
   <data name="VideoEditorExportComplete" xml:space="preserve"><value>Exported to: {0}</value></data>
@@ -4961,4 +4961,13 @@
   <data name="VideoEditorCancelExport" xml:space="preserve"><value>Cancel</value></data>
   <data name="VideoEditorStatusPaused" xml:space="preserve"><value>Paused</value></data>
   <data name="VideoEditorChooseFolderFailed" xml:space="preserve"><value>Unable to choose the export folder: {0}</value></data>
+  <data name="ResourceVideoInfo" xml:space="preserve"><value>Video information</value></data>
+  <data name="ResourceVideoFiles" xml:space="preserve"><value>Video files</value></data>
+  <data name="ResourceVideoPlay" xml:space="preserve"><value>Play video</value></data>
+  <data name="ResourceVideoIllustrations" xml:space="preserve"><value>Video illustrations</value></data>
+  <data name="ResourceVideoAddIllustration" xml:space="preserve"><value>Add illustration</value></data>
+  <data name="ResourceVideoNoIllustration" xml:space="preserve"><value>No illustrations yet. Add an image.</value></data>
+  <data name="ResourceVideoChooseFile" xml:space="preserve"><value>Select a video</value></data>
+  <data name="ResourceVideoFileSize" xml:space="preserve"><value>File size: {0}</value></data>
+  <data name="ResourceVideoModified" xml:space="preserve"><value>Modified: {0}</value></data>
 </root>

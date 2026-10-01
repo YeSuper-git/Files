@@ -258,8 +258,10 @@ public sealed partial class VideoEditorPage : Page
 	{
 		var showProcessing = tabName == "Processing";
 		var showCompleted = tabName == "Completed";
-		ProcessingTabButton.IsChecked = showProcessing;
-		CompletedTabButton.IsChecked = showCompleted;
+		ProcessingTabButton.FontWeight = showProcessing ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal;
+		CompletedTabButton.FontWeight = showCompleted ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal;
+		ProcessingTabUnderline.Visibility = showProcessing ? Visibility.Visible : Visibility.Collapsed;
+		CompletedTabUnderline.Visibility = showCompleted ? Visibility.Visible : Visibility.Collapsed;
 		ProcessingPanel.Visibility = showProcessing ? Visibility.Visible : Visibility.Collapsed;
 		CompletedPanel.Visibility = showCompleted ? Visibility.Visible : Visibility.Collapsed;
 	}
@@ -299,6 +301,7 @@ public sealed partial class VideoEditorPage : Page
 				IsHitTestVisible = false
 			};
 			_keyframeMarkers.Add(marker);
+			Canvas.SetTop(marker, 15);
 			TimelineCanvas.Children.Insert(1, marker);
 		}
 		UpdateTimelineVisuals();
@@ -534,11 +537,11 @@ public sealed partial class VideoEditorPage : Page
 	private double MoveThumb(Thumb thumb, double horizontalChange)
 	{
 		var width = TimelineCanvas.ActualWidth;
-		if (width <= 0 || ViewModel.DurationSeconds <= 0)
+		if (width <= 24 || ViewModel.DurationSeconds <= 0)
 			return 0;
-		var left = Math.Clamp(Canvas.GetLeft(thumb) + horizontalChange, 0, Math.Max(0, width - thumb.Width));
+		var left = Math.Clamp(Canvas.GetLeft(thumb) + horizontalChange, 12 - thumb.Width / 2, width - 12 - thumb.Width / 2);
 		Canvas.SetLeft(thumb, left);
-		return Math.Clamp((left + thumb.Width / 2) / width, 0, 1) * ViewModel.DurationSeconds;
+		return Math.Clamp((left + thumb.Width / 2 - 12) / (width - 24), 0, 1) * ViewModel.DurationSeconds;
 	}
 
 	private void UpdateTimelineVisuals()
@@ -557,11 +560,12 @@ public sealed partial class VideoEditorPage : Page
 			return;
 		}
 
+		var trackWidth = Math.Max(0, width - 24);
 		foreach (var pair in _keyframeMarkers.Zip(ViewModel.KeyframeMarkers))
-			Canvas.SetLeft(pair.First, Math.Clamp(pair.Second.Seconds / duration * width, 0, width));
-		Canvas.SetLeft(TrimStartThumb, Math.Clamp(ViewModel.TrimStartSeconds / duration * width - TrimStartThumb.Width / 2, 0, width - TrimStartThumb.Width));
-		Canvas.SetLeft(TrimEndThumb, Math.Clamp(ViewModel.TrimEndSeconds / duration * width - TrimEndThumb.Width / 2, 0, width - TrimEndThumb.Width));
-		Canvas.SetLeft(PlayheadLine, Math.Clamp(ViewModel.CurrentPositionSeconds / duration * width, 0, width - PlayheadLine.Width));
+			Canvas.SetLeft(pair.First, 12 + Math.Clamp(pair.Second.Seconds / duration * trackWidth, 0, trackWidth));
+		Canvas.SetLeft(TrimStartThumb, 12 + Math.Clamp(ViewModel.TrimStartSeconds / duration * trackWidth, 0, trackWidth) - TrimStartThumb.Width / 2);
+		Canvas.SetLeft(TrimEndThumb, 12 + Math.Clamp(ViewModel.TrimEndSeconds / duration * trackWidth, 0, trackWidth) - TrimEndThumb.Width / 2);
+		Canvas.SetLeft(PlayheadLine, 12 + Math.Clamp(ViewModel.CurrentPositionSeconds / duration * trackWidth, 0, trackWidth));
 		UpdateSelectedTrack();
 	}
 

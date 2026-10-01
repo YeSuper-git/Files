@@ -133,7 +133,9 @@ namespace Files.App.Utils.Storage
 			if (App.AppModel.IncrementPropertiesWindowCount() == 1)
 				PropertiesWindowsClosingTCS = new();
 
-			// WINUI3: Move window to cursor position
+			// Center the dialog near the invoking pointer while keeping it inside the
+			// monitor work area. Placing its top-left corner at the pointer sent a
+			// large dialog to the bottom-right edge for details-pane clicks.
 			PInvoke.GetCursorPos(out var pointerPosition);
 
 			// Null when no display is available, e.g. while monitors are detached
@@ -143,9 +145,9 @@ namespace Files.App.Utils.Storage
 				var appWindowPos = new PointInt32
 				{
 					X = displayArea.WorkArea.X
-						+ Math.Max(0, Math.Min(displayArea.WorkArea.Width - appWindow.Size.Width, pointerPosition.X - displayArea.WorkArea.X)),
+						+ Math.Clamp(pointerPosition.X - displayArea.WorkArea.X - appWindow.Size.Width / 2, 0, Math.Max(0, displayArea.WorkArea.Width - appWindow.Size.Width)),
 					Y = displayArea.WorkArea.Y
-						+ Math.Max(0, Math.Min(displayArea.WorkArea.Height - appWindow.Size.Height, pointerPosition.Y - displayArea.WorkArea.Y)),
+						+ Math.Clamp(pointerPosition.Y - displayArea.WorkArea.Y - appWindow.Size.Height / 2, 0, Math.Max(0, displayArea.WorkArea.Height - appWindow.Size.Height)),
 				};
 
 				appWindow.Move(appWindowPos);
