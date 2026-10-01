@@ -14,7 +14,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Verify icon variants have no blue backplate
+      - name: Verify icons match the single rounded source
         shell: pwsh
         run: '& "$env:GITHUB_WORKSPACE\src\Files.App\Assets\AppTiles\Taskbar\Verify-TaskbarIcons.ps1"'
 
@@ -167,41 +167,35 @@ jobs:
           Copy-Item "$workspace\src\Files.App\Assets\AppTiles\Dev\Square44x44Logo.scale-100.png" $identityAssetDir -Force
           $taskbarIconSourceDir = Join-Path $workspace 'src\Files.App\Assets\AppTiles\Dev'
           $taskbarIconSizes = @('16', '20', '24', '30', '32', '36', '40', '48', '60', '64', '72', '80', '96', '256')
-          $appIconPath = Join-Path $taskbarIconSourceDir 'Logo.ico'
-          if (-not (Test-Path -LiteralPath $appIconPath -PathType Leaf)) {
-            throw "The shared application icon is missing: $appIconPath"
-          }
-
-          # Windows chooses these package-identity variants for the running
-          # app's taskbar button. Keep them pixel-identical to the ICO used by
-          # the installer and native window icon instead of copying a second,
-          # independently maintained set of PNG artwork.
-          Add-Type -AssemblyName System.Drawing
+          # Copy the checked-in PNG variants generated from FilesMaxIconSource.png.
+          # The native ICO and identity package must use the same single source.
           $taskbarIconAssets = @()
           foreach ($size in $taskbarIconSizes) {
-            $icon = $null
-            $bitmap = $null
-            try {
-              $icon = [System.Drawing.Icon]::new($appIconPath, [int]$size, [int]$size)
-              $bitmap = $icon.ToBitmap()
-              if ($bitmap.Width -ne [int]$size -or $bitmap.Height -ne [int]$size) {
-                throw "Logo.ico produced an unexpected ${size}px taskbar icon size ($($bitmap.Width)x$($bitmap.Height))."
+            foreach ($suffix in @('.png', '_altform-unplated.png', '_altform-lightunplated_theme-light.png')) {
+              $assetName = "Square44x44Logo.targetsize-$size$suffix"
+              $sourceAsset = Join-Path $taskbarIconSourceDir $assetName
+              if (-not (Test-Path -LiteralPath $sourceAsset -PathType Leaf)) {
+                throw "Taskbar icon variant is missing: $sourceAsset"
               }
-
-              foreach ($variant in @("${size}_altform-unplated.png", "${size}_altform-lightunplated_theme-light.png")) {
-                $assetName = "Square44x44Logo.targetsize-$variant"
-                $assetPath = Join-Path $identityAssetDir $assetName
-                $bitmap.Save($assetPath, [System.Drawing.Imaging.ImageFormat]::Png)
-                $taskbarIconAssets += Get-Item -LiteralPath $assetPath
+              $assetPath = Join-Path $identityAssetDir $assetName
+              Copy-Item -LiteralPath $sourceAsset -Destination $assetPath -Force
+              if ((Get-FileHash -LiteralPath $sourceAsset -Algorithm SHA256).Hash -ne
+                  (Get-FileHash -LiteralPath $assetPath -Algorithm SHA256).Hash) {
+                throw "Copied taskbar icon differs from the shared artwork: $assetName"
               }
-            }
-            finally {
-              if ($bitmap) { $bitmap.Dispose() }
-              if ($icon) { $icon.Dispose() }
+              $taskbarIconAssets += Get-Item -LiteralPath $assetPath
             }
           }
-          if ($taskbarIconAssets.Count -ne ($taskbarIconSizes.Count * 2)) {
-            throw "Expected $($taskbarIconSizes.Count * 2) taskbar icon variants, generated $($taskbarIconAssets.Count)."
+          foreach ($scale in @('100', '125', '150', '200', '400')) {
+            $assetName = "Square44x44Logo.scale-$scale.png"
+            $sourceAsset = Join-Path $taskbarIconSourceDir $assetName
+            $assetPath = Join-Path $identityAssetDir $assetName
+            Copy-Item -LiteralPath $sourceAsset -Destination $assetPath -Force
+            $taskbarIconAssets += Get-Item -LiteralPath $assetPath
+          }
+          $expectedTaskbarIconCount = ($taskbarIconSizes.Count * 3) + 5
+          if ($taskbarIconAssets.Count -ne $expectedTaskbarIconCount) {
+            throw "Expected $expectedTaskbarIconCount taskbar icon variants, copied $($taskbarIconAssets.Count)."
           }
           $archiveAssetDir = Join-Path $identityDir 'Assets\archives'
           New-Item -ItemType Directory -Path $archiveAssetDir -Force | Out-Null
