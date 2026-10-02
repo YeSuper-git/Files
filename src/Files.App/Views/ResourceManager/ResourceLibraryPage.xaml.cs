@@ -816,9 +816,11 @@ public sealed partial class ResourceLibraryPage : Page
         var content = new Grid { RowSpacing = 12 };
         content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         content.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        var header = new Grid(); header.Children.Add(count); header.Children.Add(close);
+        content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var header = new Grid(); header.Children.Add(close);
         var picture = new Grid(); picture.Children.Add(image); picture.Children.Add(previous); picture.Children.Add(next);
         Grid.SetRow(picture, 1); content.Children.Add(header); content.Children.Add(picture);
+        Grid.SetRow(count, 2); content.Children.Add(count);
         var dialog = ResourceDialogPresentation.Create(XamlRoot, content);
         close.Click += (_, _) => dialog.Hide();
         dialog.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler(async (_, args) =>

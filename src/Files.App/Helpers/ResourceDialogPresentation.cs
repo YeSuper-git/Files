@@ -12,12 +12,14 @@ internal static class ResourceDialogPresentation
 	{
 		var width = Math.Max(320, Math.Min(1200, root.Size.Width - 80));
 		var height = Math.Max(240, Math.Min(800, root.Size.Height - 100));
-		content.Width = double.NaN;
-		content.MaxWidth = width - 48;
+		content.Width = width - 64;
+		content.MaxWidth = width - 64;
 		content.HorizontalAlignment = HorizontalAlignment.Stretch;
 		content.Height = height - 96;
-		var dialog = new ContentDialog { XamlRoot = root, Content = content, FullSizeDesired = true, MinWidth = width, MaxWidth = width, MinHeight = height, MaxHeight = height };
+		var dialog = new ContentDialog { XamlRoot = root, Content = content, FullSizeDesired = false };
+		dialog.Resources["ContentDialogMinWidth"] = width;
 		dialog.Resources["ContentDialogMaxWidth"] = width;
+		dialog.Resources["ContentDialogMinHeight"] = height;
 		dialog.Resources["ContentDialogMaxHeight"] = height;
 		return dialog;
 	}
