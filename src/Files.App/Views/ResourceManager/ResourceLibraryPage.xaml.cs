@@ -780,15 +780,15 @@ public sealed partial class ResourceLibraryPage : Page
         var paths = images.Select(item => _illustrationPaths.GetValueOrDefault(item)).ToArray();
         var index = Array.IndexOf(images, selected);
         if (index < 0) return;
-        var previewWidth = Math.Max(320, Math.Min(1200, XamlRoot.Size.Width - 80));
-        var previewHeight = Math.Max(240, Math.Min(800, XamlRoot.Size.Height - 100));
         var image = new Image { Stretch = Stretch.Uniform };
         var count = new TextBlock { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
-        var previous = new Button { Content = new SymbolIcon(Symbol.Back), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Left };
-        var next = new Button { Content = new SymbolIcon(Symbol.Forward), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
+        var previous = ResourceDialogPresentation.CreateIconButton("\uE76B", Strings.ResourcePreviousIllustration.GetLocalizedResource());
+        var next = ResourceDialogPresentation.CreateIconButton("\uE76C", Strings.ResourceNextIllustration.GetLocalizedResource());
+        previous.VerticalAlignment = next.VerticalAlignment = VerticalAlignment.Center;
+        previous.HorizontalAlignment = HorizontalAlignment.Left;
+        next.HorizontalAlignment = HorizontalAlignment.Right;
+        previous.Margin = next.Margin = new Thickness(12);
         previous.IsEnabled = next.IsEnabled = images.Length > 1;
-        ToolTipService.SetToolTip(previous, Strings.ResourcePreviousIllustration.GetLocalizedResource());
-        ToolTipService.SetToolTip(next, Strings.ResourceNextIllustration.GetLocalizedResource());
         var requestVersion = 0;
         async Task ShowAsync(int step)
         {
@@ -810,17 +810,16 @@ public sealed partial class ResourceLibraryPage : Page
         }
         previous.Click += async (_, _) => await ShowAsync(-1);
         next.Click += async (_, _) => await ShowAsync(1);
-        var close = new Button { Content = new SymbolIcon(Symbol.Cancel), HorizontalAlignment = HorizontalAlignment.Right };
-        ToolTipService.SetToolTip(close, Strings.Close.GetLocalizedResource());
-        var content = new Grid { Width = previewWidth - 48, Height = previewHeight - 48, RowSpacing = 12 };
+        var close = ResourceDialogPresentation.CreateIconButton("\uE8BB", Strings.Close.GetLocalizedResource());
+        close.HorizontalAlignment = HorizontalAlignment.Right;
+        close.Margin = new Thickness(0, 0, 8, 0);
+        var content = new Grid { RowSpacing = 12 };
         content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         content.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         var header = new Grid(); header.Children.Add(count); header.Children.Add(close);
         var picture = new Grid(); picture.Children.Add(image); picture.Children.Add(previous); picture.Children.Add(next);
         Grid.SetRow(picture, 1); content.Children.Add(header); content.Children.Add(picture);
-        var dialog = new ContentDialog { XamlRoot = XamlRoot, Content = content, FullSizeDesired = true };
-        dialog.Resources["ContentDialogMaxWidth"] = previewWidth;
-        dialog.Resources["ContentDialogMaxHeight"] = previewHeight;
+        var dialog = ResourceDialogPresentation.Create(XamlRoot, content);
         close.Click += (_, _) => dialog.Hide();
         dialog.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler(async (_, args) =>
         {
@@ -1278,7 +1277,7 @@ public sealed partial class ResourceLibraryPage : Page
         _contentPageContext.ShellPage?.NavigateToResourceManager();
     }
 
-    public void ShowFormatOptimization(FrameworkElement anchor)
+    public async void ShowFormatOptimization(FrameworkElement anchor)
     {
         if (_locations.Count == 0 || LoadingRing.IsActive)
         {
@@ -1292,37 +1291,13 @@ public sealed partial class ResourceLibraryPage : Page
             currentLocation.Path,
             currentLocation.Kind,
             BrowserItems.Select(item => item.Model).ToArray());
-        var allowFlyoutClose = false;
-        var flyout = new Flyout
-        {
-            Content = toolsDialog,
-            Placement = FlyoutPlacementMode.Full,
-        };
-        var presenterStyle = new Style(typeof(FlyoutPresenter));
-        presenterStyle.Setters.Add(new Setter(FrameworkElement.MaxWidthProperty, double.PositiveInfinity));
-        presenterStyle.Setters.Add(new Setter(FrameworkElement.MaxHeightProperty, double.PositiveInfinity));
-        presenterStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
-        presenterStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0)));
-        flyout.FlyoutPresenterStyle = presenterStyle;
-        toolsDialog.ConfigureSize(XamlRoot.Size);
-        toolsDialog.RequestClose += (_, _) =>
-        {
-            allowFlyoutClose = true;
-            flyout.Hide();
-        };
-        flyout.Closing += (_, args) =>
-        {
-            if (toolsDialog.HasChanges && !allowFlyoutClose)
-                args.Cancel = true;
-        };
-        flyout.Closed += async (_, _) =>
-        {
-            if (toolsDialog.HasChanges && _locations.Count > 0)
-                await LoadLocationAsync(_locations[^1]);
-        };
-
-        flyout.ShowAt(this);
+        var dialog = ResourceDialogPresentation.Create(XamlRoot, toolsDialog);
+        toolsDialog.RequestClose += (_, _) => dialog.Hide();
+        dialog.Closing += (_, args) => args.Cancel = toolsDialog.IsBusy;
         toolsDialog.StartFormatOptimizationPreview();
+        await dialog.ShowAsync();
+        if (toolsDialog.HasChanges && _locations.Count > 0)
+            await LoadLocationAsync(_locations[^1]);
     }
 
     [DynamicWindowsRuntimeCast(typeof(FrameworkElement))]

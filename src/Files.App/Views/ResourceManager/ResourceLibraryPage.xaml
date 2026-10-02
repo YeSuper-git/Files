@@ -166,7 +166,7 @@
                             </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
-                    <TextBlock x:Name="EmptyText" HorizontalAlignment="Center" VerticalAlignment="Center" Text="当前层级没有可展示的资源" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed" />
+                    <TextBlock x:Name="EmptyText" HorizontalAlignment="Center" VerticalAlignment="Center" Text="暂无" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed" />
                     </Grid>
                 </Grid>
             </Grid>

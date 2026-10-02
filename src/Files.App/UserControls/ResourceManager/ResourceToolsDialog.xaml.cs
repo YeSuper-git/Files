@@ -4,6 +4,7 @@
 using CommunityToolkit.Mvvm.DependencyInjection;
 using Files.App.Data.Models.ResourceManager;
 using Files.App.Services.ResourceManager;
+using Files.App.Helpers;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System.Collections.ObjectModel;
@@ -34,6 +35,8 @@ public sealed partial class ResourceToolsDialog : UserControl
     private bool _isBusy;
 
     public ObservableCollection<string> PreviewItems { get; } = [];
+    private readonly Dictionary<CheckBox, OptimizationChoice> _choices = [];
+    public bool IsBusy => _isBusy;
     public bool HasChanges { get; private set; }
     public event EventHandler? RequestClose;
 
@@ -48,13 +51,13 @@ public sealed partial class ResourceToolsDialog : UserControl
         _scopePath = Path.GetFullPath(scopePath);
         _scopeKind = scopeKind;
         _scopeItems = scopeItems;
-    }
-
-    public void ConfigureSize(Windows.Foundation.Size windowSize)
-    {
-        DialogSurface.Width = Math.Max(320, Math.Min(1200, windowSize.Width - 80));
-        DialogSurface.Height = Math.Max(240, Math.Min(800, windowSize.Height - 100));
-        DialogSurface.MaxHeight = DialogSurface.Height;
+        SelectAllButton.Content = Strings.ResourceOptimizationSelectAll.GetLocalizedResource();
+        SelectNoneButton.Content = Strings.ResourceOptimizationSelectNone.GetLocalizedResource();
+        ExecuteButton.Content = Strings.ResourceOptimizationConfirm.GetLocalizedResource();
+        var close = ResourceDialogPresentation.CreateIconButton("\uE8BB", Strings.Close.GetLocalizedResource());
+        CloseButton.Content = new FontIcon { Glyph = "\uE8BB", FontSize = 16 };
+        CloseButton.Background = close.Background;
+        CloseButton.Foreground = close.Foreground;
     }
 
     public void StartFormatOptimizationPreview()
@@ -130,29 +133,10 @@ public sealed partial class ResourceToolsDialog : UserControl
             _pendingTagRemovals = tagRemovals;
             _pendingTagId = tagId;
 
-            var renameCount = renameOperations.Count(operation => operation.Status == "ready");
-            foreach (var actor in actorNames.OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase))
-            {
-                var actorOperations = _pendingOperations.Where(op => op.Status == "ready" &&
-                    GetActorName(Path.GetDirectoryName(op.Source) ?? _libraryPath) == actor).ToList();
-                var additions = tagPaths.Where(path => GetActorName(path) == actor).ToList();
-                var removals = tagRemovals.Where(change => GetActorName(change.RollbackPath) == actor).ToList();
-                if (actorOperations.Count + additions.Count + removals.Count == 0) continue;
-                var changes = new List<string>();
-                changes.AddRange(actorOperations.Select(op => $"{Path.GetFileName(op.Source)} → {Path.GetRelativePath(_libraryPath, op.Target)}"));
-                changes.AddRange(additions.Select(path => string.Format(Strings.ResourceFormatAddSubtitleTag.GetLocalizedResource(), Path.GetFileName(path))));
-                changes.AddRange(removals.Select(change => string.Format(Strings.ResourceFormatRemoveSubtitleTag.GetLocalizedResource(), Path.GetFileName(change.RollbackPath))));
-                PreviewItems.Add($"{actor}\n{string.Join("\n", changes)}");
-            }
-            var counts = new List<string>();
-            if (renameCount > 0) counts.Add(string.Format(Strings.ResourceFormatRenameCount.GetLocalizedResource(), renameCount));
-            if (moves.Count > 0) counts.Add(string.Format(Strings.ResourceFormatMoveCount.GetLocalizedResource(), moves.Count));
-            if (tagPaths.Count > 0) counts.Add(string.Format(Strings.ResourceFormatAddTagCount.GetLocalizedResource(), tagPaths.Count));
-            if (tagRemovals.Count > 0) counts.Add(string.Format(Strings.ResourceFormatRemoveTagCount.GetLocalizedResource(), tagRemovals.Count));
-            StatusText.Text = counts.Count == 0 ? Strings.ResourceFormatNoChanges.GetLocalizedResource() : string.Join(" · ", counts);
-            PreviewList.Visibility = PreviewItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-            ExecuteButton.IsEnabled = renameCount > 0 || moves.Count > 0 || tagPaths.Count > 0 || tagRemovals.Count > 0;
-            ExecuteButton.Content = "确认并执行";
+            BuildChoiceGroups();
+            StatusText.Text = _choices.Count == 0 ? Strings.ResourceFormatNoChanges.GetLocalizedResource() : string.Empty;
+            PreviewList.Visibility = Visibility.Collapsed;
+            UpdateSelectionState();
         }
         catch (Exception ex)
         {
@@ -161,15 +145,26 @@ public sealed partial class ResourceToolsDialog : UserControl
         finally
         {
             _isBusy = false;
+            UpdateSelectionState();
         }
     }
 
     private async void Execute_Click(object sender, RoutedEventArgs e)
     {
-        if (_isBusy || (_pendingOperations.Count == 0 && _pendingTagPaths.Count == 0 && _pendingTagRemovals.Count == 0))
-            return;
-
+        if (_isBusy) return;
+        var selected = _choices.Where(pair => pair.Key.IsChecked == true).Select(pair => pair.Value).ToList();
+        if (selected.Count == 0) return;
+        _pendingOperations = selected.Where(choice => choice.Operation is not null).Select(choice => choice.Operation!).ToList();
+        _pendingTagPaths = selected.Where(choice => choice.AddTagPath is not null).Select(choice => choice.AddTagPath!).ToList();
+        _pendingTagRemovals = selected.Where(choice => choice.RemoveTag is not null).Select(choice =>
+        {
+            var mutation = choice.RemoveTag!;
+            var move = _pendingOperations.FirstOrDefault(op => op.Operation.StartsWith("classify") &&
+                string.Equals(op.Source, mutation.RollbackPath, StringComparison.OrdinalIgnoreCase));
+            return new TagRemovalMutation(move?.Target ?? mutation.RollbackPath, mutation.RollbackPath);
+        }).ToList();
         _isBusy = true;
+        SetChoiceEditingEnabled(false);
         ExecuteButton.IsEnabled = false;
         ResourceToolSnapshot? snapshot = null;
         string? executedCreatedTagUid = null;
@@ -242,6 +237,7 @@ public sealed partial class ResourceToolsDialog : UserControl
             if (_pendingTagRemovals.Count > 0 && !string.IsNullOrWhiteSpace(_pendingTagId))
             {
                 var tagRemovalsToApply = _pendingTagRemovals
+                    .Select(mutation => Directory.Exists(mutation.ExecutePath) ? mutation : mutation with { ExecutePath = mutation.RollbackPath })
                     .Where(mutation => _workspace.GetResourceTagIds(mutation.ExecutePath).Contains(_pendingTagId, StringComparer.OrdinalIgnoreCase))
                     .ToList();
                 if (tagRemovalsToApply.Count > 0)
@@ -256,6 +252,8 @@ public sealed partial class ResourceToolsDialog : UserControl
             if (hasChanges)
             {
                 HasChanges = true;
+                ChoiceGroups.Visibility = Visibility.Collapsed;
+                SelectionButtons.Visibility = Visibility.Collapsed;
                 PreviewItems.Clear();
                 foreach (var line in BuildExecutedSummaries(taggedCount, removedTagCount))
                     PreviewItems.Add(line);
@@ -294,8 +292,69 @@ public sealed partial class ResourceToolsDialog : UserControl
         finally
         {
             _isBusy = false;
+            SetChoiceEditingEnabled(!HasChanges);
+            UpdateSelectionState();
         }
     }
+
+    private void BuildChoiceGroups()
+    {
+        _choices.Clear();
+        ChoiceGroups.Children.Clear();
+        ChoiceGroups.Visibility = SelectionButtons.Visibility = Visibility.Visible;
+        var choices = _pendingOperations.Where(op => op.Status == "ready")
+            .Select(op => new OptimizationChoice(GetActorName(Path.GetDirectoryName(op.Source) ?? _libraryPath),
+                op.Operation.StartsWith("classify") ? Strings.ResourceOptimizationMoveSummary : Strings.ResourceOptimizationRenameSummary,
+                $"{Path.GetFileName(op.Source)} → {Path.GetRelativePath(_libraryPath, op.Target)}", Operation: op))
+            .Concat(_pendingTagPaths.Select(path => new OptimizationChoice(GetActorName(path), Strings.ResourceOptimizationAddTagSummary,
+                Path.GetFileName(path), AddTagPath: path)))
+            .Concat(_pendingTagRemovals.Select(change => new OptimizationChoice(GetActorName(change.RollbackPath), Strings.ResourceOptimizationRemoveTagSummary,
+                Path.GetFileName(change.RollbackPath), RemoveTag: change)));
+        foreach (var group in choices.GroupBy(choice => (choice.Actor, choice.Kind)).OrderBy(group => group.Key.Actor, StringComparer.CurrentCultureIgnoreCase))
+        {
+            var rows = new StackPanel { Spacing = 4 };
+            foreach (var choice in group)
+            {
+                var label = new TextBlock { Text = choice.Label, TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap };
+                var check = new CheckBox { Content = label, IsChecked = true, HorizontalAlignment = HorizontalAlignment.Stretch,
+                    HorizontalContentAlignment = HorizontalAlignment.Stretch };
+                ToolTipService.SetToolTip(check, choice.Label);
+                _choices.Add(check, choice);
+                check.Checked += (_, _) => UpdateSelectionState();
+                check.Unchecked += (_, _) => UpdateSelectionState();
+                rows.Children.Add(check);
+            }
+            var header = new StackPanel { Spacing = 4 };
+            header.Children.Add(new TextBlock { Text = string.Format(group.Key.Kind.GetLocalizedResource(), group.Key.Actor, group.Count()), TextWrapping = TextWrapping.Wrap });
+            header.Children.Add(new TextBlock { Text = Strings.ResourceOptimizationViewDetails.GetLocalizedResource(), FontSize = 12 });
+            ChoiceGroups.Children.Add(new Expander { Header = header, Content = rows, HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch, IsExpanded = false });
+        }
+    }
+
+    private void UpdateSelectionState()
+    {
+        ExecuteButton.IsEnabled = !_isBusy && !HasChanges && _choices.Keys.Any(check => check.IsChecked == true);
+    }
+
+    private void SetChoiceEditingEnabled(bool enabled)
+    {
+        SelectAllButton.IsEnabled = SelectNoneButton.IsEnabled = enabled;
+        foreach (var check in _choices.Keys) check.IsEnabled = enabled;
+    }
+
+    private void SelectAll_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_isBusy) foreach (var check in _choices.Keys) check.IsChecked = true;
+    }
+
+    private void SelectNone_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_isBusy) foreach (var check in _choices.Keys) check.IsChecked = false;
+    }
+
+    private sealed record OptimizationChoice(string Actor, string Kind, string Label,
+        ResourceFileOperation? Operation = null, string? AddTagPath = null, TagRemovalMutation? RemoveTag = null);
 
     private static ResourceFileOperation CloneOperation(ResourceFileOperation operation) => new()
     {
@@ -443,23 +502,6 @@ public sealed partial class ResourceToolsDialog : UserControl
         }
 
         throw new IOException($"无法为“{folderName}”分配不冲突的目标文件夹名。");
-    }
-
-    private async Task<bool> ShowConfirmationAsync(string title, string message, string confirmText)
-    {
-        if (XamlRoot is null)
-            return false;
-
-        var dialog = new ContentDialog
-        {
-            Title = title,
-            Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, MaxWidth = 460 },
-            PrimaryButtonText = confirmText,
-            CloseButtonText = "取消",
-            DefaultButton = ContentDialogButton.Close,
-            XamlRoot = XamlRoot,
-        };
-        return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
 
     private void Close_Click(object sender, RoutedEventArgs e)

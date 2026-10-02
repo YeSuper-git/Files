@@ -1,0 +1,39 @@
+// Copyright (c) Files Community. Licensed under the MIT License.
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using Windows.UI;
+
+namespace Files.App.Helpers;
+
+internal static class ResourceDialogPresentation
+{
+	public static ContentDialog Create(XamlRoot root, FrameworkElement content)
+	{
+		var width = Math.Max(320, Math.Min(1200, root.Size.Width - 80));
+		var height = Math.Max(240, Math.Min(800, root.Size.Height - 100));
+		content.Width = double.NaN;
+		content.MaxWidth = width - 48;
+		content.HorizontalAlignment = HorizontalAlignment.Stretch;
+		content.Height = height - 96;
+		var dialog = new ContentDialog { XamlRoot = root, Content = content, FullSizeDesired = true, MinWidth = width, MaxWidth = width, MinHeight = height, MaxHeight = height };
+		dialog.Resources["ContentDialogMaxWidth"] = width;
+		dialog.Resources["ContentDialogMaxHeight"] = height;
+		return dialog;
+	}
+
+	public static Button CreateIconButton(string glyph, string tooltip)
+	{
+		var button = new Button
+		{
+			Content = new FontIcon { Glyph = glyph, FontSize = 16 },
+			Width = 36, Height = 36, MinWidth = 0, MinHeight = 0, Padding = new Thickness(0),
+			CornerRadius = new CornerRadius(18), BorderThickness = new Thickness(0),
+			Background = new SolidColorBrush(Color.FromArgb(150, 32, 32, 32)),
+			Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 255, 255)),
+		};
+		ToolTipService.SetToolTip(button, tooltip);
+		Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, tooltip);
+		return button;
+	}
+}

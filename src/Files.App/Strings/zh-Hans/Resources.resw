@@ -5013,4 +5013,12 @@
   <data name="ResourceFormatMoveCount" xml:space="preserve"><value>移动 {0} 个文件夹</value></data>
   <data name="ResourceFormatAddTagCount" xml:space="preserve"><value>添加标签 {0} 部</value></data>
   <data name="ResourceFormatRemoveTagCount" xml:space="preserve"><value>移除标签 {0} 部</value></data>
+  <data name="ResourceOptimizationConfirm" xml:space="preserve"><value>确定优化</value></data>
+  <data name="ResourceOptimizationSelectAll" xml:space="preserve"><value>全选</value></data>
+  <data name="ResourceOptimizationSelectNone" xml:space="preserve"><value>取消全选</value></data>
+  <data name="ResourceOptimizationViewDetails" xml:space="preserve"><value>点击查看详情</value></data>
+  <data name="ResourceOptimizationAddTagSummary" xml:space="preserve"><value>{0} 共有 {1} 部作品缺少中文字幕标记</value></data>
+  <data name="ResourceOptimizationRemoveTagSummary" xml:space="preserve"><value>{0} 共有 {1} 部作品的中文字幕标记不匹配</value></data>
+  <data name="ResourceOptimizationMoveSummary" xml:space="preserve"><value>{0} 共有 {1} 部作品需要归入无中文字幕分类</value></data>
+  <data name="ResourceOptimizationRenameSummary" xml:space="preserve"><value>{0} 共有 {1} 个视频文件需要规范名称</value></data>
 </root>

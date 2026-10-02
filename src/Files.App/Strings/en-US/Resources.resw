@@ -5019,4 +5019,12 @@
   <data name="ResourceFormatMoveCount" xml:space="preserve"><value>Move {0} folders</value></data>
   <data name="ResourceFormatAddTagCount" xml:space="preserve"><value>Add tags to {0} works</value></data>
   <data name="ResourceFormatRemoveTagCount" xml:space="preserve"><value>Remove tags from {0} works</value></data>
+  <data name="ResourceOptimizationConfirm" xml:space="preserve"><value>Optimize selected</value></data>
+  <data name="ResourceOptimizationSelectAll" xml:space="preserve"><value>Select all</value></data>
+  <data name="ResourceOptimizationSelectNone" xml:space="preserve"><value>Deselect all</value></data>
+  <data name="ResourceOptimizationViewDetails" xml:space="preserve"><value>Click to view details</value></data>
+  <data name="ResourceOptimizationAddTagSummary" xml:space="preserve"><value>{0}: {1} works are missing the Chinese subtitle tag</value></data>
+  <data name="ResourceOptimizationRemoveTagSummary" xml:space="preserve"><value>{0}: {1} works have an incorrect Chinese subtitle tag</value></data>
+  <data name="ResourceOptimizationMoveSummary" xml:space="preserve"><value>{0}: {1} works need to move to the no-subtitle category</value></data>
+  <data name="ResourceOptimizationRenameSummary" xml:space="preserve"><value>{0}: {1} video files need normalized names</value></data>
 </root>
