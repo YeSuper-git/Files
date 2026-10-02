@@ -52,8 +52,9 @@ public sealed partial class ResourceToolsDialog : UserControl
 
     public void ConfigureSize(Windows.Foundation.Size windowSize)
     {
-        DialogSurface.Width = Math.Max(320, Math.Min(980, windowSize.Width - 64));
-        DialogSurface.MaxHeight = Math.Max(240, windowSize.Height - 80);
+        DialogSurface.Width = Math.Max(320, Math.Min(1200, windowSize.Width - 80));
+        DialogSurface.Height = Math.Max(240, Math.Min(800, windowSize.Height - 100));
+        DialogSurface.MaxHeight = DialogSurface.Height;
     }
 
     public void StartFormatOptimizationPreview()

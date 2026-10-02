@@ -780,10 +780,13 @@ public sealed partial class ResourceLibraryPage : Page
         var paths = images.Select(item => _illustrationPaths.GetValueOrDefault(item)).ToArray();
         var index = Array.IndexOf(images, selected);
         if (index < 0) return;
-        var image = new Image { Stretch = Stretch.Uniform, Height = Math.Max(180, Math.Min(720, XamlRoot.Size.Height - 220)) };
-        var count = new TextBlock { VerticalAlignment = VerticalAlignment.Center };
-        var previous = new Button { Content = new SymbolIcon(Symbol.Back) };
-        var next = new Button { Content = new SymbolIcon(Symbol.Forward) };
+        var previewWidth = Math.Max(320, Math.Min(1200, XamlRoot.Size.Width - 80));
+        var previewHeight = Math.Max(240, Math.Min(800, XamlRoot.Size.Height - 100));
+        var image = new Image { Stretch = Stretch.Uniform };
+        var count = new TextBlock { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+        var previous = new Button { Content = new SymbolIcon(Symbol.Back), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Left };
+        var next = new Button { Content = new SymbolIcon(Symbol.Forward), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
+        previous.IsEnabled = next.IsEnabled = images.Length > 1;
         ToolTipService.SetToolTip(previous, Strings.ResourcePreviousIllustration.GetLocalizedResource());
         ToolTipService.SetToolTip(next, Strings.ResourceNextIllustration.GetLocalizedResource());
         var requestVersion = 0;
@@ -807,14 +810,23 @@ public sealed partial class ResourceLibraryPage : Page
         }
         previous.Click += async (_, _) => await ShowAsync(-1);
         next.Click += async (_, _) => await ShowAsync(1);
-        var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 16, HorizontalAlignment = HorizontalAlignment.Center };
-        controls.Children.Add(previous); controls.Children.Add(count); controls.Children.Add(next);
-        var content = new StackPanel { Spacing = 12 }; content.Children.Add(image); content.Children.Add(controls);
-        var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = Strings.ResourceIllustrationPreview.GetLocalizedResource(),
-            Content = content, CloseButtonText = Strings.Close.GetLocalizedResource(), FullSizeDesired = true };
-        dialog.Resources["ContentDialogMaxWidth"] = Math.Max(320, Math.Min(1200, XamlRoot.Size.Width - 80));
-        dialog.KeyDown += async (_, args) => { if (args.Key == Windows.System.VirtualKey.Left) { args.Handled = true; await ShowAsync(-1); }
-            else if (args.Key == Windows.System.VirtualKey.Right) { args.Handled = true; await ShowAsync(1); } };
+        var close = new Button { Content = new SymbolIcon(Symbol.Cancel), HorizontalAlignment = HorizontalAlignment.Right };
+        ToolTipService.SetToolTip(close, Strings.Close.GetLocalizedResource());
+        var content = new Grid { Width = previewWidth - 48, Height = previewHeight - 48, RowSpacing = 12 };
+        content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        content.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        var header = new Grid(); header.Children.Add(count); header.Children.Add(close);
+        var picture = new Grid(); picture.Children.Add(image); picture.Children.Add(previous); picture.Children.Add(next);
+        Grid.SetRow(picture, 1); content.Children.Add(header); content.Children.Add(picture);
+        var dialog = new ContentDialog { XamlRoot = XamlRoot, Content = content, FullSizeDesired = true };
+        dialog.Resources["ContentDialogMaxWidth"] = previewWidth;
+        dialog.Resources["ContentDialogMaxHeight"] = previewHeight;
+        close.Click += (_, _) => dialog.Hide();
+        dialog.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler(async (_, args) =>
+        {
+            if (args.Key == Windows.System.VirtualKey.Left) { args.Handled = true; await ShowAsync(-1); }
+            else if (args.Key == Windows.System.VirtualKey.Right) { args.Handled = true; await ShowAsync(1); }
+        }), true);
         await ShowAsync(0);
         await dialog.ShowAsync();
     }
@@ -1286,6 +1298,12 @@ public sealed partial class ResourceLibraryPage : Page
             Content = toolsDialog,
             Placement = FlyoutPlacementMode.Full,
         };
+        var presenterStyle = new Style(typeof(FlyoutPresenter));
+        presenterStyle.Setters.Add(new Setter(FrameworkElement.MaxWidthProperty, double.PositiveInfinity));
+        presenterStyle.Setters.Add(new Setter(FrameworkElement.MaxHeightProperty, double.PositiveInfinity));
+        presenterStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
+        presenterStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0)));
+        flyout.FlyoutPresenterStyle = presenterStyle;
         toolsDialog.ConfigureSize(XamlRoot.Size);
         toolsDialog.RequestClose += (_, _) =>
         {
@@ -1303,7 +1321,7 @@ public sealed partial class ResourceLibraryPage : Page
                 await LoadLocationAsync(_locations[^1]);
         };
 
-        flyout.ShowAt(anchor);
+        flyout.ShowAt(this);
         toolsDialog.StartFormatOptimizationPreview();
     }
 
@@ -1482,7 +1500,7 @@ public sealed partial class ResourceLibraryPage : Page
                 .ToList();
             var hasVideos = directVideos.Count > 0;
 
-            if (hasVideos)
+            if (hasVideos || category.Name == "无中文字幕")
             {
                 var relativeName = string.Join(" / ", Path.GetRelativePath(actorLocation.Path, category.Path)
                     .Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries));
@@ -1492,7 +1510,7 @@ public sealed partial class ResourceLibraryPage : Page
             foreach (var childCategory in children.Where(child => child.Kind == ResourceBrowserItemKind.CategoryFolder))
                 hasVideos |= await CollectCategoryGroupsAsync(childCategory, depth + 1);
 
-            if (hasVideos)
+            if (hasVideos || category.Name == "无中文字幕")
                 categoriesWithVideos.Add(category.Path);
 
             return hasVideos;
