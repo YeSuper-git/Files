@@ -28,6 +28,16 @@
 				</Grid>
 			</wctcontrols:SettingsExpander.ItemsHeader>
 		</wctcontrols:SettingsExpander>
-		<TextBlock x:Name="FolderStatusText" Margin="48,4,0,0" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+		<wctcontrols:SettingsExpander Header="{video:VideoEditorText Name=VideoEditorShortcutSettings}" Description="{video:VideoEditorText Name=VideoEditorShortcutHint}" IsExpanded="True">
+            <wctcontrols:SettingsExpander.HeaderIcon><FontIcon Glyph="&#xE765;" /></wctcontrols:SettingsExpander.HeaderIcon>
+            <Button Content="{video:VideoEditorText Name=VideoEditorShortcutDefaults}" Click="RestoreShortcuts_Click" />
+            <wctcontrols:SettingsExpander.ItemsHeader>
+                <StackPanel Padding="20,12" Spacing="8">
+                    <StackPanel x:Name="ShortcutRows" Spacing="8" />
+                    <TextBlock x:Name="ShortcutStatus" TextWrapping="Wrap" />
+                </StackPanel>
+            </wctcontrols:SettingsExpander.ItemsHeader>
+        </wctcontrols:SettingsExpander>
+        <TextBlock x:Name="FolderStatusText" Margin="48,4,0,0" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
 	</StackPanel>
 </Page>

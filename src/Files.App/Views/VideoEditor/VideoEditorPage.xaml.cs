@@ -52,10 +52,40 @@ public sealed partial class VideoEditorPage : Page
 		ViewModel = Ioc.Default.GetRequiredService<VideoEditorViewModel>();
 		InitializeComponent();
 		DataContext = ViewModel;
+        AddHandler(UIElement.KeyDownEvent, new KeyEventHandler(VideoShortcut_KeyDown), true);
 		_playbackTimer.Tick += PlaybackTimer_Tick;
 		SelectQueueTab("Pending");
 		UpdateEmptyStates();
 	}
+
+    private void VideoShortcut_KeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Handled || XamlRoot is null) return;
+        var focused = FocusManager.GetFocusedElement(XamlRoot) as DependencyObject;
+        while (focused is not null && focused != this)
+        {
+            if (focused is TextBox or PasswordBox or RichEditBox or AutoSuggestBox or ComboBox or ContentDialog or FlyoutPresenter or MenuFlyoutPresenter) return;
+            focused = VisualTreeHelper.GetParent(focused);
+        }
+        var settings = Ioc.Default.GetRequiredService<IAppSettingsService>();
+        var modifiers = VideoEditorShortcuts.CurrentModifiers();
+        var binding = VideoEditorShortcuts.Load(settings.VideoEditorShortcuts).FirstOrDefault(item => (int)item.Key != 0 && item.Key == e.Key && item.Modifiers == modifiers);
+        if (binding is null || (!ViewModel.HasVideo && binding.Action != "Open")) return;
+        e.Handled = true;
+        switch (binding.Action)
+        {
+            case "Play": PlayPause_Click(this, new RoutedEventArgs()); break;
+            case "Split": SplitVideo_Click(this, new RoutedEventArgs()); break;
+            case "Start": GoToStart_Click(this, new RoutedEventArgs()); break;
+            case "Open": OpenVideo_Click(this, new RoutedEventArgs()); break;
+            case "Reset": RestoreTrim_Click(this, new RoutedEventArgs()); break;
+            case "Export": if (ViewModel.CanSave) ExportButton.Flyout.ShowAt(ExportButton); break;
+            case "Close": CloseVideo_Click(this, new RoutedEventArgs()); break;
+            case "ZoomIn": ZoomIn_Click(this, new RoutedEventArgs()); break;
+            case "ZoomOut": ZoomOut_Click(this, new RoutedEventArgs()); break;
+            case "Fit": ZoomFit_Click(this, new RoutedEventArgs()); break;
+        }
+    }
 
 	private async void OpenVideo_Click(object sender, RoutedEventArgs e)
 	{

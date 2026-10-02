@@ -4,6 +4,7 @@
 using CommunityToolkit.Mvvm.DependencyInjection;
 using Files.App.Data.Models.ResourceManager;
 using Files.App.Services.ResourceManager;
+using Files.App.Helpers;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System.Collections.ObjectModel;
@@ -34,6 +35,8 @@ public sealed partial class ResourceToolsDialog : UserControl
     private bool _isBusy;
 
     public ObservableCollection<string> PreviewItems { get; } = [];
+    private readonly Dictionary<CheckBox, OptimizationChoice> _choices = [];
+    public bool IsBusy => _isBusy;
     public bool HasChanges { get; private set; }
     public event EventHandler? RequestClose;
 
@@ -48,6 +51,13 @@ public sealed partial class ResourceToolsDialog : UserControl
         _scopePath = Path.GetFullPath(scopePath);
         _scopeKind = scopeKind;
         _scopeItems = scopeItems;
+        SelectAllButton.Content = Strings.ResourceOptimizationSelectAll.GetLocalizedResource();
+        SelectNoneButton.Content = Strings.ResourceOptimizationSelectNone.GetLocalizedResource();
+        ExecuteButton.Content = Strings.ResourceOptimizationConfirm.GetLocalizedResource();
+        var close = ResourceDialogPresentation.CreateIconButton("\uE8BB", Strings.Close.GetLocalizedResource());
+        CloseButton.Content = new FontIcon { Glyph = "\uE8BB", FontSize = 16 };
+        CloseButton.Background = close.Background;
+        CloseButton.Foreground = close.Foreground;
     }
 
     public void StartFormatOptimizationPreview()
@@ -68,32 +78,26 @@ public sealed partial class ResourceToolsDialog : UserControl
             var moves = new List<ResourceFileOperation>();
             var tagPaths = new List<string>();
             var tagRemovals = new List<TagRemovalMutation>();
-            var summaries = new Dictionary<string, OrganizationActorSummary>(StringComparer.OrdinalIgnoreCase);
-            var videoExtensions = settings.VideoExtensions.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var actorNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var folder in folders)
             {
                 var actorName = GetActorName(folder.Path);
-                var summary = GetOrAddSummary(summaries, actorName);
-                var hasChineseSubtitle = _codeParser.HasChineseSubtitle(folder.Name, settings.SubtitleKeywords)
-                    || HasChineseSubtitleInFolder(folder.Path, settings, videoExtensions, 0);
+                actorNames.Add(actorName);
+                var hasChineseSubtitle = _codeParser.HasChineseSubtitle(folder.Name, []);
 
                 if (hasChineseSubtitle)
                 {
-                    summary.ChineseSubtitleWorks++;
                     if (tagId is null || !_workspace.GetResourceTagIds(folder.Path).Contains(tagId, StringComparer.OrdinalIgnoreCase))
                     {
                         tagPaths.Add(folder.Path);
-                        summary.ChineseSubtitleWorksToTag++;
                     }
                     continue;
                 }
 
-                summary.NoSubtitleWorks++;
                 var parent = Directory.GetParent(folder.Path);
                 if (parent is null || string.Equals(parent.Name, NoSubtitleFolderName, StringComparison.OrdinalIgnoreCase))
                 {
-                    summary.AlreadyOrganizedWorks++;
                     if (tagId is not null && _workspace.GetResourceTagIds(folder.Path).Contains(tagId, StringComparer.OrdinalIgnoreCase))
                         tagRemovals.Add(new TagRemovalMutation(folder.Path, folder.Path));
                     continue;
@@ -112,7 +116,6 @@ public sealed partial class ResourceToolsDialog : UserControl
                         ? null
                         : "目标已存在，将保留两者并为该文件夹添加序号"
                 });
-                summary.NoSubtitleWorksToMove++;
                 if (tagId is not null && _workspace.GetResourceTagIds(folder.Path).Contains(tagId, StringComparer.OrdinalIgnoreCase))
                     tagRemovals.Add(new TagRemovalMutation(targetPath, folder.Path));
             }
@@ -122,17 +125,7 @@ public sealed partial class ResourceToolsDialog : UserControl
                 folders.Select(folder => folder.Path),
                 settings);
             foreach (var operation in renameOperations)
-            {
-                var actorSummary = GetOrAddSummary(
-                    summaries,
-                    GetActorName(Path.GetDirectoryName(operation.Source) ?? _libraryPath));
-                if (operation.Status == "ready")
-                    actorSummary.VideoFilesToRename++;
-                else if (operation.Status == "conflict")
-                    actorSummary.VideoRenameConflicts++;
-                else if (operation.Status == "skip")
-                    actorSummary.VideoRenameSkipped++;
-            }
+                actorNames.Add(GetActorName(Path.GetDirectoryName(operation.Source) ?? _libraryPath));
 
             // Rename files while their video folders still have their original paths, then move no-subtitle folders.
             _pendingOperations = renameOperations.Concat(moves).ToList();
@@ -140,29 +133,10 @@ public sealed partial class ResourceToolsDialog : UserControl
             _pendingTagRemovals = tagRemovals;
             _pendingTagId = tagId;
 
-            var chineseCount = summaries.Values.Sum(summary => summary.ChineseSubtitleWorks);
-            var noSubtitleCount = summaries.Values.Sum(summary => summary.NoSubtitleWorks);
-            var alreadyOrganizedCount = summaries.Values.Sum(summary => summary.AlreadyOrganizedWorks);
-            var renameCount = renameOperations.Count(operation => operation.Status == "ready");
-            var renameConflictCount = renameOperations.Count(operation => operation.Status == "conflict");
-            var renameSkippedCount = renameOperations.Count(operation => operation.Status == "skip");
-            var lines = summaries
-                .Where(pair => pair.Value.ChineseSubtitleWorks > 0 ||
-                    pair.Value.NoSubtitleWorks > 0 ||
-                    pair.Value.VideoFilesToRename > 0 ||
-                    pair.Value.VideoRenameConflicts > 0 ||
-                    pair.Value.VideoRenameSkipped > 0)
-                .OrderBy(pair => pair.Key, StringComparer.CurrentCultureIgnoreCase)
-                .Select(pair => FormatOptimizationSummary(pair.Key, pair.Value));
-            foreach (var line in lines)
-                PreviewItems.Add(line);
-
-            StatusText.Text = folders.Count == 0
-                ? "没有找到可优化的视频文件夹。"
-                : $"格式检查完成：识别 {folders.Count} 部，有中字 {chineseCount} 部（待贴标 {tagPaths.Count}）；无中字 {noSubtitleCount} 部（待移 {moves.Count}，已归档 {alreadyOrganizedCount}）；视频文件待改名 {renameCount} 个，冲突 {renameConflictCount} 个，未识别番号 {renameSkippedCount} 个。";
-            PreviewList.Visibility = PreviewItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-            ExecuteButton.IsEnabled = renameCount > 0 || moves.Count > 0 || tagPaths.Count > 0 || tagRemovals.Count > 0;
-            ExecuteButton.Content = "确认并执行";
+            BuildChoiceGroups();
+            StatusText.Text = _choices.Count == 0 ? Strings.ResourceFormatNoChanges.GetLocalizedResource() : string.Empty;
+            PreviewList.Visibility = Visibility.Collapsed;
+            UpdateSelectionState();
         }
         catch (Exception ex)
         {
@@ -171,15 +145,26 @@ public sealed partial class ResourceToolsDialog : UserControl
         finally
         {
             _isBusy = false;
+            UpdateSelectionState();
         }
     }
 
     private async void Execute_Click(object sender, RoutedEventArgs e)
     {
-        if (_isBusy || (_pendingOperations.Count == 0 && _pendingTagPaths.Count == 0 && _pendingTagRemovals.Count == 0))
-            return;
-
+        if (_isBusy) return;
+        var selected = _choices.Where(pair => pair.Key.IsChecked == true).Select(pair => pair.Value).ToList();
+        if (selected.Count == 0) return;
+        _pendingOperations = selected.Where(choice => choice.Operation is not null).Select(choice => choice.Operation!).ToList();
+        _pendingTagPaths = selected.Where(choice => choice.AddTagPath is not null).Select(choice => choice.AddTagPath!).ToList();
+        _pendingTagRemovals = selected.Where(choice => choice.RemoveTag is not null).Select(choice =>
+        {
+            var mutation = choice.RemoveTag!;
+            var move = _pendingOperations.FirstOrDefault(op => op.Operation.StartsWith("classify") &&
+                string.Equals(op.Source, mutation.RollbackPath, StringComparison.OrdinalIgnoreCase));
+            return new TagRemovalMutation(move?.Target ?? mutation.RollbackPath, mutation.RollbackPath);
+        }).ToList();
         _isBusy = true;
+        SetChoiceEditingEnabled(false);
         ExecuteButton.IsEnabled = false;
         ResourceToolSnapshot? snapshot = null;
         string? executedCreatedTagUid = null;
@@ -252,6 +237,7 @@ public sealed partial class ResourceToolsDialog : UserControl
             if (_pendingTagRemovals.Count > 0 && !string.IsNullOrWhiteSpace(_pendingTagId))
             {
                 var tagRemovalsToApply = _pendingTagRemovals
+                    .Select(mutation => Directory.Exists(mutation.ExecutePath) ? mutation : mutation with { ExecutePath = mutation.RollbackPath })
                     .Where(mutation => _workspace.GetResourceTagIds(mutation.ExecutePath).Contains(_pendingTagId, StringComparer.OrdinalIgnoreCase))
                     .ToList();
                 if (tagRemovalsToApply.Count > 0)
@@ -266,6 +252,8 @@ public sealed partial class ResourceToolsDialog : UserControl
             if (hasChanges)
             {
                 HasChanges = true;
+                ChoiceGroups.Visibility = Visibility.Collapsed;
+                SelectionButtons.Visibility = Visibility.Collapsed;
                 PreviewItems.Clear();
                 foreach (var line in BuildExecutedSummaries(taggedCount, removedTagCount))
                     PreviewItems.Add(line);
@@ -304,8 +292,69 @@ public sealed partial class ResourceToolsDialog : UserControl
         finally
         {
             _isBusy = false;
+            SetChoiceEditingEnabled(!HasChanges);
+            UpdateSelectionState();
         }
     }
+
+    private void BuildChoiceGroups()
+    {
+        _choices.Clear();
+        ChoiceGroups.Children.Clear();
+        ChoiceGroups.Visibility = SelectionButtons.Visibility = Visibility.Visible;
+        var choices = _pendingOperations.Where(op => op.Status == "ready")
+            .Select(op => new OptimizationChoice(GetActorName(Path.GetDirectoryName(op.Source) ?? _libraryPath),
+                op.Operation.StartsWith("classify") ? Strings.ResourceOptimizationMoveSummary : Strings.ResourceOptimizationRenameSummary,
+                $"{Path.GetFileName(op.Source)} → {Path.GetRelativePath(_libraryPath, op.Target)}", Operation: op))
+            .Concat(_pendingTagPaths.Select(path => new OptimizationChoice(GetActorName(path), Strings.ResourceOptimizationAddTagSummary,
+                Path.GetFileName(path), AddTagPath: path)))
+            .Concat(_pendingTagRemovals.Select(change => new OptimizationChoice(GetActorName(change.RollbackPath), Strings.ResourceOptimizationRemoveTagSummary,
+                Path.GetFileName(change.RollbackPath), RemoveTag: change)));
+        foreach (var group in choices.GroupBy(choice => (choice.Actor, choice.Kind)).OrderBy(group => group.Key.Actor, StringComparer.CurrentCultureIgnoreCase))
+        {
+            var rows = new StackPanel { Spacing = 4 };
+            foreach (var choice in group)
+            {
+                var label = new TextBlock { Text = choice.Label, TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap };
+                var check = new CheckBox { Content = label, IsChecked = true, HorizontalAlignment = HorizontalAlignment.Stretch,
+                    HorizontalContentAlignment = HorizontalAlignment.Stretch };
+                ToolTipService.SetToolTip(check, choice.Label);
+                _choices.Add(check, choice);
+                check.Checked += (_, _) => UpdateSelectionState();
+                check.Unchecked += (_, _) => UpdateSelectionState();
+                rows.Children.Add(check);
+            }
+            var header = new StackPanel { Spacing = 4 };
+            header.Children.Add(new TextBlock { Text = string.Format(group.Key.Kind.GetLocalizedResource(), group.Key.Actor, group.Count()), TextWrapping = TextWrapping.Wrap });
+            header.Children.Add(new TextBlock { Text = Strings.ResourceOptimizationViewDetails.GetLocalizedResource(), FontSize = 12 });
+            ChoiceGroups.Children.Add(new Expander { Header = header, Content = rows, HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch, IsExpanded = false });
+        }
+    }
+
+    private void UpdateSelectionState()
+    {
+        ExecuteButton.IsEnabled = !_isBusy && !HasChanges && _choices.Keys.Any(check => check.IsChecked == true);
+    }
+
+    private void SetChoiceEditingEnabled(bool enabled)
+    {
+        SelectAllButton.IsEnabled = SelectNoneButton.IsEnabled = enabled;
+        foreach (var check in _choices.Keys) check.IsEnabled = enabled;
+    }
+
+    private void SelectAll_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_isBusy) foreach (var check in _choices.Keys) check.IsChecked = true;
+    }
+
+    private void SelectNone_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_isBusy) foreach (var check in _choices.Keys) check.IsChecked = false;
+    }
+
+    private sealed record OptimizationChoice(string Actor, string Kind, string Label,
+        ResourceFileOperation? Operation = null, string? AddTagPath = null, TagRemovalMutation? RemoveTag = null);
 
     private static ResourceFileOperation CloneOperation(ResourceFileOperation operation) => new()
     {
@@ -376,52 +425,6 @@ public sealed partial class ResourceToolsDialog : UserControl
             await VisitFolderAsync(child, settings, videoFolders);
     }
 
-    private bool HasChineseSubtitleInFolder(
-        string folderPath,
-        ResourceSettings settings,
-        IReadOnlySet<string> videoExtensions,
-        int depth)
-    {
-        if (depth > 2)
-            return false;
-
-        try
-        {
-            var directory = new DirectoryInfo(folderPath);
-            foreach (var file in directory.EnumerateFiles())
-            {
-                if (videoExtensions.Contains(file.Extension.TrimStart('.'))
-                    && _codeParser.HasChineseSubtitle(file.Name, settings.SubtitleKeywords))
-                    return true;
-            }
-
-            foreach (var child in directory.EnumerateDirectories())
-            {
-                if (child.Name.StartsWith('.') || child.Name.Equals("@eaDir", StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                try
-                {
-                    if (child.Attributes.HasFlag(FileAttributes.ReparsePoint))
-                        continue;
-                }
-                catch
-                {
-                    // Keep scanning folders whose attributes cannot be read.
-                }
-
-                if (HasChineseSubtitleInFolder(child.FullName, settings, videoExtensions, depth + 1))
-                    return true;
-            }
-        }
-        catch
-        {
-            // An inaccessible nested folder does not prevent the remaining resources from being classified.
-        }
-
-        return false;
-    }
-
     private string GetActorName(string videoFolderPath)
     {
         try
@@ -436,33 +439,6 @@ public sealed partial class ResourceToolsDialog : UserControl
         {
             return Path.GetFileName(Path.GetDirectoryName(videoFolderPath)) ?? videoFolderPath;
         }
-    }
-
-    private static OrganizationActorSummary GetOrAddSummary(
-        IDictionary<string, OrganizationActorSummary> summaries,
-        string actorName)
-    {
-        if (!summaries.TryGetValue(actorName, out var summary))
-            summaries[actorName] = summary = new OrganizationActorSummary();
-        return summary;
-    }
-
-    private static string FormatOptimizationSummary(string actorName, OrganizationActorSummary summary)
-    {
-        var parts = new List<string>();
-        if (summary.ChineseSubtitleWorks > 0)
-            parts.Add($"中字待标 {summary.ChineseSubtitleWorksToTag}/{summary.ChineseSubtitleWorks}");
-        if (summary.NoSubtitleWorksToMove > 0)
-            parts.Add($"无中字待移 {summary.NoSubtitleWorksToMove}");
-        if (summary.AlreadyOrganizedWorks > 0)
-            parts.Add($"已整理 {summary.AlreadyOrganizedWorks}");
-        if (summary.VideoFilesToRename > 0)
-            parts.Add($"视频待改名 {summary.VideoFilesToRename}");
-        if (summary.VideoRenameConflicts > 0)
-            parts.Add($"改名冲突 {summary.VideoRenameConflicts}");
-        if (summary.VideoRenameSkipped > 0)
-            parts.Add($"未识别番号 {summary.VideoRenameSkipped}");
-        return $"{actorName}：{string.Join("；", parts)}";
     }
 
     private IEnumerable<string> BuildExecutedSummaries(int taggedCount, int removedTagCount)
@@ -528,40 +504,11 @@ public sealed partial class ResourceToolsDialog : UserControl
         throw new IOException($"无法为“{folderName}”分配不冲突的目标文件夹名。");
     }
 
-    private async Task<bool> ShowConfirmationAsync(string title, string message, string confirmText)
-    {
-        if (XamlRoot is null)
-            return false;
-
-        var dialog = new ContentDialog
-        {
-            Title = title,
-            Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, MaxWidth = 460 },
-            PrimaryButtonText = confirmText,
-            CloseButtonText = "取消",
-            DefaultButton = ContentDialogButton.Close,
-            XamlRoot = XamlRoot,
-        };
-        return await dialog.ShowAsync() == ContentDialogResult.Primary;
-    }
-
     private void Close_Click(object sender, RoutedEventArgs e)
     {
         if (_isBusy)
             return;
         RequestClose?.Invoke(this, EventArgs.Empty);
-    }
-
-    private sealed class OrganizationActorSummary
-    {
-        public int ChineseSubtitleWorks { get; set; }
-        public int ChineseSubtitleWorksToTag { get; set; }
-        public int NoSubtitleWorks { get; set; }
-        public int NoSubtitleWorksToMove { get; set; }
-        public int AlreadyOrganizedWorks { get; set; }
-        public int VideoFilesToRename { get; set; }
-        public int VideoRenameConflicts { get; set; }
-        public int VideoRenameSkipped { get; set; }
     }
 
     private sealed class ExecutionActorSummary

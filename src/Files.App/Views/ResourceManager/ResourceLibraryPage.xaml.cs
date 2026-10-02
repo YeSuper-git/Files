@@ -39,6 +39,11 @@ namespace Files.App.Views.ResourceManager;
 
 public sealed partial class ResourceLibraryPage : Page
 {
+    private ResourceBrowserItemViewModel? _detailFolderItem;
+    private ResourceVideoFolderListedItem? _detailFolderListedItem;
+    private List<BitmapImage> _illustrationImages = [];
+    private readonly Dictionary<BitmapImage, string> _illustrationPaths = [];
+
     private readonly IResourceBrowserService _browser = Ioc.Default.GetRequiredService<IResourceBrowserService>();
     private readonly IResourceWorkspaceService _workspace = Ioc.Default.GetRequiredService<IResourceWorkspaceService>();
     private readonly IResourceTitleTranslationService _machineTranslation = Ioc.Default.GetRequiredService<IResourceTitleTranslationService>();
@@ -468,11 +473,13 @@ public sealed partial class ResourceLibraryPage : Page
                 BrowserItems.Add(viewModel);
             }
 
-            EmptyText.Visibility = BrowserItems.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            EmptyText.Visibility = BrowserItems.Count == 0 && location.Kind != ResourceBrowserLocationKind.VideoFolder ? Visibility.Visible : Visibility.Collapsed;
             if (location.Kind == ResourceBrowserLocationKind.VideoFolder)
             {
+                await PrepareVideoDetailFolderAsync(location, cancellationToken);
                 if (BrowserItems.Count > 0)
                     VideoFileList.SelectedItem = BrowserItems[0];
+                else { _activeVideoItem = null; ShowActiveVideoDetails(); }
                 await LoadVideoIllustrationsAsync(location.Path, cancellationToken);
             }
             SetResourceStatusMessage(string.Empty);
@@ -697,10 +704,11 @@ public sealed partial class ResourceLibraryPage : Page
     private void ShowActiveVideoDetails()
     {
         var item = _activeVideoItem;
-        VideoDetailPoster.Source = item?.Poster;
-        VideoDetailTitle.Text = _locations.Count > 0 ? _locations[^1].Title : string.Empty;
-        VideoDetailFileName.Text = item?.Name ?? Strings.ResourceVideoChooseFile.GetLocalizedResource();
-        VideoDetailPath.Text = item?.Path ?? string.Empty;
+        VideoDetailPoster.Source = item?.Poster ?? _detailFolderItem?.Poster;
+        VideoDetailTitle.Text = _detailFolderItem?.Name ?? (_locations.Count > 0 ? _locations[^1].Title : string.Empty);
+        UpdateDetailTitleAction();
+        VideoDetailFileName.Text = item?.Name ?? Strings.ResourceVideoNoFiles.GetLocalizedResource();
+        VideoDetailPath.Text = item?.Path ?? _detailFolderItem?.Path ?? string.Empty;
         if (item is null)
         {
             VideoDetailFileSize.Text = string.Empty;
@@ -728,26 +736,128 @@ public sealed partial class ResourceLibraryPage : Page
         catch (Exception ex) { SetResourceStatusMessage($"无法打开视频：{ex.Message}"); }
     }
 
+    private async Task PrepareVideoDetailFolderAsync(ResourceBrowserLocation location, CancellationToken token)
+    {
+        _detailFolderItem = null;
+        _detailFolderListedItem = null;
+        ResourceBrowserItem? model = null;
+        if (_locations.Count > 1)
+        {
+            var parent = _locations[^2];
+            var children = await _browser.GetChildrenAsync(parent.Path, parent.Kind, _workspace.Settings, token);
+            model = children.FirstOrDefault(child => string.Equals(child.Path, location.Path, StringComparison.OrdinalIgnoreCase));
+        }
+        model ??= new ResourceBrowserItem { Name = Path.GetFileName(location.Path), Path = location.Path, Kind = ResourceBrowserItemKind.VideoFolder };
+        var item = new ResourceBrowserItemViewModel(model);
+        var listed = CreateListedItem(item) as ResourceVideoFolderListedItem;
+        if (!string.IsNullOrWhiteSpace(model.PosterPath))
+            item.Poster = await LoadPosterAsync(model.PosterPath, token);
+        token.ThrowIfCancellationRequested();
+        _detailFolderItem = item;
+        _detailFolderListedItem = listed;
+        ShowActiveVideoDetails();
+    }
+
+    private void UpdateDetailTitleAction()
+    {
+        DetailTitleAction.Content = (_detailFolderListedItem?.IsTranslatedTitleShown == true ? Strings.ResourceDetailOriginal :
+            _detailFolderListedItem?.HasTranslatedTitle == true ? Strings.ResourceDetailTranslation : Strings.ResourceDetailTranslate).GetLocalizedResource();
+    }
+
+    private async void DetailTitleAction_Click(object sender, RoutedEventArgs e)
+    {
+        if (_detailFolderItem is not { } item || _detailFolderListedItem is not { } listed) return;
+        DetailTitleAction.IsEnabled = false;
+        try { await ToggleVideoFolderTitleAsync(item, listed); VideoDetailTitle.Text = item.Name; UpdateDetailTitleAction(); }
+        finally { DetailTitleAction.IsEnabled = true; }
+    }
+
+    private async void Illustration_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: BitmapImage selected } || _illustrationImages.Count == 0) return;
+        e.Handled = true;
+        var images = _illustrationImages.ToArray();
+        var paths = images.Select(item => _illustrationPaths.GetValueOrDefault(item)).ToArray();
+        var index = Array.IndexOf(images, selected);
+        if (index < 0) return;
+        var image = new Image { Stretch = Stretch.Uniform };
+        var count = new TextBlock { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+        var previous = ResourceDialogPresentation.CreateIconButton("\uE76B", Strings.ResourcePreviousIllustration.GetLocalizedResource());
+        var next = ResourceDialogPresentation.CreateIconButton("\uE76C", Strings.ResourceNextIllustration.GetLocalizedResource());
+        previous.VerticalAlignment = next.VerticalAlignment = VerticalAlignment.Center;
+        previous.HorizontalAlignment = HorizontalAlignment.Left;
+        next.HorizontalAlignment = HorizontalAlignment.Right;
+        previous.Margin = next.Margin = new Thickness(12);
+        previous.IsEnabled = next.IsEnabled = images.Length > 1;
+        var requestVersion = 0;
+        async Task ShowAsync(int step)
+        {
+            index = (index + step + images.Length) % images.Length;
+            var requestedIndex = index;
+            var version = ++requestVersion;
+            count.Text = $"{index + 1} / {images.Length}";
+            image.Source = images[index];
+            if (paths[index] is not { } path) return;
+            try
+            {
+                var file = await StorageFile.GetFileFromPathAsync(path);
+                using var stream = await file.OpenReadAsync();
+                var fullImage = new BitmapImage { DecodePixelWidth = (int)(Math.Min(1200, XamlRoot.Size.Width - 80) * XamlRoot.RasterizationScale) };
+                await fullImage.SetSourceAsync(stream);
+                if (version == requestVersion && index == requestedIndex) image.Source = fullImage;
+            }
+            catch (Exception ex) { App.Logger.LogWarning(ex, "Unable to preview illustration {Path}", path); }
+        }
+        previous.Click += async (_, _) => await ShowAsync(-1);
+        next.Click += async (_, _) => await ShowAsync(1);
+        var close = ResourceDialogPresentation.CreateIconButton("\uE8BB", Strings.Close.GetLocalizedResource());
+        close.HorizontalAlignment = HorizontalAlignment.Right;
+        close.Margin = new Thickness(0, 0, 8, 0);
+        var content = new Grid { RowSpacing = 12 };
+        content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        content.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var header = new Grid(); header.Children.Add(close);
+        var picture = new Grid(); picture.Children.Add(image); picture.Children.Add(previous); picture.Children.Add(next);
+        Grid.SetRow(picture, 1); content.Children.Add(header); content.Children.Add(picture);
+        Grid.SetRow(count, 2); content.Children.Add(count);
+        var dialog = ResourceDialogPresentation.Create(XamlRoot, content);
+        close.Click += (_, _) => dialog.Hide();
+        dialog.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler(async (_, args) =>
+        {
+            if (args.Key == Windows.System.VirtualKey.Left) { args.Handled = true; await ShowAsync(-1); }
+            else if (args.Key == Windows.System.VirtualKey.Right) { args.Handled = true; await ShowAsync(1); }
+        }), true);
+        await ShowAsync(0);
+        await dialog.ShowAsync();
+    }
+
     private async Task LoadVideoIllustrationsAsync(string folderPath, CancellationToken token)
     {
         var images = new List<BitmapImage>();
+        var imagePaths = new Dictionary<BitmapImage, string>();
         try
         {
             var extensions = _workspace.Settings.ImageExtensions.ToHashSet(StringComparer.OrdinalIgnoreCase);
             var posterPaths = BrowserItems.Select(item => item.Model.PosterPath)
+                .Append(_detailFolderItem?.Model.PosterPath)
                 .Append(_workspace.GetPosterOverride(folderPath))
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var path in Directory.EnumerateFiles(folderPath)
-                .Where(path => extensions.Contains(Path.GetExtension(path).TrimStart('.')) && !posterPaths.Contains(path)))
+                .Where(path => extensions.Contains(Path.GetExtension(path).TrimStart('.')) && !posterPaths.Contains(path)).OrderBy(path => path, StringComparer.CurrentCultureIgnoreCase))
             {
                 token.ThrowIfCancellationRequested();
                 if (await LoadPosterAsync(path, token) is { } image)
-                    images.Add(image);
+                { images.Add(image); imagePaths[image] = path; }
             }
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex) { App.Logger.LogWarning(ex, "Unable to load video illustrations from {Folder}", folderPath); }
+        token.ThrowIfCancellationRequested();
+        _illustrationPaths.Clear();
+        foreach (var pair in imagePaths) _illustrationPaths[pair.Key] = pair.Value;
+        _illustrationImages = images;
         VideoIllustrations.ItemsSource = images;
         VideoIllustrationsEmpty.Visibility = images.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -1169,7 +1279,7 @@ public sealed partial class ResourceLibraryPage : Page
         _contentPageContext.ShellPage?.NavigateToResourceManager();
     }
 
-    public void ShowFormatOptimization(FrameworkElement anchor)
+    public async void ShowFormatOptimization(FrameworkElement anchor)
     {
         if (_locations.Count == 0 || LoadingRing.IsActive)
         {
@@ -1183,30 +1293,13 @@ public sealed partial class ResourceLibraryPage : Page
             currentLocation.Path,
             currentLocation.Kind,
             BrowserItems.Select(item => item.Model).ToArray());
-        var allowFlyoutClose = false;
-        var flyout = new Flyout
-        {
-            Content = toolsDialog,
-            Placement = FlyoutPlacementMode.Bottom,
-        };
-        toolsDialog.RequestClose += (_, _) =>
-        {
-            allowFlyoutClose = true;
-            flyout.Hide();
-        };
-        flyout.Closing += (_, args) =>
-        {
-            if (toolsDialog.HasChanges && !allowFlyoutClose)
-                args.Cancel = true;
-        };
-        flyout.Closed += async (_, _) =>
-        {
-            if (toolsDialog.HasChanges && _locations.Count > 0)
-                await LoadLocationAsync(_locations[^1]);
-        };
-
-        flyout.ShowAt(anchor);
+        var dialog = ResourceDialogPresentation.Create(XamlRoot, toolsDialog);
+        toolsDialog.RequestClose += (_, _) => dialog.Hide();
+        dialog.Closing += (_, args) => args.Cancel = toolsDialog.IsBusy;
         toolsDialog.StartFormatOptimizationPreview();
+        await dialog.ShowAsync();
+        if (toolsDialog.HasChanges && _locations.Count > 0)
+            await LoadLocationAsync(_locations[^1]);
     }
 
     [DynamicWindowsRuntimeCast(typeof(FrameworkElement))]
@@ -1384,7 +1477,7 @@ public sealed partial class ResourceLibraryPage : Page
                 .ToList();
             var hasVideos = directVideos.Count > 0;
 
-            if (hasVideos)
+            if (hasVideos || category.Name == "无中文字幕")
             {
                 var relativeName = string.Join(" / ", Path.GetRelativePath(actorLocation.Path, category.Path)
                     .Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries));
@@ -1394,7 +1487,7 @@ public sealed partial class ResourceLibraryPage : Page
             foreach (var childCategory in children.Where(child => child.Kind == ResourceBrowserItemKind.CategoryFolder))
                 hasVideos |= await CollectCategoryGroupsAsync(childCategory, depth + 1);
 
-            if (hasVideos)
+            if (hasVideos || category.Name == "无中文字幕")
                 categoriesWithVideos.Add(category.Path);
 
             return hasVideos;
@@ -2184,96 +2277,9 @@ public sealed partial class ResourceLibraryPage : Page
         SetResourceStatusMessage($"已恢复显示 {list.SelectedItems.Count} 个演员文件夹。");
     }
 
-    public async Task ImportActorsAsync()
-    {
-        var picker = new Windows.Storage.Pickers.FileOpenPicker
-        {
-            SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Downloads,
-        };
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, MainWindow.Instance.WindowHandle);
-        picker.FileTypeFilter.Add(".json");
-        var file = await picker.PickSingleFileAsync();
-        if (file is null)
-            return;
-
-        LoadingRing.IsActive = true;
-        SetResourceStatusMessage("正在读取演员资料包并匹配文件夹……");
-        try
-        {
-            var targets = Directory.EnumerateDirectories(_libraryPath, "*", SearchOption.TopDirectoryOnly)
-                .Select(path => new DirectoryInfo(path))
-                .Where(ChangLiActorImportService.IsImportActorFolder)
-                .Select(directory =>
-                {
-                    var details = _workspace.GetActorDetails(directory.FullName);
-                    return new ChangLiActorImportTarget(
-                        directory.FullName,
-                        directory.Name,
-                        details.Name,
-                        details.Aliases);
-                })
-                .ToArray();
-            var plan = await ChangLiActorImportService.CreatePlanAsync(file.Path, targets);
-            LoadingRing.IsActive = false;
-
-            if (plan.Matches.Count == 0)
-            {
-                SetResourceStatusMessage($"没有找到可导入的匹配演员。未匹配 {plan.UnmatchedCount} 位，重名冲突 {plan.AmbiguousCount} 位。");
-                return;
-            }
-
-            var overwriteCheckBox = new CheckBox
-            {
-                Content = "覆盖 Files 中已有资料和主海报；不勾选时只补空字段",
-                IsChecked = false,
-            };
-            var summary = new StackPanel { Spacing = 10 };
-            summary.Children.Add(new TextBlock
-            {
-                Text = $"导出文件包含 {plan.SourceActorCount} 位演员；按姓名、别名或日文名精确匹配到 {plan.Matches.Count} 个文件夹。未匹配 {plan.UnmatchedCount} 位，重名冲突 {plan.AmbiguousCount} 位。",
-                TextWrapping = TextWrapping.Wrap,
-            });
-            summary.Children.Add(new TextBlock
-            {
-                Text = "导入会合并演员海报，并写入简介、生日、身高、体重、数值和罩杯。",
-                TextWrapping = TextWrapping.Wrap,
-            });
-            summary.Children.Add(overwriteCheckBox);
-
-            var dialog = new ContentDialog
-            {
-                Title = "导入演员资料",
-                Content = summary,
-                PrimaryButtonText = $"导入 {plan.Matches.Count} 位演员",
-                CloseButtonText = "取消",
-                DefaultButton = ContentDialogButton.Primary,
-                XamlRoot = XamlRoot,
-            };
-            if (await dialog.ShowAsync() != ContentDialogResult.Primary)
-            {
-                SetResourceStatusMessage("已取消导入。");
-                return;
-            }
-
-            LoadingRing.IsActive = true;
-            SetResourceStatusMessage("正在导入演员资料和海报……");
-            var result = await ChangLiActorImportService.ApplyAsync(
-                plan,
-                _workspace,
-                overwriteCheckBox.IsChecked == true);
-            await RefreshAsync();
-            SetResourceStatusMessage($"已导入 {result.ImportedActors} 位演员，登记 {result.ImportedPhotos} 张海报；无法读取 {result.SkippedPhotos} 张。未匹配 {plan.UnmatchedCount} 位，重名冲突 {plan.AmbiguousCount} 位。");
-        }
-        catch (Exception ex)
-        {
-            App.Logger.LogError(ex, "Unable to import ChangLi actor data from {PackagePath}", file.Path);
-            SetResourceStatusMessage($"导入演员失败：{ex.Message}");
-        }
-        finally
-        {
-            LoadingRing.IsActive = false;
-        }
-    }
+    public Task ImportActorsAsync()
+        => ResourceActorImportWorkflow.ImportAsync(_libraryPath, _workspace, XamlRoot, SetResourceStatusMessage,
+            RefreshAsync, busy => LoadingRing.IsActive = busy);
 
     private async Task ChoosePosterAsync(ResourceBrowserItemViewModel item)
     {

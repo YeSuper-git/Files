@@ -60,7 +60,7 @@ public sealed class ResourceBrowserService : IResourceBrowserService
 
                 var kind = locationKind == ResourceBrowserLocationKind.LibraryRoot
                     ? ResourceBrowserItemKind.ActorFolder
-                    : HasDirectVideo(child, settings.VideoExtensions, cancellationToken)
+                    : IsVideoFolder(child, settings, cancellationToken)
                         ? ResourceBrowserItemKind.VideoFolder
                         : ResourceBrowserItemKind.CategoryFolder;
 
@@ -113,6 +113,17 @@ public sealed class ResourceBrowserService : IResourceBrowserService
         return result
             .OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
+    }
+
+    private bool IsVideoFolder(DirectoryInfo directory, ResourceSettings settings, CancellationToken token)
+    {
+        if (HasDirectVideo(directory, settings.VideoExtensions, token) || new ResourceCodeParser().ParseCode(directory.Name) is not null)
+            return true;
+        if (directory.Name is "无中文字幕" or "中文字幕" or "无中字" or "有中字") return false;
+        // Leaf work folders retain their identity when a video is missing or has been removed.
+        try { return !directory.EnumerateDirectories().Any(child => !ShouldSkipDirectory(child)); }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
     }
 
     private bool HasDirectVideo(DirectoryInfo directory, IReadOnlyCollection<string> extensions, CancellationToken cancellationToken)

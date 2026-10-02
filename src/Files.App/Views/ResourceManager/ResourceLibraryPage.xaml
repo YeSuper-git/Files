@@ -128,7 +128,10 @@
                                     <Image x:Name="VideoDetailPoster" Stretch="Uniform" />
                                 </Border>
                                 <StackPanel Grid.Column="1" Spacing="14">
-                                    <TextBlock x:Name="VideoDetailTitle" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                        <TextBlock x:Name="VideoDetailTitle" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
+                                        <Button x:Name="DetailTitleAction" Grid.Column="1" VerticalAlignment="Top" Content="{helpers:ResourceString Name=ResourceDetailTranslate}" Click="DetailTitleAction_Click" />
+                                    </Grid>
                                     <TextBlock Text="{helpers:ResourceString Name=ResourceVideoInfo}" Style="{StaticResource SubtitleTextBlockStyle}" />
                                     <TextBlock x:Name="VideoDetailFileName" TextWrapping="Wrap" />
                                     <TextBlock x:Name="VideoDetailFileSize" />
@@ -157,13 +160,13 @@
                                 </Grid>
                                 <ItemsControl x:Name="VideoIllustrations">
                                     <ItemsControl.ItemsPanel><ItemsPanelTemplate><ItemsWrapGrid Orientation="Horizontal" ItemWidth="210" ItemHeight="160" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate><DataTemplate><Border Margin="0,0,10,10" Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="8"><Image Source="{Binding}" Stretch="UniformToFill" /></Border></DataTemplate></ItemsControl.ItemTemplate>
+                                    <ItemsControl.ItemTemplate><DataTemplate><Border DoubleTapped="Illustration_DoubleTapped" Margin="0,0,10,10" Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="8"><Image Source="{Binding}" Stretch="UniformToFill" /></Border></DataTemplate></ItemsControl.ItemTemplate>
                                 </ItemsControl>
                                 <TextBlock x:Name="VideoIllustrationsEmpty" Text="{helpers:ResourceString Name=ResourceVideoNoIllustration}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
-                    <TextBlock x:Name="EmptyText" HorizontalAlignment="Center" VerticalAlignment="Center" Text="当前层级没有可展示的资源" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed" />
+                    <TextBlock x:Name="EmptyText" HorizontalAlignment="Center" VerticalAlignment="Center" Text="暂无" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed" />
                     </Grid>
                 </Grid>
             </Grid>

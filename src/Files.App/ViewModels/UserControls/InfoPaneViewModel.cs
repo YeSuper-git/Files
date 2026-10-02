@@ -149,10 +149,9 @@ namespace Files.App.ViewModels.UserControls
 			}
 		}
 
-		public bool LoadTagsList
-			=> SelectedItem?.HasTags ?? false &&
-			PreviewPaneState is PreviewPaneStates.NoPreviewAvailable ||
-			PreviewPaneState is PreviewPaneStates.PreviewAndDetailsAvailable;
+        public bool LoadTagsList
+            => SelectedItem is { ItemPath: not null } && SelectedDriveItem is null &&
+                PreviewPaneState is PreviewPaneStates.NoPreviewAvailable or PreviewPaneStates.PreviewAndDetailsAvailable;
 
 		public Visibility DetailsTagsListVisibility
 			=> SelectedItem is ResourceActorListedItem

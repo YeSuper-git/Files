@@ -29,5 +29,6 @@ namespace Files.App.Data.Contracts
 		bool VideoEditorReplaceOriginal { get; set; }
 		bool VideoEditorExportToSourceFolder { get; set; }
 		string VideoEditorExportFolder { get; set; }
+        string VideoEditorShortcuts { get; set; }
 	}
 }
