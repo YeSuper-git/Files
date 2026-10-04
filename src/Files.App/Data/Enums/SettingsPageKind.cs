@@ -17,6 +17,7 @@ namespace Files.App.Data.Enums
 		AboutPage,
 #if FILES_RESOURCE_MANAGER
 		ResourceManagerPage,
+		AnimeLibraryPage,
 #endif
 	}
 }

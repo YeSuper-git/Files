@@ -41,22 +41,31 @@ public sealed partial class ResourceLibraryPage : Page
 {
     private ResourceBrowserItemViewModel? _detailFolderItem;
     private ResourceVideoFolderListedItem? _detailFolderListedItem;
+    private string? _pendingAnimeEditPath;
+    private string? _animeEditingPath;
     private List<BitmapImage> _illustrationImages = [];
+    private readonly Dictionary<BitmapImage, string> _animeIllustrationCache = [];
     private readonly Dictionary<BitmapImage, string> _illustrationPaths = [];
 
-    private readonly IResourceBrowserService _browser = Ioc.Default.GetRequiredService<IResourceBrowserService>();
-    private readonly IResourceWorkspaceService _workspace = Ioc.Default.GetRequiredService<IResourceWorkspaceService>();
+    private IResourceBrowserService _browser = Ioc.Default.GetRequiredService<IResourceBrowserService>();
+    private IResourceWorkspaceService _workspace = Ioc.Default.GetRequiredService<IResourceWorkspaceService>();
     private readonly IResourceTitleTranslationService _machineTranslation = Ioc.Default.GetRequiredService<IResourceTitleTranslationService>();
     private readonly IBailianQwenMtTitleTranslationService _bailianTranslation = Ioc.Default.GetRequiredService<IBailianQwenMtTitleTranslationService>();
     private readonly IAppSettingsService _appSettings = Ioc.Default.GetRequiredService<IAppSettingsService>();
     private readonly VideoAssistantSearchService _videoAssistantSearch = Ioc.Default.GetRequiredService<VideoAssistantSearchService>();
     private readonly IContentPageContext _contentPageContext = Ioc.Default.GetRequiredService<IContentPageContext>();
+    private readonly IDisplayPageContext _displayContext = Ioc.Default.GetRequiredService<IDisplayPageContext>();
+    private readonly Dictionary<ResourceBrowserItemViewModel, ListedItem> _sortItems = [];
+    private readonly Dictionary<string, (DateTime Modified, Task<BitmapImage?> Image)> _posterCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly SemaphoreSlim _posterLoads = new(8);
     private readonly List<ResourceBrowserLocation> _locations = [];
     private readonly List<ActorVideoGroup> _actorVideoGroups = [];
     private readonly Dictionary<string, (ListedItem Item, ResourceBrowserItemViewModel ViewModel)> _selectedResourceItems = new(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource? _loadCancellation;
     private VideoAssistantChatView? _assistantChatView;
     private Storyboard? _assistantButtonScaleAnimation;
+    private int _animeSeasonSelection;
+    private bool _animeLibrary;
     private string _libraryPath = string.Empty;
     private int _selectedActorGroupIndex;
     private string? _selectedActorGroupName;
@@ -74,13 +83,14 @@ public sealed partial class ResourceLibraryPage : Page
     {
         InitializeComponent();
         DataContext = this;
-        foreach (var list in new ListViewBase[] { BrowserGrid, VideoFileList })
+        foreach (var list in new ListViewBase[] { BrowserGrid, VideoFileList, AnimeEpisodeCards, AnimeEpisodeButtons })
         {
             list.AddHandler(PointerPressedEvent, new PointerEventHandler(BrowserGrid_PointerPressed), true);
             list.AddHandler(PointerMovedEvent, new PointerEventHandler(BrowserGrid_PointerMoved), true);
             list.AddHandler(PointerReleasedEvent, new PointerEventHandler(BrowserGrid_PointerReleased), true);
             list.AddHandler(PointerCanceledEvent, new PointerEventHandler(BrowserGrid_PointerReleased), true);
         }
+        Loaded += (_, _) => { _displayContext.PropertyChanged -= OnSortingChanged; _displayContext.PropertyChanged += OnSortingChanged; ApplyBrowserSorting(); };
         Unloaded += OnPageUnloaded;
     }
 
@@ -169,7 +179,23 @@ public sealed partial class ResourceLibraryPage : Page
         {
             base.OnNavigatedTo(e);
             var args = e.Parameter as NavigationArguments;
-            _libraryPath = Path.GetFullPath(args?.ResourceLibraryPath ?? _workspace.LibraryPath);
+            _animeLibrary = args?.NavPathParam == "AnimeLibrary";
+            _pendingAnimeEditPath = _animeLibrary ? args?.AnimeEditPath : null;
+            if (args is not null) args.AnimeEditPath = null;
+            if (_animeLibrary)
+            {
+                var anime = Ioc.Default.GetRequiredService<AnimeLibraryService>();
+                _workspace = anime.Workspace;
+                _browser = anime.Browser;
+                AnimeRootPanel.Visibility = Visibility.Collapsed;
+                AnimeRootButton.Content = Strings.AnimeLibraryChooseRoot.GetLocalizedResource();
+                AnimeRootPath.Text = _workspace.LibraryPath;
+                UpdateAnimePosterLayout();
+                AssistantEntry.Visibility = Visibility.Collapsed;
+            }
+            var libraryPath = args?.ResourceLibraryPath ?? _workspace.LibraryPath;
+            if (string.IsNullOrWhiteSpace(libraryPath)) { EmptyText.Visibility = Visibility.Visible; return; }
+            _libraryPath = Path.GetFullPath(libraryPath);
 
             if (string.IsNullOrWhiteSpace(_libraryPath) || !Directory.Exists(_libraryPath))
             {
@@ -239,11 +265,55 @@ public sealed partial class ResourceLibraryPage : Page
 
     private void OnPageUnloaded(object sender, RoutedEventArgs e)
     {
+        _displayContext.PropertyChanged -= OnSortingChanged;
+        _sortItems.Clear();
         _loadCancellation?.Cancel();
         AssistantFloatingPanel.Visibility = Visibility.Collapsed;
         ClearSelectedResourceItems();
         if (GetNativeResourceStatusBarViewModel() is { } statusBarViewModel)
             statusBarViewModel.DirectoryItemCount = null;
+    }
+
+    private void OnSortingChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(IDisplayPageContext.SortOption) or nameof(IDisplayPageContext.SortDirection)
+            or nameof(IDisplayPageContext.SortFilesFirst) or nameof(IDisplayPageContext.SortDirectoriesAlongsideFiles))
+        {
+            if (_contentPageContext.ShellPage is ModernShellPage shell && ReferenceEquals(shell.CurrentResourceLibraryPage, this))
+                ApplyBrowserSorting();
+        }
+    }
+
+    private void ApplyBrowserSorting()
+    {
+        var current = BrowserItems.ToArray();
+        foreach (var stale in _sortItems.Keys.Except(current).ToArray()) _sortItems.Remove(stale);
+        foreach (var item in current)
+        {
+            if (!_sortItems.ContainsKey(item))
+            {
+                var info = item.Kind == ResourceBrowserItemKind.VideoFile ? (FileSystemInfo)new FileInfo(item.Path) : new DirectoryInfo(item.Path);
+                _sortItems[item] = new ListedItem
+                {
+                    PrimaryItemAttribute = item.Kind == ResourceBrowserItemKind.VideoFile ? StorageItemTypes.File : StorageItemTypes.Folder,
+                    ItemPath = item.Path,
+                    ItemType = item.Kind == ResourceBrowserItemKind.VideoFile ? Path.GetExtension(item.Path) : "文件夹",
+                    ItemDateModifiedReal = info.LastWriteTimeUtc,
+                    ItemDateCreatedReal = info.CreationTimeUtc,
+                    FileSizeBytes = info is FileInfo file && file.Exists ? file.Length : 0,
+                    FileTags = item.FileTags.Select(tag => tag.Name).ToArray(),
+                };
+            }
+            _sortItems[item].ItemNameRaw = item.Name;
+        }
+        var byItem = current.ToDictionary(item => _sortItems[item]);
+        var sorted = Files.App.Utils.Storage.SortingHelper.OrderFileList(current.Select(item => _sortItems[item]).ToList(),
+            _displayContext.SortOption, _displayContext.SortDirection, _displayContext.SortDirectoriesAlongsideFiles, _displayContext.SortFilesFirst).ToArray();
+        for (var index = 0; index < sorted.Length; index++)
+        {
+            var oldIndex = BrowserItems.IndexOf(byItem[sorted[index]]);
+            if (oldIndex != index) BrowserItems.Move(oldIndex, index);
+        }
     }
 
     public async Task RefreshAsync()
@@ -256,7 +326,7 @@ public sealed partial class ResourceLibraryPage : Page
         => ActiveBrowserList.SelectAll();
 
     private ListViewBase ActiveBrowserList => _locations.Count > 0 && _locations[^1].Kind == ResourceBrowserLocationKind.VideoFolder
-        ? VideoFileList
+        ? (AnimeEpisodeButtons.Visibility == Visibility.Visible ? AnimeEpisodeButtons : AnimeEpisodeCards.Visibility == Visibility.Visible ? AnimeEpisodeCards : VideoFileList)
         : BrowserGrid;
 
     public async Task<bool> TryDeleteSelectedActorFoldersAsync(IReadOnlyList<ListedItem> selectedItems)
@@ -416,11 +486,20 @@ public sealed partial class ResourceLibraryPage : Page
             SetNativeSelection(null);
             BrowserGrid.SelectedItems.Clear();
             LoadingRing.IsActive = true;
+            AnimeMetadataEditor.Visibility = Visibility.Collapsed;
+            AnimeMetadataDisplay.Visibility = Visibility.Visible;
+            if (_pendingAnimeEditPath is not null && !PathEquals(_pendingAnimeEditPath, location.Path)) _pendingAnimeEditPath = null;
             BrowserItems.Clear();
             VideoFileList.SelectedItems.Clear();
+            AnimeEpisodeButtons.SelectedItems.Clear();
+            AnimeEpisodeButtons.Visibility = Visibility.Collapsed;
+            AnimeEpisodeCards.SelectedItems.Clear();
+            AnimeEpisodeCards.Visibility = Visibility.Collapsed;
+            VideoFileList.Visibility = _animeLibrary ? Visibility.Collapsed : Visibility.Visible;
             _activeVideoItem = null;
-            VideoDetailView.Visibility = location.Kind == ResourceBrowserLocationKind.VideoFolder ? Visibility.Visible : Visibility.Collapsed;
-            BrowserGrid.Visibility = location.Kind == ResourceBrowserLocationKind.VideoFolder ? Visibility.Collapsed : Visibility.Visible;
+            VideoDetailView.Visibility = !_animeLibrary && location.Kind == ResourceBrowserLocationKind.VideoFolder ? Visibility.Visible : Visibility.Collapsed;
+            BrowserGrid.Visibility = _animeLibrary || location.Kind == ResourceBrowserLocationKind.VideoFolder ? Visibility.Collapsed : Visibility.Visible;
+            _animeIllustrationCache.Clear();
             EmptyText.Visibility = Visibility.Collapsed;
             ActorGroupButtons.Children.Clear();
             ActorGroupSelector.Visibility = Visibility.Collapsed;
@@ -428,7 +507,7 @@ public sealed partial class ResourceLibraryPage : Page
             SetResourceStatusMessage("正在加载资源……");
 
             var items = await _browser.GetChildrenAsync(location.Path, location.Kind, _workspace.Settings, cancellationToken);
-            if (location.Kind == ResourceBrowserLocationKind.ActorFolder)
+            if (!_animeLibrary && location.Kind == ResourceBrowserLocationKind.ActorFolder)
             {
                 _selectedActorGroupActorPath = location.Path;
                 await BuildActorVideoGroupsAsync(location, items, cancellationToken);
@@ -450,15 +529,17 @@ public sealed partial class ResourceLibraryPage : Page
             if (initialGridLayout is { } layout && BrowserGrid.ItemsPanelRoot is ItemsWrapGrid initialItemsPanel)
                 initialItemsPanel.ItemWidth = layout.ItemWidth;
 
+            var posters = await Task.WhenAll(items.Select(item => LoadPosterAsync(item.PosterPath, cancellationToken)));
+            var posterIndex = 0;
             foreach (var item in items)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var viewModel = new ResourceBrowserItemViewModel(item);
+                var viewModel = new ResourceBrowserItemViewModel(item, _workspace, _animeLibrary);
                 if (initialGridLayout is { } initialLayout &&
                     item.Kind is ResourceBrowserItemKind.ActorFolder or ResourceBrowserItemKind.VideoFolder)
                     viewModel.SetAdaptiveCardWidth(initialLayout.CardWidth);
 
-                viewModel.Poster = await LoadPosterAsync(item.PosterPath, cancellationToken);
+                viewModel.Poster = posters[posterIndex++];
                 if (item.Kind == ResourceBrowserItemKind.VideoFolder)
                 {
                     try
@@ -473,20 +554,27 @@ public sealed partial class ResourceLibraryPage : Page
                 BrowserItems.Add(viewModel);
             }
 
+            ApplyBrowserSorting();
             EmptyText.Visibility = BrowserItems.Count == 0 && location.Kind != ResourceBrowserLocationKind.VideoFolder ? Visibility.Visible : Visibility.Collapsed;
             if (location.Kind == ResourceBrowserLocationKind.VideoFolder)
             {
                 await PrepareVideoDetailFolderAsync(location, cancellationToken);
-                if (BrowserItems.Count > 0)
+                if (!_animeLibrary && BrowserItems.Count > 0)
                     VideoFileList.SelectedItem = BrowserItems[0];
                 else { _activeVideoItem = null; ShowActiveVideoDetails(); }
-                await LoadVideoIllustrationsAsync(location.Path, cancellationToken);
+                if (_animeLibrary) await BuildAnimeSeasonButtonsAsync(location, cancellationToken);
+                else await LoadVideoIllustrationsAsync(location.Path, cancellationToken);
+            }
+            if (_animeLibrary)
+            {
+                VideoDetailView.Visibility = location.Kind == ResourceBrowserLocationKind.VideoFolder ? Visibility.Visible : Visibility.Collapsed;
+                BrowserGrid.Visibility = location.Kind == ResourceBrowserLocationKind.VideoFolder ? Visibility.Collapsed : Visibility.Visible;
             }
             SetResourceStatusMessage(string.Empty);
             UpdateActorGridLayout();
             UpdateNativeResourceStatus();
 
-            if (location.Kind == ResourceBrowserLocationKind.LibraryRoot && BrowserItems.Count > 0)
+            if (!_animeLibrary && location.Kind == ResourceBrowserLocationKind.LibraryRoot && BrowserItems.Count > 0)
                 _ = LoadActorWorkCountsAsync(BrowserItems.ToArray(), cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -602,24 +690,46 @@ public sealed partial class ResourceLibraryPage : Page
         if (availableWidth <= 0)
             return null;
 
-        const double minimumCardWidth = 250;
+        var minimumCardWidth = _animeLibrary ? _workspace.Settings.AnimePosterWidth : 250d;
         const double itemHorizontalChrome = 26;
-        const double maximumCardWidth = 340;
+        var maximumCardWidth = _animeLibrary ? _workspace.Settings.AnimePosterWidth + 20d : 340d;
         var minimumItemWidth = minimumCardWidth + itemHorizontalChrome;
         var columnCount = Math.Max(1, (int)Math.Floor(availableWidth / minimumItemWidth));
         var itemWidth = availableWidth / columnCount;
-        var cardWidth = Math.Clamp(itemWidth - itemHorizontalChrome, 180, maximumCardWidth);
+        var cardWidth = Math.Clamp(itemWidth - itemHorizontalChrome, _animeLibrary ? _workspace.Settings.AnimePosterWidth - 20 : 180, maximumCardWidth);
         return (itemWidth, cardWidth);
     }
 
-    private static async Task<BitmapImage?> LoadPosterAsync(string? path, CancellationToken cancellationToken)
+    private async Task<BitmapImage?> LoadPosterAsync(string? path, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return null;
+        cancellationToken.ThrowIfCancellationRequested();
+        var modified = File.GetLastWriteTimeUtc(path);
+        if (!_posterCache.TryGetValue(path, out var cached) || cached.Modified != modified)
+        {
+            if (_posterCache.Count >= 400) _posterCache.Clear();
+            cached = (modified, LoadPosterCoreAsync(path));
+            _posterCache[path] = cached;
+        }
+        var image = await cached.Image.WaitAsync(cancellationToken);
+        if (image is null) _posterCache.Remove(path);
+        return image;
+    }
+
+    private async Task<BitmapImage?> LoadPosterCoreAsync(string path)
+    {
+        await _posterLoads.WaitAsync();
+        try { return await DecodePosterAsync(path); }
+        finally { _posterLoads.Release(); }
+    }
+
+    private static async Task<BitmapImage?> DecodePosterAsync(string? path)
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
             return null;
 
         try
         {
-            cancellationToken.ThrowIfCancellationRequested();
             var file = await StorageFile.GetFileFromPathAsync(path);
             using var stream = await file.OpenReadAsync();
             var image = new BitmapImage { DecodePixelWidth = 640 };
@@ -682,9 +792,14 @@ public sealed partial class ResourceLibraryPage : Page
     {
         if (_locations.Count == 0 || _locations[^1].Kind != ResourceBrowserLocationKind.VideoFolder)
             return;
-        _activeVideoItem = VideoFileList.SelectedItem as ResourceBrowserItemViewModel;
+        var list = (ListViewBase)sender;
+        _animeEditingPath = null;
+        AnimeMetadataEditor.Visibility = Visibility.Collapsed;
+        AnimeMetadataDisplay.Visibility = Visibility.Visible;
+        _activeVideoItem = list.SelectedItem as ResourceBrowserItemViewModel;
         ShowActiveVideoDetails();
-        UpdateResourceSelection(VideoFileList.SelectedItems.OfType<ResourceBrowserItemViewModel>());
+        if (_animeLibrary) UpdateAnimeIllustrations();
+        UpdateResourceSelection(list.SelectedItems.OfType<ResourceBrowserItemViewModel>());
     }
 
     private void UpdateResourceSelection(IEnumerable<ResourceBrowserItemViewModel> selection)
@@ -704,9 +819,12 @@ public sealed partial class ResourceLibraryPage : Page
     private void ShowActiveVideoDetails()
     {
         var item = _activeVideoItem;
+        VideoDetailModified.Visibility = _animeLibrary ? Visibility.Collapsed : Visibility.Visible;
+        VideoDetailPath.Visibility = _animeLibrary ? Visibility.Collapsed : Visibility.Visible;
         VideoDetailPoster.Source = item?.Poster ?? _detailFolderItem?.Poster;
         VideoDetailTitle.Text = _detailFolderItem?.Name ?? (_locations.Count > 0 ? _locations[^1].Title : string.Empty);
         UpdateDetailTitleAction();
+        UpdateAnimeMetadata();
         VideoDetailFileName.Text = item?.Name ?? Strings.ResourceVideoNoFiles.GetLocalizedResource();
         VideoDetailPath.Text = item?.Path ?? _detailFolderItem?.Path ?? string.Empty;
         if (item is null)
@@ -726,6 +844,72 @@ public sealed partial class ResourceLibraryPage : Page
             VideoDetailFileSize.Text = string.Format(CultureInfo.CurrentCulture, Strings.ResourceVideoFileSize.GetLocalizedResource(), Strings.Unknown.GetLocalizedResource());
             VideoDetailModified.Text = string.Empty;
         }
+    }
+
+    private string? AnimeMetadataPath => _activeVideoItem?.Path ?? _detailFolderItem?.Path;
+
+    private void UpdateAnimeMetadata()
+    {
+        AnimeDetailMetadata.Visibility = _animeLibrary ? Visibility.Visible : Visibility.Collapsed;
+        VideoDetailLayout.DataContext = _detailFolderItem;
+        AnimeDetailMetadata.DataContext = _detailFolderItem;
+        if (!_animeLibrary || _detailFolderItem is null) return;
+        var details = _workspace.GetVideoDetails(AnimeMetadataPath!);
+        AnimeSynopsis.Text = string.IsNullOrWhiteSpace(details.Synopsis) ? Strings.AnimeLibraryNoSynopsis.GetLocalizedResource() : details.Synopsis;
+        AnimeAirDate.Text = string.Format(CultureInfo.CurrentCulture, Strings.AnimeLibraryAirDate.GetLocalizedResource(), details.AirDate?.ToString("yyyy-MM", CultureInfo.CurrentCulture) ?? "—");
+        if (_pendingAnimeEditPath is not null && PathEquals(_pendingAnimeEditPath, _detailFolderItem.Path) && (_activeVideoItem is not null || BrowserItems.Count == 0))
+        {
+            _pendingAnimeEditPath = null;
+            BeginAnimeEdit();
+        }
+    }
+
+    private Task EditAnimeDetailsAsync(ResourceBrowserItemViewModel item)
+    {
+        if (_detailFolderItem is not null && PathEquals(_detailFolderItem.Path, item.Path) && VideoDetailView.Visibility == Visibility.Visible)
+            BeginAnimeEdit();
+        else
+        {
+            _pendingAnimeEditPath = item.Path;
+            NavigateToLocation(_locations.Append(new ResourceBrowserLocation(item.Path, ResourceBrowserLocationKind.VideoFolder, item.Name)).ToArray());
+        }
+        return Task.CompletedTask;
+    }
+
+    private void BeginAnimeEdit()
+    {
+        if (AnimeMetadataPath is null) return;
+        _animeEditingPath = AnimeMetadataPath;
+        var details = _workspace.GetVideoDetails(_animeEditingPath);
+        AnimeSynopsisEditor.Text = details.Synopsis;
+        AnimeMonthEditor.Text = details.AirDate?.ToString("yyyy-MM", CultureInfo.InvariantCulture) ?? string.Empty;
+        AnimeEditError.Visibility = Visibility.Collapsed;
+        AnimeMetadataDisplay.Visibility = Visibility.Collapsed;
+        AnimeMetadataEditor.Visibility = Visibility.Visible;
+    }
+
+    private void AnimeMetadataSave_Click(object sender, RoutedEventArgs e)
+    {
+        if (_animeEditingPath is null) return;
+        DateTimeOffset? month = null;
+        if (!string.IsNullOrWhiteSpace(AnimeMonthEditor.Text))
+        {
+            if (!DateTime.TryParseExact(AnimeMonthEditor.Text.Trim(), "yyyy-MM", CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date))
+            { AnimeEditError.Visibility = Visibility.Visible; return; }
+            month = new DateTimeOffset(date);
+        }
+        _workspace.SetVideoDetails(_animeEditingPath, new ResourceVideoDetails { Synopsis = AnimeSynopsisEditor.Text, AirDate = month });
+        if (_activeVideoItem is not null) UpdateResourceSelection([_activeVideoItem]);
+        AnimeMetadataEditor.Visibility = Visibility.Collapsed;
+        AnimeMetadataDisplay.Visibility = Visibility.Visible;
+        UpdateAnimeMetadata();
+    }
+
+    private void AnimeMetadataCancel_Click(object sender, RoutedEventArgs e)
+    {
+        _animeEditingPath = null;
+        AnimeMetadataEditor.Visibility = Visibility.Collapsed;
+        AnimeMetadataDisplay.Visibility = Visibility.Visible;
     }
 
     private void VideoDetailPlay_Click(object sender, RoutedEventArgs e)
@@ -748,7 +932,7 @@ public sealed partial class ResourceLibraryPage : Page
             model = children.FirstOrDefault(child => string.Equals(child.Path, location.Path, StringComparison.OrdinalIgnoreCase));
         }
         model ??= new ResourceBrowserItem { Name = Path.GetFileName(location.Path), Path = location.Path, Kind = ResourceBrowserItemKind.VideoFolder };
-        var item = new ResourceBrowserItemViewModel(model);
+        var item = new ResourceBrowserItemViewModel(model, _workspace, _animeLibrary);
         var listed = CreateListedItem(item) as ResourceVideoFolderListedItem;
         if (!string.IsNullOrWhiteSpace(model.PosterPath))
             item.Poster = await LoadPosterAsync(model.PosterPath, token);
@@ -756,6 +940,87 @@ public sealed partial class ResourceLibraryPage : Page
         _detailFolderItem = item;
         _detailFolderListedItem = listed;
         ShowActiveVideoDetails();
+    }
+
+    private async void AnimeRoot_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new Windows.Storage.Pickers.FolderPicker();
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, MainWindow.Instance.WindowHandle);
+        picker.FileTypeFilter.Add("*");
+        var folder = await picker.PickSingleFolderAsync();
+        if (folder is null) return;
+        _workspace.SetLibraryPath(folder.Path);
+        _libraryPath = folder.Path;
+        AnimeRootPath.Text = folder.Path;
+        NavigateToLocation([new ResourceBrowserLocation(folder.Path, ResourceBrowserLocationKind.LibraryRoot, folder.Path)]);
+    }
+
+    private async Task BuildAnimeSeasonButtonsAsync(ResourceBrowserLocation location, CancellationToken token)
+    {
+        var seasons = await AnimeLibraryService.GetSeasonsAsync(location.Path, _workspace.Settings, token);
+        if (seasons.Count == 0) return;
+        ActorGroupButtons.Children.Clear();
+        ActorGroupSelector.Visibility = !_workspace.Settings.AnimeFlattenSeasons && (seasons.Count > 1 || !PathEquals(seasons[0], location.Path)) ? Visibility.Visible : Visibility.Collapsed;
+        async Task SelectSeasonAsync(string path)
+        {
+            foreach (var button in ActorGroupButtons.Children.OfType<Button>()) button.Style = PathEquals((string)button.Tag, path) ? (Style)Application.Current.Resources["AccentButtonStyle"] : null;
+            var selection = ++_animeSeasonSelection;
+            var episodes = await _browser.GetChildrenAsync(path, ResourceBrowserLocationKind.VideoFolder, _workspace.Settings, token);
+            if (selection != _animeSeasonSelection) return;
+            token.ThrowIfCancellationRequested();
+            var models = new List<ResourceBrowserItemViewModel>();
+            var posterCache = new Dictionary<string, BitmapImage?>(StringComparer.OrdinalIgnoreCase);
+            foreach (var episode in episodes)
+            {
+                var model = new ResourceBrowserItemViewModel(episode, _workspace, true);
+                model.EpisodeIndex = models.Count + 1;
+                var poster = AnimeLibraryService.ResolveEpisodePoster(episode.Path, path, location.Path, _workspace.Settings, _detailFolderItem?.Model.PosterPath);
+                if (!string.IsNullOrWhiteSpace(poster))
+                {
+                    if (!posterCache.TryGetValue(poster, out var image))
+                    {
+                        image = await LoadPosterAsync(poster, token);
+                        posterCache[poster] = image;
+                    }
+                    model.Poster = image;
+                }
+                models.Add(model);
+            }
+            if (selection != _animeSeasonSelection) return;
+            token.ThrowIfCancellationRequested();
+            ClearSelectedResourceItems(); SetNativeSelection(null);
+            BrowserItems.Clear();
+            AnimeEpisodeCards.Visibility = episodes.Count > 0 && episodes.Count <= _workspace.Settings.AnimePosterEpisodeLimit ? Visibility.Visible : Visibility.Collapsed;
+            AnimeEpisodeButtons.Visibility = episodes.Count > _workspace.Settings.AnimePosterEpisodeLimit ? Visibility.Visible : Visibility.Collapsed;
+            VideoFileList.Visibility = Visibility.Collapsed;
+            foreach (var model in models) BrowserItems.Add(model);
+            ApplyBrowserSorting();
+            ActiveBrowserList.SelectedItem = BrowserItems.FirstOrDefault();
+            _activeVideoItem = ActiveBrowserList.SelectedItem as ResourceBrowserItemViewModel;
+            ShowActiveVideoDetails(); UpdateNativeResourceStatus();
+            await LoadVideoIllustrationsAsync(path, token);
+        }
+        foreach (var season in seasons)
+        {
+            var path = season;
+            var button = new Button { Content = PathEquals(path, location.Path) ? Strings.AnimeLibraryEpisodes.GetLocalizedResource() : Path.GetRelativePath(location.Path, path), Tag = path, Padding = new Thickness(12, 6, 12, 6) };
+            button.Click += async (_, _) => { try { await SelectSeasonAsync(path); } catch (OperationCanceledException) { } catch (Exception ex) { SetResourceStatusMessage(ex.Message); } };
+            ActorGroupButtons.Children.Add(button);
+        }
+        await SelectSeasonAsync(seasons[0]);
+    }
+
+    private void VideoDetailLayout_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateAnimePosterLayout();
+
+    private void UpdateAnimePosterLayout()
+    {
+        if (!_animeLibrary) return;
+        var width = VideoDetailLayout.ActualWidth is > 0 and < 700 ? 150 : 210;
+        VideoPosterColumn.Width = GridLength.Auto;
+        VideoDetailLayout.ColumnDefinitions[1].Width = new GridLength(1, GridUnitType.Star);
+        VideoPosterFrame.Width = width;
+        VideoPosterFrame.Height = width * 1.5;
+        VideoPosterFrame.HorizontalAlignment = HorizontalAlignment.Left;
     }
 
     private void UpdateDetailTitleAction()
@@ -855,11 +1120,31 @@ public sealed partial class ResourceLibraryPage : Page
         catch (OperationCanceledException) { throw; }
         catch (Exception ex) { App.Logger.LogWarning(ex, "Unable to load video illustrations from {Folder}", folderPath); }
         token.ThrowIfCancellationRequested();
+        if (_animeLibrary)
+        {
+            _animeIllustrationCache.Clear();
+            foreach (var pair in imagePaths) _animeIllustrationCache[pair.Key] = pair.Value;
+            UpdateAnimeIllustrations();
+            return;
+        }
         _illustrationPaths.Clear();
         foreach (var pair in imagePaths) _illustrationPaths[pair.Key] = pair.Value;
         _illustrationImages = images;
         VideoIllustrations.ItemsSource = images;
         VideoIllustrationsEmpty.Visibility = images.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void UpdateAnimeIllustrations()
+    {
+        var orderedVideos = BrowserItems.OrderBy(item => item.EpisodeIndex).Select(item => item.Path).ToArray();
+        var number = _activeVideoItem is null ? null : AnimeLibraryService.GetIllustrationNumber(_activeVideoItem.Path, orderedVideos);
+        var matching = _activeVideoItem is null ? [] : _animeIllustrationCache.Where(pair => AnimeLibraryService.IsEpisodeIllustration(pair.Value, _activeVideoItem.Path, number)).ToArray();
+        var images = matching.Length > 0 ? matching : _animeIllustrationCache.Where(pair => AnimeLibraryService.GetIllustrationGroup(pair.Value) is null && AnimeLibraryService.GetIllustrationEpisodeNumber(pair.Value) is null).ToArray();
+        _illustrationPaths.Clear();
+        foreach (var pair in images) _illustrationPaths[pair.Key] = pair.Value;
+        _illustrationImages = images.Select(pair => pair.Key).ToList();
+        VideoIllustrations.ItemsSource = _illustrationImages;
+        VideoIllustrationsEmpty.Visibility = images.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private async void AddVideoIllustration_Click(object sender, RoutedEventArgs e)
@@ -931,6 +1216,8 @@ public sealed partial class ResourceLibraryPage : Page
         {
             videoFolderListedItem = new ResourceVideoFolderListedItem
             {
+                IsAnime = _animeLibrary,
+                AnimeDetails = _animeLibrary ? _workspace.GetVideoDetails(item.Path) : null,
                 PosterPath = item.Model.PosterPath,
                 DisplayTitle = item.Model.Name,
             };
@@ -938,7 +1225,7 @@ public sealed partial class ResourceLibraryPage : Page
         }
         else if (isFile)
         {
-            listedItem = new ResourceVideoFileListedItem();
+            listedItem = new ResourceVideoFileListedItem { IsAnime = _animeLibrary, AnimeDetails = _animeLibrary ? _workspace.GetVideoDetails(item.Path) : null };
         }
         else
         {
@@ -1084,14 +1371,14 @@ public sealed partial class ResourceLibraryPage : Page
             return;
         }
 
-        var locationKind = item.Kind switch
+        var locationKind = _animeLibrary && _locations.Count == 1 ? ResourceBrowserLocationKind.ActorFolder : item.Kind switch
         {
             ResourceBrowserItemKind.ActorFolder => ResourceBrowserLocationKind.ActorFolder,
             ResourceBrowserItemKind.VideoFolder => ResourceBrowserLocationKind.VideoFolder,
             _ => ResourceBrowserLocationKind.CategoryFolder,
         };
 
-        if (_locations.Count > 0 &&
+        if (!_animeLibrary && _locations.Count > 0 &&
             !PathEquals(Path.GetDirectoryName(item.Path) ?? string.Empty, _locations[^1].Path))
         {
             await TryNavigateToResourcePathAsync(item.Path);
@@ -1246,10 +1533,11 @@ public sealed partial class ResourceLibraryPage : Page
     {
         var arguments = new NavigationArguments
         {
-            NavPathParam = "ResourceManager",
+            NavPathParam = _animeLibrary ? "AnimeLibrary" : "ResourceManager",
             IsResourceLibraryPage = true,
             IsResourceManagerMode = false,
             ResourceLibraryPath = _libraryPath,
+            AnimeEditPath = _pendingAnimeEditPath,
             ResourceLocationPaths = locations.Select(location => location.Path).ToArray(),
             ResourceLocationTitles = locations.Select(location => location.Title).ToArray(),
             ResourceLocationKinds = locations.Select(location => location.Kind).ToArray(),
@@ -1287,6 +1575,29 @@ public sealed partial class ResourceLibraryPage : Page
             return;
         }
 
+        if (_animeLibrary)
+        {
+            var current = _locations[^1];
+            var content = new AnimeFormatOptimizationDialog(_libraryPath, current.Path, current.Kind == ResourceBrowserLocationKind.VideoFolder, _workspace);
+            var animeDialog = ResourceDialogPresentation.Create(XamlRoot, content);
+            content.RequestClose += (_, _) => animeDialog.Hide();
+            animeDialog.Closing += (_, args) => args.Cancel = content.IsBusy;
+            await animeDialog.ShowAsync();
+            if (content.HasChanges)
+            {
+                var locations = _locations.Select(location =>
+                {
+                    var path = location.Path;
+                    foreach (var mapping in content.AppliedMappings)
+                        if (PathEquals(path, mapping.SourcePath) || path.StartsWith(mapping.SourcePath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                            path = mapping.TargetPath + path[mapping.SourcePath.Length..];
+                    return new ResourceBrowserLocation(path, location.Kind, location.Kind == ResourceBrowserLocationKind.VideoFolder ? AnimeLibraryService.GetSeasonTitle(path) : location.Title);
+                }).ToArray();
+                NavigateToLocation(locations);
+            }
+            return;
+        }
+
         var currentLocation = _locations[^1];
         var toolsDialog = new ResourceToolsDialog(
             _libraryPath,
@@ -1302,15 +1613,39 @@ public sealed partial class ResourceLibraryPage : Page
             await LoadLocationAsync(_locations[^1]);
     }
 
+    private async Task ImportAnimeImagesAsync(ResourceBrowserItemViewModel item)
+    {
+        try
+        {
+            var content = new AnimeImageImportDialog(item.Path, _workspace);
+            var dialog = ResourceDialogPresentation.Create(XamlRoot, content);
+            content.RequestClose += (_, _) => dialog.Hide();
+            dialog.Closing += (_, args) => args.Cancel = content.IsBusy;
+            await dialog.ShowAsync();
+            if (content.HasChanges) await RefreshAsync();
+        }
+        catch (Exception ex) { SetResourceStatusMessage(Strings.AnimeImagesFailed.GetLocalizedResource() + " " + ex.Message); }
+    }
+
     [DynamicWindowsRuntimeCast(typeof(FrameworkElement))]
     private void OnBrowserItemRightTapped(object sender, RightTappedRoutedEventArgs e)
     {
+        if (_animeLibrary && _locations.Count > 0 && _locations[^1].Kind == ResourceBrowserLocationKind.LibraryRoot) { e.Handled = true; return; }
         if (sender is not FrameworkElement element || element.DataContext is not ResourceBrowserItemViewModel item)
             return;
 
         var pointerPosition = e.GetPosition(element);
         e.Handled = true;
         var flyout = new MenuFlyout();
+        if (_animeLibrary && item.Kind is ResourceBrowserItemKind.VideoFolder or ResourceBrowserItemKind.VideoFile)
+        {
+            var edit = new MenuFlyoutItem { Text = Strings.AnimeLibraryEditDetails.GetLocalizedResource() };
+            edit.Click += async (_, _) => { if (item.Kind == ResourceBrowserItemKind.VideoFile) { ActiveBrowserList.SelectedItem = item; BeginAnimeEdit(); } else await EditAnimeDetailsAsync(item); };
+            flyout.Items.Add(edit);
+            var import = new MenuFlyoutItem { Text = Strings.AnimeImagesImport.GetLocalizedResource() };
+            import.Click += async (_, _) => await ImportAnimeImagesAsync(item);
+            if (item.Kind == ResourceBrowserItemKind.VideoFolder) flyout.Items.Add(import);
+        }
         if (item.Kind == ResourceBrowserItemKind.ActorFolder)
         {
             var hide = new MenuFlyoutItem { Text = "在资源管理中隐藏" };
@@ -1571,7 +1906,7 @@ public sealed partial class ResourceLibraryPage : Page
         foreach (var item in items)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var viewModel = new ResourceBrowserItemViewModel(item);
+            var viewModel = new ResourceBrowserItemViewModel(item, _workspace, _animeLibrary);
             if (initialGridLayout is { } initialLayout &&
                 item.Kind is ResourceBrowserItemKind.ActorFolder or ResourceBrowserItemKind.VideoFolder)
                 viewModel.SetAdaptiveCardWidth(initialLayout.CardWidth);
@@ -1584,6 +1919,7 @@ public sealed partial class ResourceLibraryPage : Page
             }
             BrowserItems.Add(viewModel);
         }
+        ApplyBrowserSorting();
     }
 
     private StatusBarViewModel? GetNativeResourceStatusBarViewModel()
@@ -1618,6 +1954,7 @@ public sealed partial class ResourceLibraryPage : Page
     private string GetResourceCountStatus()
     {
         var locationKind = _locations.Count > 0 ? _locations[^1].Kind : ResourceBrowserLocationKind.LibraryRoot;
+        if (_animeLibrary) return $"{BrowserItems.Count} {Strings.Items.GetLocalizedFormatResource(BrowserItems.Count)}";
         if (locationKind == ResourceBrowserLocationKind.LibraryRoot)
         {
             var actorCount = BrowserItems.Count(item => item.Kind == ResourceBrowserItemKind.ActorFolder);

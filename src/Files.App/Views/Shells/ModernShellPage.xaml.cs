@@ -194,6 +194,10 @@ namespace Files.App.Views.Shells
 			{
 				NavigateToResourceManagerTools();
 			}
+			else if (navParams.NavPath == "AnimeLibrary")
+			{
+				NavigationHelpers.OpenAnimeLibrary(this);
+			}
 			else if (navParams.NavPath == "VideoEditor")
 			{
 				NavigateToVideoEditor();
@@ -572,7 +576,7 @@ namespace Files.App.Views.Shells
 			if (ItemDisplayFrame is not { } itemDisplayFrame)
 				return;
 
-			arguments.NavPathParam = "ResourceManager";
+			arguments.NavPathParam = arguments.NavPathParam == "AnimeLibrary" ? "AnimeLibrary" : "ResourceManager";
 			arguments.IsResourceLibraryPage = true;
 			arguments.IsResourceManagerMode = false;
 			arguments.ResourceLibraryPath ??= _resourceWorkspaceService.LibraryPath;

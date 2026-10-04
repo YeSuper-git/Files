@@ -7,6 +7,9 @@ namespace Files.App.Data.Items.ResourceManager;
 
 public sealed partial class ResourceVideoFolderListedItem : ListedItem
 {
+    public bool IsAnime { get; set; }
+    public Files.App.Data.Models.ResourceManager.ResourceVideoDetails? AnimeDetails { get; set; }
+
     public string? PosterPath { get; set; }
 
     private string _displayTitle = string.Empty;

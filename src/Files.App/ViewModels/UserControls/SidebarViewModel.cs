@@ -87,7 +87,8 @@ namespace Files.App.ViewModels.UserControls
 				SectionType.FileTag
 #if FILES_RESOURCE_MANAGER
 				, SectionType.ResourceManager,
-				SectionType.VideoEditor
+				SectionType.VideoEditor,
+				SectionType.AnimeLibrary
 #endif
 			];
 
@@ -323,6 +324,7 @@ namespace Files.App.ViewModels.UserControls
 #if FILES_RESOURCE_MANAGER
 			Manager_DataChanged(SectionType.ResourceManager, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
 			Manager_DataChanged(SectionType.VideoEditor, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+			Manager_DataChanged(SectionType.AnimeLibrary, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
 #endif
 
 			App.QuickAccessManager.Model.DataChanged += Manager_DataChanged;
@@ -386,7 +388,7 @@ namespace Files.App.ViewModels.UserControls
 #if FILES_RESOURCE_MANAGER
 				// Resource Manager is a standalone navigation item, so it has no
 				// child collection to synchronize like the filesystem sections do.
-				if (sectionType is SectionType.ResourceManager or SectionType.VideoEditor)
+				if (sectionType is SectionType.ResourceManager or SectionType.VideoEditor or SectionType.AnimeLibrary)
 					return;
 #endif
 
@@ -403,6 +405,7 @@ namespace Files.App.ViewModels.UserControls
 					// Resource Manager is a standalone navigation item, not a collection-backed section.
 					SectionType.ResourceManager => Array.Empty<INavigationControlItem>(),
 					SectionType.VideoEditor => Array.Empty<INavigationControlItem>(),
+					SectionType.AnimeLibrary => Array.Empty<INavigationControlItem>(),
 #endif
 					_ => throw new ArgumentOutOfRangeException(nameof(sectionType), sectionType, "The sidebar section type is not supported.")
 				};
@@ -640,6 +643,13 @@ namespace Files.App.ViewModels.UserControls
 					section.IsHeader = true;
 					break;
 
+				case SectionType.AnimeLibrary:
+					section = BuildSection(Strings.AnimeLibraryTitle.GetLocalizedResource(), sectionType, new ContextMenuOptions { IsLocationItem = true }, true);
+					section.ChildItems = null;
+					section.Path = "AnimeLibrary";
+					section.IsHeader = true;
+					break;
+
 				case SectionType.VideoEditor:
 					section = BuildSection(Strings.VideoEditorNavigationTitle.GetLocalizedResource(), sectionType, new ContextMenuOptions { IsLocationItem = true }, true);
 					section.ChildItems = null;
@@ -697,6 +707,7 @@ namespace Files.App.ViewModels.UserControls
 #if FILES_RESOURCE_MANAGER
 					SectionType.ResourceManager => () => Task.CompletedTask,
 					SectionType.VideoEditor => () => Task.CompletedTask,
+					SectionType.AnimeLibrary => () => Task.CompletedTask,
 #endif
 					_ => () => Task.CompletedTask
 				};
@@ -887,6 +898,13 @@ namespace Files.App.ViewModels.UserControls
 
 				if (PaneHolder?.ActivePane is IShellPage resourceManagerShellPage)
 					resourceManagerShellPage.NavigateToResourceManager();
+				return;
+			}
+
+			if (string.Equals(navigationPath, "AnimeLibrary", StringComparison.OrdinalIgnoreCase))
+			{
+				if (ctrlPressed || middleClickPressed) await NavigationHelpers.OpenPathInNewTab("AnimeLibrary");
+				else if (PaneHolder?.ActivePane is IShellPage animeShell) NavigationHelpers.OpenAnimeLibrary(animeShell);
 				return;
 			}
 

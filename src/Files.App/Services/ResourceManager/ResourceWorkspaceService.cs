@@ -25,14 +25,16 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
     private readonly string _posterStoragePath;
     private ResourceWorkspaceState _state;
 
-    public ResourceWorkspaceService(ILogger<ResourceWorkspaceService> logger)
+    public ResourceWorkspaceService(ILogger<ResourceWorkspaceService> logger) : this(logger, false) { }
+
+    public ResourceWorkspaceService(ILogger<ResourceWorkspaceService> logger, bool animeLibrary)
     {
         _logger = logger;
         _statePath = Path.Combine(
             ApplicationData.Current.LocalFolder.Path,
             Constants.LocalSettings.SettingsFolderName,
-            StateFileName);
-        _posterStoragePath = Path.Combine(Path.GetDirectoryName(_statePath)!, PosterStorageFolderName);
+            animeLibrary ? "files-anime-workspace.json" : StateFileName);
+        _posterStoragePath = Path.Combine(Path.GetDirectoryName(_statePath)!, animeLibrary ? "AnimePosters" : PosterStorageFolderName);
         _state = LoadState();
         MigratePosterReferences();
     }
@@ -410,6 +412,14 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
                 videoTitleTranslations[itemKey] = pair.Value.Clone();
             }
 
+            var videoDetails = new Dictionary<string, ResourceVideoDetails>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in _state.VideoDetails)
+            {
+                var itemPath = RemapPath(pair.Key, mappings);
+                changed |= !string.Equals(itemPath, pair.Key, StringComparison.OrdinalIgnoreCase);
+                videoDetails[itemPath] = pair.Value;
+            }
+
             var actorDetails = new Dictionary<string, ResourceActorDetails>(StringComparer.OrdinalIgnoreCase);
             foreach (var pair in _state.ActorDetails)
             {
@@ -443,6 +453,7 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
             _state.VideoWatchStatuses = videoWatchStatuses;
             _state.VideoLastWatchedAt = videoLastWatchedAt;
             _state.VideoTitleTranslations = videoTitleTranslations;
+            _state.VideoDetails = videoDetails;
             _state.ActorDetails = actorDetails;
             _state.HiddenActorFolders = hiddenActorFolders;
             PersistState();
@@ -451,6 +462,20 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
         {
             _logger.LogWarning(ex, "Unable to update resource metadata paths for a batch of path mappings");
         }
+    }
+
+    public ResourceVideoDetails GetVideoDetails(string path)
+    {
+        var key = Path.GetFullPath(path);
+        return _state.VideoDetails.TryGetValue(key, out var details)
+            ? new ResourceVideoDetails { Synopsis = details.Synopsis, AirDate = details.AirDate }
+            : new ResourceVideoDetails();
+    }
+
+    public void SetVideoDetails(string path, ResourceVideoDetails details)
+    {
+        _state.VideoDetails[Path.GetFullPath(path)] = new ResourceVideoDetails { Synopsis = details.Synopsis.Trim(), AirDate = details.AirDate };
+        PersistState();
     }
 
     public ResourceActorDetails GetActorDetails(string actorFolderPath)
@@ -756,6 +781,7 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
                     state.PosterOverrides = NormalizePosterOverrides(state.PosterOverrides);
                     state.HiddenActorFolders = NormalizeHiddenActorFolders(state.HiddenActorFolders);
                     state.ActorDetails = NormalizeActorDetails(state.ActorDetails);
+                    state.VideoDetails = new(state.VideoDetails ?? new(), StringComparer.OrdinalIgnoreCase);
                     state.ResourceTags = NormalizeResourceTags(state.ResourceTags);
                     state.ResourceTagAssignments = NormalizeResourceTagAssignments(state.ResourceTagAssignments, state.ResourceTags);
                     state.VideoWatchStatuses = NormalizeVideoWatchStatuses(state.VideoWatchStatuses);

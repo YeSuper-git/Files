@@ -1,0 +1,9 @@
+<!-- Copyright (c) Files Community. Licensed under the MIT License. -->
+<Page x:Class="Files.App.Views.Settings.AnimeLibrarySettingsPage"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:helpers="using:Files.App.Helpers">
+ <StackPanel x:Name="SettingsContent" Spacing="8">
+  <TextBlock Padding="0,0,0,12" Style="{StaticResource App.Theme.SubtitleTextBlockStyle}" Text="{helpers:ResourceString Name=AnimeLibraryTitle}" />
+ </StackPanel>
+</Page>

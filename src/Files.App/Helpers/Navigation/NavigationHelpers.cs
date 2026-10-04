@@ -45,6 +45,12 @@ namespace Files.App.Helpers
 		}
 
 #if FILES_RESOURCE_MANAGER
+		public static void OpenAnimeLibrary(IShellPage shell)
+		{
+			var workspace = Ioc.Default.GetRequiredService<Files.App.Services.ResourceManager.AnimeLibraryService>().Workspace;
+			shell.NavigateToResourceLibraryLocation(new NavigationArguments { NavPathParam = "AnimeLibrary", IsResourceLibraryPage = true, ResourceLibraryPath = workspace.LibraryPath });
+		}
+
 		public static Task OpenResourceManagerInNewTab()
 		{
 			return AddNewTabByParamAsync(
@@ -300,6 +306,11 @@ namespace Files.App.Helpers
 				tabLocationHeader = "资源管理";
 				iconSource = new FontIconSource() { Glyph = "\uE8B7" };
 				toolTipText = tabLocationHeader;
+			}
+			else if (currentPath.Equals("AnimeLibrary", StringComparison.OrdinalIgnoreCase))
+			{
+				tabLocationHeader = Strings.AnimeLibraryTitle.GetLocalizedResource();
+				((ImageIconSource)iconSource).ImageSource = new BitmapImage(new Uri(SidebarSectionIcons.For(SectionType.AnimeLibrary)!));
 			}
 			else if (currentPath.Equals("VideoEditor", StringComparison.OrdinalIgnoreCase))
 			{

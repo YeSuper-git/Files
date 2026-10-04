@@ -7,6 +7,12 @@ public sealed class ResourceSettings
 {
     public List<string> VideoExtensions { get; set; } = ["mp4", "mkv", "avi", "mov", "wmv", "flv", "m4v", "ts"];
     public List<string> ImageExtensions { get; set; } = ["jpg", "jpeg", "png", "webp"];
+    public List<string> AnimeImageIncludedNames { get; set; } = [];
+    public string AnimeImageWebsitePrefix { get; set; } = string.Empty;
+    public string AnimeImageSource { get; set; } = string.Empty;
+    public bool AnimeFlattenSeasons { get; set; } = true;
+    public int AnimePosterWidth { get; set; } = 160;
+    public int AnimePosterEpisodeLimit { get; set; } = 8;
     public int PosterQualityKb { get; set; } = 30;
     public List<string> SubtitleKeywords { get; set; } = ["中文字幕", "中字", "中文", "chinese", "chs", "cht", "sub"];
 
@@ -15,6 +21,12 @@ public sealed class ResourceSettings
         VideoExtensions = [.. (VideoExtensions ?? [])],
         ImageExtensions = [.. (ImageExtensions ?? [])],
         PosterQualityKb = PosterQualityKb,
+        AnimeImageIncludedNames = [.. (AnimeImageIncludedNames ?? [])],
+        AnimeImageWebsitePrefix = AnimeImageWebsitePrefix,
+        AnimeImageSource = AnimeImageSource,
+        AnimeFlattenSeasons = AnimeFlattenSeasons,
+        AnimePosterWidth = AnimePosterWidth,
+        AnimePosterEpisodeLimit = AnimePosterEpisodeLimit,
         SubtitleKeywords = [.. (SubtitleKeywords ?? [])],
     };
 
@@ -30,6 +42,9 @@ public sealed class ResourceSettings
         SubtitleKeywords = keywords.Count > 0
             ? keywords
             : ["中文字幕", "中字", "中文", "chinese", "chs", "cht", "sub"];
+        AnimeImageIncludedNames = (AnimeImageIncludedNames ?? []).Select(value => value.Trim()).Where(value => value.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        AnimePosterWidth = Math.Clamp(AnimePosterWidth, 100, 240);
+        AnimePosterEpisodeLimit = Math.Clamp(AnimePosterEpisodeLimit, 0, 30);
         PosterQualityKb = Math.Clamp(PosterQualityKb, 1, 1024 * 1024);
     }
 

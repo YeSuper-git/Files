@@ -45,6 +45,7 @@ namespace Files.App.Data.Contracts
 #if FILES_RESOURCE_MANAGER
 		, ResourceManager
 		, VideoEditor
+		, AnimeLibrary
 #endif
 	}
 

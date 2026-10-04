@@ -382,6 +382,7 @@ namespace Files.App.ViewModels.UserControls
 			}
 
 			var control = await GetBuiltInPreviewControlAsync(item, downloadItem);
+            AddAnimeEpisodeDetails(item);
 
 			if (token.IsCancellationRequested)
 				return;
@@ -395,6 +396,7 @@ namespace Files.App.ViewModels.UserControls
 
 			var basicModel = new BasicPreviewViewModel(item);
 			await basicModel.LoadAsync();
+            AddAnimeEpisodeDetails(item);
 
 			control = new BasicPreview(basicModel);
 
@@ -404,6 +406,17 @@ namespace Files.App.ViewModels.UserControls
 			PreviewPaneContent = control;
 			PreviewPaneState = SelectedDriveItem is not null ? PreviewPaneStates.DriveStorageDetailsAvailable : PreviewPaneStates.PreviewAndDetailsAvailable;
 		}
+
+        private static void AddAnimeEpisodeDetails(ListedItem item)
+        {
+            if (item is not ResourceVideoFileListedItem { IsAnime: true } anime) return;
+            item.FileDetails ??= [];
+            foreach (var property in item.FileDetails.Where(property => property.NameResource is "PropertyDateModified" or "PropertyDateCreated" or "PropertyItemCount"
+                || property.LocalizedName == Strings.AnimeLibraryAirDateLabel.GetLocalizedResource() || property.LocalizedName == Strings.AnimeLibrarySynopsis.GetLocalizedResource()).ToArray())
+                item.FileDetails.Remove(property);
+            item.FileDetails.Insert(0, new FileProperty { LocalizedName = Strings.AnimeLibrarySynopsis.GetLocalizedResource(), Value = string.IsNullOrWhiteSpace(anime.AnimeDetails?.Synopsis) ? Strings.AnimeLibraryNoSynopsis.GetLocalizedResource() : anime.AnimeDetails.Synopsis });
+            item.FileDetails.Insert(0, new FileProperty { LocalizedName = Strings.AnimeLibraryAirDateLabel.GetLocalizedResource(), Value = anime.AnimeDetails?.AirDate?.ToString("yyyy-MM") ?? "—" });
+        }
 
 		private async Task<UserControl?> GetBuiltInPreviewControlAsync(ListedItem item, bool downloadItem)
 		{
@@ -656,6 +669,7 @@ namespace Files.App.ViewModels.UserControls
 
 				var basicModel = new BasicPreviewViewModel(selectedItem);
 				await basicModel.LoadAsync();
+                AddAnimeEpisodeDetails(selectedItem);
 
 				if (token.IsCancellationRequested)
 					return;

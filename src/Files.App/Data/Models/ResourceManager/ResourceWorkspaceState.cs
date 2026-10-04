@@ -17,6 +17,7 @@ public sealed class ResourceWorkspaceState
     public Dictionary<string, string> PosterOverrides { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public List<string> HiddenActorFolders { get; set; } = [];
     public Dictionary<string, ResourceActorDetails> ActorDetails { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, ResourceVideoDetails> VideoDetails { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public List<ResourceTagDefinition> ResourceTags { get; set; } = [];
     public Dictionary<string, List<string>> ResourceTagAssignments { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, ResourceVideoWatchStatus> VideoWatchStatuses { get; set; } = new(StringComparer.OrdinalIgnoreCase);

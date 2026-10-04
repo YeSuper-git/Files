@@ -5027,4 +5027,61 @@
   <data name="ResourceOptimizationRemoveTagSummary" xml:space="preserve"><value>{0}: {1} works have an incorrect Chinese subtitle tag</value></data>
   <data name="ResourceOptimizationMoveSummary" xml:space="preserve"><value>{0}: {1} works need to move to the no-subtitle category</value></data>
   <data name="ResourceOptimizationRenameSummary" xml:space="preserve"><value>{0}: {1} video files need normalized names</value></data>
+  <data name="AnimeLibraryTitle" xml:space="preserve"><value>Anime library</value></data>
+  <data name="AnimeLibraryChooseRoot" xml:space="preserve"><value>选择番剧根目录</value></data>
+  <data name="AnimeLibraryEpisodes" xml:space="preserve"><value>剧集</value></data>
+  <data name="AnimeLibraryEpisodeNumber" xml:space="preserve"><value>Episode {0}</value></data>
+  <data name="AnimeLibraryNoSynopsis" xml:space="preserve"><value>No synopsis</value></data>
+  <data name="AnimeLibraryAirDate" xml:space="preserve"><value>Air date: {0}</value></data>
+  <data name="AnimeLibrarySynopsis" xml:space="preserve"><value>Synopsis</value></data>
+  <data name="AnimeLibraryAirDateLabel" xml:space="preserve"><value>Air date</value></data>
+  <data name="AnimeLibraryEditDetails" xml:space="preserve"><value>Edit</value></data>
+  <data name="AnimeLibrarySave" xml:space="preserve"><value>Save</value></data>
+  <data name="AnimeLibraryCancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="AnimeLibraryFlattenSeasons" xml:space="preserve"><value>Show seasons directly in categories</value></data>
+  <data name="AnimeLibraryPosterWidth" xml:space="preserve"><value>Poster width (pixels)</value></data>
+  <data name="AnimeLibraryPosterEpisodeLimit" xml:space="preserve"><value>Maximum episodes for poster cards (0 uses buttons for all)</value></data>
+  <data name="AnimeLibraryVideoExtensions" xml:space="preserve"><value>Video file extensions</value></data>
+  <data name="AnimeLibraryImageExtensions" xml:space="preserve"><value>Poster image extensions</value></data>
+  <data name="AnimeLibraryInvalidMonth" xml:space="preserve"><value>Enter a year and month, e.g. 2026-10</value></data>
+  <data name="AnimeOptimizationTitle" xml:space="preserve"><value>Anime format optimization</value></data>
+  <data name="AnimeOptimizationFolders" xml:space="preserve"><value>Optimize folder names</value></data>
+  <data name="AnimeOptimizationPosters" xml:space="preserve"><value>Optimize poster names</value></data>
+  <data name="AnimeOptimizationIllustrations" xml:space="preserve"><value>Identify and optimize illustration names</value></data>
+  <data name="AnimeOptimizationScanning" xml:space="preserve"><value>Generating rename preview…</value></data>
+  <data name="AnimeOptimizationNoChanges" xml:space="preserve"><value>No changes needed</value></data>
+  <data name="AnimeOptimizationCount" xml:space="preserve"><value>{0} changes, {1} skipped</value></data>
+  <data name="AnimeOptimizationResult" xml:space="preserve"><value>{0} changes completed, {1} incomplete</value></data>
+  <data name="AnimeOptimizationCompleted" xml:space="preserve"><value>Optimization completed</value></data>
+  <data name="AnimeOptimizationContinue" xml:space="preserve"><value>Continue optimizing</value></data>
+  <data name="AnimeOptimizationOpenFolder" xml:space="preserve"><value>Open folder</value></data>
+  <data name="AnimeOptimizationAssignVideo" xml:space="preserve"><value>Select matching video</value></data>
+  <data name="AnimeOptimizationAssignments" xml:space="preserve"><value>{0} ready, {1} unassigned or conflicting</value></data>
+  <data name="AnimeOptimizationFolderExecute" xml:space="preserve"><value>Optimize this folder</value></data>
+  <data name="AnimeOptimizationAssignGroup" xml:space="preserve"><value>Assign video to entire group</value></data>
+  <data name="AnimeImagesSource" xml:space="preserve"><value>Image source URL</value></data>
+  <data name="AnimeImagesSourceHelp" xml:space="preserve"><value>Enter a regular anime page URL. You can change it when importing.</value></data>
+  <data name="AnimeImagesImport" xml:space="preserve"><value>Import posters and illustrations</value></data>
+  <data name="AnimeImagesScan" xml:space="preserve"><value>Find images</value></data>
+  <data name="AnimeImagesSave" xml:space="preserve"><value>Download selected images</value></data>
+  <data name="AnimeImagesHelp" xml:space="preserve"><value>Finds image links in static HTML without running scripts. Confirm the image type and episode. Downloads preserve source bytes and do not overwrite existing posters.</value></data>
+  <data name="AnimeImagesLoading" xml:space="preserve"><value>Finding images…</value></data>
+  <data name="AnimeImagesDeclared" xml:space="preserve"><value>Page-declared full image; original quality unverified</value></data>
+  <data name="AnimeImagesLargest" xml:space="preserve"><value>Largest page candidate; original unconfirmed</value></data>
+  <data name="AnimeImagesUnknown" xml:space="preserve"><value>Original unconfirmed</value></data>
+  <data name="AnimeImagesPoster" xml:space="preserve"><value>Poster</value></data>
+  <data name="AnimeImagesIllustration" xml:space="preserve"><value>Illustration</value></data>
+  <data name="AnimeImagesPreview" xml:space="preserve"><value>Preview</value></data>
+  <data name="AnimeImagesNoVideos" xml:space="preserve"><value>No videos to associate. Open a folder containing videos.</value></data>
+  <data name="AnimeImagesEmpty" xml:space="preserve"><value>No identifiable images. Dynamically loaded pages are not supported yet.</value></data>
+  <data name="AnimeImagesFound" xml:space="preserve"><value>Found {0} candidate images. Select images and their videos.</value></data>
+  <data name="AnimeImagesCancelled" xml:space="preserve"><value>Cancelled. Completed downloads are retained.</value></data>
+  <data name="AnimeImagesFailed" xml:space="preserve"><value>Image import failed:</value></data>
+  <data name="AnimeImagesResult" xml:space="preserve"><value>Completed: {0} downloaded, {1} skipped, {2} failed.</value></data>
+  <data name="AnimeImagesChooseSeries" xml:space="preserve"><value>Choose work / series</value></data>
+  <data name="AnimeImagesChooseVideo" xml:space="preserve"><value>Choose video</value></data>
+  <data name="AnimeImagesPrefix" xml:space="preserve"><value>Website prefix preset</value></data>
+  <data name="AnimeImagesPrefixHelp" xml:space="preserve"><value>For example https://example.org/anime/. Enter only the suffix when importing, or enter a full URL to override.</value></data>
+  <data name="AnimeImagesIncludedNames" xml:space="preserve"><value>Included image name keywords</value></data>
+  <data name="AnimeImagesIncludedNamesHelp" xml:space="preserve"><value>Keep images whose filename contains any keyword, ignoring case. Separate keywords with commas. Leave empty to keep all images.</value></data>
 </root>

@@ -26,6 +26,7 @@ namespace Files.App.Helpers
 #if FILES_RESOURCE_MANAGER
 			SectionType.ResourceManager => Resolve("Home"),
 			SectionType.VideoEditor => Resolve("VideoEditor"),
+			SectionType.AnimeLibrary => Resolve("VideoEditor"),
 #endif
 			_ => null
 		};
