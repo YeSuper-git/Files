@@ -21,14 +21,18 @@ public sealed partial class ResourceBrowserItemViewModel : ObservableObject
     private readonly IAppSettingsService _appSettings = Ioc.Default.GetRequiredService<IAppSettingsService>();
     private readonly VideoAssistantSearchService _videoAssistantSearch = Ioc.Default.GetRequiredService<VideoAssistantSearchService>();
 
-    public ResourceBrowserItemViewModel(ResourceBrowserItem model)
+    public ResourceBrowserItemViewModel(ResourceBrowserItem model, IResourceWorkspaceService? workspace = null, bool animeLibrary = false)
     {
+        _workspace = workspace ?? _workspace;
+        _animeLibrary = animeLibrary;
+        if (animeLibrary) _actorCardWidth = _workspace.Settings.AnimePosterWidth;
         Model = model;
         if (model.Kind != ResourceBrowserItemKind.ActorFolder)
             UpdateTags(_workspace.GetResourceTagIds(model.Path));
     }
 
     public ResourceBrowserItem Model { get; }
+    private readonly bool _animeLibrary;
     private int? _actorWorkCount;
     private double _actorCardWidth = 250;
     private string? _translatedTitle;
@@ -58,6 +62,8 @@ public sealed partial class ResourceBrowserItemViewModel : ObservableObject
             return string.IsNullOrWhiteSpace(actorName) ? Model.Name : actorName;
         }
     }
+    public int EpisodeIndex { get; set; }
+    public string EpisodeLabel => string.Format(System.Globalization.CultureInfo.CurrentCulture, Strings.AnimeLibraryEpisodeNumber.GetLocalizedResource(), AnimeLibraryService.GetEpisodeNumber(Model.Name) ?? EpisodeIndex.ToString());
     public string Path => Model.Path;
     public ResourceBrowserItemKind Kind => Model.Kind;
     public string DescriptionText
@@ -188,10 +194,10 @@ public sealed partial class ResourceBrowserItemViewModel : ObservableObject
     public double CardWidth => Kind switch
     {
         ResourceBrowserItemKind.ActorFolder or ResourceBrowserItemKind.VideoFolder => _actorCardWidth,
-        ResourceBrowserItemKind.VideoFile => 244,
+        ResourceBrowserItemKind.VideoFile => _animeLibrary ? 168 : 244,
         _ => 176,
     };
-    public double PosterHeight => Kind switch
+    public double PosterHeight => _animeLibrary && Kind is ResourceBrowserItemKind.VideoFolder or ResourceBrowserItemKind.VideoFile ? CardWidth * 1.5 : Kind switch
     {
         ResourceBrowserItemKind.ActorFolder => CardWidth * 1.32,
         ResourceBrowserItemKind.VideoFolder => CardWidth * (9d / 16d),

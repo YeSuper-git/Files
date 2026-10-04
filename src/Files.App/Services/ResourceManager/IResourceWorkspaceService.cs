@@ -21,6 +21,8 @@ public interface IResourceWorkspaceService
     void SetPosterOverride(string itemPath, string posterPath);
     Task<string> ImportPosterAsync(string sourcePath, CancellationToken cancellationToken = default);
     void DeleteImportedPosterIfUnused(string posterPath);
+    ResourceVideoDetails GetVideoDetails(string path);
+    void SetVideoDetails(string path, ResourceVideoDetails details);
     ResourceActorDetails GetActorDetails(string actorFolderPath);
     void SetActorDetails(string actorFolderPath, ResourceActorDetails details);
     ResourceVideoWatchStatus GetVideoWatchStatus(string videoPath);

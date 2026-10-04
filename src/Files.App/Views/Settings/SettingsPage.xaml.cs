@@ -139,6 +139,7 @@ namespace Files.App.Views
 				SettingsPageKind.VideoEditorPage => typeof(VideoEditorSettingsPage),
 				#if FILES_RESOURCE_MANAGER
 				SettingsPageKind.ResourceManagerPage => typeof(ResourceManagerSettingsPage),
+				SettingsPageKind.AnimeLibraryPage => typeof(AnimeLibrarySettingsPage),
 				#endif
 				SettingsPageKind.DevToolsPage => typeof(DevToolsPage),
 				SettingsPageKind.AdvancedPage => typeof(AdvancedPage),

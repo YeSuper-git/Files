@@ -344,6 +344,7 @@ namespace Files.App.Helpers
 					.AddSingleton<Files.App.Services.ResourceManager.IResourceCodeParser, Files.App.Services.ResourceManager.ResourceCodeParser>()
 					.AddSingleton<Files.App.Services.ResourceManager.IResourceScanner, Files.App.Services.ResourceManager.ResourceScanner>()
 					.AddSingleton<Files.App.Services.ResourceManager.IResourceBrowserService, Files.App.Services.ResourceManager.ResourceBrowserService>()
+						.AddSingleton<Files.App.Services.ResourceManager.AnimeLibraryService>()
 					.AddSingleton<Files.App.Services.ResourceManager.VideoAssistantSearchService>()
 					.AddTransient<Files.App.ViewModels.Assistant.VideoAssistantViewModel>()
 					.AddSingleton<Files.App.Services.ResourceManager.IResourceOperationsService, Files.App.Services.ResourceManager.ResourceOperationsService>()

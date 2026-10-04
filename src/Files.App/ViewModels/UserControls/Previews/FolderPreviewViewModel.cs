@@ -76,6 +76,17 @@ namespace Files.App.ViewModels.Previews
 				return;
 			}
 
+			if (Item is ResourceVideoFolderListedItem { IsAnime: true } anime)
+            {
+                Item.FileDetails =
+                [
+                    new FileProperty { LocalizedName = Strings.AnimeLibraryAirDateLabel.GetLocalizedResource(), Value = anime.AnimeDetails?.AirDate?.ToString("yyyy-MM") ?? "—" },
+                    new FileProperty { LocalizedName = Strings.AnimeLibrarySynopsis.GetLocalizedResource(), Value = string.IsNullOrWhiteSpace(anime.AnimeDetails?.Synopsis) ? Strings.AnimeLibraryNoSynopsis.GetLocalizedResource() : anime.AnimeDetails.Synopsis },
+                    GetFileProperty("PropertyParsingPath", folder.Path),
+                ];
+                return;
+            }
+
 			var info = await folder.GetBasicPropertiesAsync();
 
 			Item.FileDetails =

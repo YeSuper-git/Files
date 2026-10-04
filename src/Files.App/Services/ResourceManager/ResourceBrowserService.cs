@@ -9,12 +9,14 @@ namespace Files.App.Services.ResourceManager;
 
 public sealed class ResourceBrowserService : IResourceBrowserService
 {
+    private readonly bool _animeLibrary;
     private readonly IResourceWorkspaceService _workspace;
     private readonly ILogger<ResourceBrowserService> _logger;
 
-    public ResourceBrowserService(IResourceWorkspaceService workspace, ILogger<ResourceBrowserService> logger)
+    public ResourceBrowserService(IResourceWorkspaceService workspace, ILogger<ResourceBrowserService> logger, bool animeLibrary = false)
     {
         _workspace = workspace;
+        _animeLibrary = animeLibrary;
         _logger = logger;
     }
 
@@ -49,7 +51,23 @@ public sealed class ResourceBrowserService : IResourceBrowserService
         var result = new List<ResourceBrowserItem>();
         try
         {
-            foreach (var child in directory.EnumerateDirectories())
+            IEnumerable<DirectoryInfo> folders = directory.EnumerateDirectories();
+            if (_animeLibrary && settings.AnimeFlattenSeasons && locationKind == ResourceBrowserLocationKind.ActorFolder)
+            {
+                var flattened = new List<DirectoryInfo>();
+                void Visit(DirectoryInfo folder, int depth)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (depth > 8 || ShouldSkipDirectory(folder) || folder.Attributes.HasFlag(FileAttributes.ReparsePoint)) return;
+                    var children = folder.EnumerateDirectories().Where(child => !ShouldSkipDirectory(child) && !child.Attributes.HasFlag(FileAttributes.ReparsePoint)).ToArray();
+                    if (children.Length == 0 || folder.EnumerateFiles().Any(file => settings.VideoExtensions.Contains(file.Extension.TrimStart('.'), StringComparer.OrdinalIgnoreCase)))
+                        flattened.Add(folder);
+                    foreach (var child in children) Visit(child, depth + 1);
+                }
+                foreach (var folder in folders) Visit(folder, 0);
+                folders = flattened;
+            }
+            foreach (var child in folders)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (ShouldSkipDirectory(child))
@@ -59,17 +77,17 @@ public sealed class ResourceBrowserService : IResourceBrowserService
                     continue;
 
                 var kind = locationKind == ResourceBrowserLocationKind.LibraryRoot
-                    ? ResourceBrowserItemKind.ActorFolder
-                    : IsVideoFolder(child, settings, cancellationToken)
+                    ? (_animeLibrary ? ResourceBrowserItemKind.CategoryFolder : ResourceBrowserItemKind.ActorFolder)
+                    : (_animeLibrary && locationKind == ResourceBrowserLocationKind.ActorFolder) || IsVideoFolder(child, settings, cancellationToken)
                         ? ResourceBrowserItemKind.VideoFolder
                         : ResourceBrowserItemKind.CategoryFolder;
 
                 result.Add(new ResourceBrowserItem
                 {
-                    Name = child.Name,
+                    Name = _animeLibrary && settings.AnimeFlattenSeasons && locationKind == ResourceBrowserLocationKind.ActorFolder ? AnimeLibraryService.GetSeasonTitle(child.FullName) : child.Name,
                     Path = child.FullName,
                     Kind = kind,
-                    PosterPath = kind is ResourceBrowserItemKind.ActorFolder or ResourceBrowserItemKind.VideoFolder
+                    PosterPath = _animeLibrary || kind is ResourceBrowserItemKind.ActorFolder or ResourceBrowserItemKind.VideoFolder
                         ? ResolvePoster(child.FullName, child, child.Name, settings)
                         : null,
                 });
@@ -79,7 +97,7 @@ public sealed class ResourceBrowserService : IResourceBrowserService
         catch (Exception ex) { _logger.LogWarning(ex, "Unable to enumerate resource folders at {Path}", directory.FullName); }
 
         return result
-            .OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
+            .OrderBy(x => x.Name, _animeLibrary ? new EpisodeNameComparer() : StringComparer.CurrentCultureIgnoreCase)
             .ToList();
     }
 
@@ -111,7 +129,7 @@ public sealed class ResourceBrowserService : IResourceBrowserService
         catch (Exception ex) { _logger.LogWarning(ex, "Unable to enumerate resource videos at {Path}", directory.FullName); }
 
         return result
-            .OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
+            .OrderBy(x => x.Name, _animeLibrary ? new EpisodeNameComparer() : StringComparer.CurrentCultureIgnoreCase)
             .ToList();
     }
 
@@ -153,6 +171,34 @@ public sealed class ResourceBrowserService : IResourceBrowserService
 
         try
         {
+            if (_animeLibrary)
+            {
+                if (File.Exists(targetPath))
+                    return AnimeLibraryService.ResolveEpisodePoster(targetPath, directory.FullName, directory.FullName, settings, null);
+                var seriesCover = directory.EnumerateFiles().FirstOrDefault(file => IsImageFile(file.FullName, settings.ImageExtensions)
+                    && AnimeLibraryService.IsSeriesCover(file.FullName, directory.FullName)
+                    && !excludedPosterPaths.Contains(file.FullName, StringComparer.OrdinalIgnoreCase));
+                if (seriesCover is not null) return seriesCover.FullName;
+                string? FirstEpisode(DirectoryInfo folder, int depth)
+                {
+                    if (depth > 8 || folder.Attributes.HasFlag(FileAttributes.ReparsePoint)) return null;
+                    var video = folder.EnumerateFiles().Where(file => settings.VideoExtensions.Contains(file.Extension.TrimStart('.'), StringComparer.OrdinalIgnoreCase))
+                        .OrderBy(file => file.Name, new EpisodeNameComparer()).FirstOrDefault();
+                    if (video is not null) return video.FullName;
+                    foreach (var child in folder.EnumerateDirectories().Where(child => !ShouldSkipDirectory(child)).OrderBy(child => child.Name, new EpisodeNameComparer()))
+                    {
+                        var episode = FirstEpisode(child, depth + 1);
+                        if (episode is not null) return episode;
+                    }
+                    return null;
+                }
+                var firstEpisode = FirstEpisode(directory, 0);
+                if (firstEpisode is not null)
+                {
+                    var matched = AnimeLibraryService.ResolveEpisodePoster(firstEpisode, Path.GetDirectoryName(firstEpisode)!, directory.FullName, settings, null);
+                    if (matched is not null) return matched;
+                }
+            }
             var candidates = directory.EnumerateFiles()
                 .Where(file => IsImageFile(file.FullName, settings.ImageExtensions))
                 .Where(file => !excludedPosterPaths.Contains(file.FullName, StringComparer.OrdinalIgnoreCase))

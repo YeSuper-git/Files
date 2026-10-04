@@ -1,4 +1,4 @@
-﻿// Copyright (c) Files Community
+// Copyright (c) Files Community
 // SPDX-License-Identifier: MPL-2.0
 
 namespace Files.App.Data.EventArguments
@@ -38,6 +38,8 @@ namespace Files.App.Data.EventArguments
 
 		/// <summary>Marks a navigation entry as a virtual location inside the resource-library browser.</summary>
 		public bool IsResourceLibraryPage { get; set; }
+
+		public string? AnimeEditPath { get; set; }
 
 		public string[]? ResourceLocationPaths { get; set; }
 
