@@ -41,6 +41,9 @@ public sealed partial class AnimeLibrarySettingsPage : Page
             workspace.UpdateSettings(settings);
         };
         SettingsContent.Children.Add(new SettingsCard { Header = Strings.AnimeImagesIncludedNames.GetLocalizedResource(), Description = Strings.AnimeImagesIncludedNamesHelp.GetLocalizedResource(), Content = includedNames });
+        var groupImages = new ToggleSwitch { IsOn = settings.AnimeImageGroupByPrefix };
+        groupImages.Toggled += (_, _) => { settings.AnimeImageGroupByPrefix = groupImages.IsOn; workspace.UpdateSettings(settings); };
+        SettingsContent.Children.Add(new SettingsCard { Header = Strings.AnimeImagesGroupByPrefix.GetLocalizedResource(), Description = Strings.AnimeImagesGroupByPrefixHelp.GetLocalizedResource(), Content = groupImages });
         var flatten = new ToggleSwitch { IsOn = settings.AnimeFlattenSeasons };
         flatten.Toggled += (_, _) => { settings.AnimeFlattenSeasons = flatten.IsOn; workspace.UpdateSettings(settings); };
         SettingsContent.Children.Add(new SettingsCard { Header = Strings.AnimeLibraryFlattenSeasons.GetLocalizedResource(), Content = flatten });
@@ -50,6 +53,8 @@ public sealed partial class AnimeLibrarySettingsPage : Page
             box.ValueChanged += (_, args) => { if (!double.IsNaN(args.NewValue)) { save((int)Math.Clamp(args.NewValue, minimum, maximum)); workspace.UpdateSettings(settings); } };
             SettingsContent.Children.Add(new SettingsCard { Header = label, Content = box });
         }
+        AddNumber(Strings.AnimeImagesMinimumWidth.GetLocalizedResource(), settings.AnimeImageMinimumWidth, 0, 65535, value => settings.AnimeImageMinimumWidth = value);
+        AddNumber(Strings.AnimeImagesMinimumHeight.GetLocalizedResource(), settings.AnimeImageMinimumHeight, 0, 65535, value => settings.AnimeImageMinimumHeight = value);
         AddNumber(Strings.AnimeLibraryPosterWidth.GetLocalizedResource(), settings.AnimePosterWidth, 100, 240, value => settings.AnimePosterWidth = value);
         AddNumber(Strings.AnimeLibraryPosterEpisodeLimit.GetLocalizedResource(), settings.AnimePosterEpisodeLimit, 0, 30, value => settings.AnimePosterEpisodeLimit = value);
         void AddExtensions(string label, List<string> values, Action<List<string>> save)

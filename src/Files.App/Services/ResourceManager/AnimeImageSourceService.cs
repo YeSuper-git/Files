@@ -1,5 +1,6 @@
 // Copyright (c) Files Community. Licensed under the MIT License.
 using System.IO;
+using Windows.Graphics.Imaging;
 using System.Net.Http;
 using System.Text.Json;
 using System.Security.Cryptography;
@@ -20,7 +21,7 @@ public sealed class AnimeImageSourceService
     public static string ResolvePageAddress(string address, string prefix)
     {
         address = address.Trim();
-        if (Uri.TryCreate(address, UriKind.Absolute, out var complete) && complete.Scheme == "https") return complete.AbsoluteUri;
+        if (Uri.TryCreate(address, UriKind.Absolute, out _)) throw new InvalidDataException("Enter only the page suffix.");
         if (address.Contains("://", StringComparison.Ordinal) || address.Length == 0 || !Uri.TryCreate(prefix.Trim(), UriKind.Absolute, out var origin) || origin.Scheme != "https")
             throw new InvalidDataException("Enter an HTTPS URL or configure an HTTPS website prefix.");
         var combined = new Uri(origin.AbsoluteUri.TrimEnd('/') + "/" + address.TrimStart('/'));
@@ -28,12 +29,46 @@ public sealed class AnimeImageSourceService
         return combined.AbsoluteUri;
     }
 
-    public sealed record PageImage(Uri Url, string Label, string Evidence);
+    public sealed record PageImage(Uri Url, string Label, string Evidence, string? SuggestedName = null);
+
+    public static string GetImageFileName(PageImage image)
+        => image.SuggestedName ?? Uri.UnescapeDataString(Path.GetFileName(image.Url.AbsolutePath));
 
     public static IReadOnlyList<PageImage> FilterImages(IEnumerable<PageImage> images, IEnumerable<string> includedNames)
     {
         var keywords = includedNames.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim()).ToArray();
-        return images.Where(image => keywords.Length == 0 || keywords.Any(keyword => Uri.UnescapeDataString(Path.GetFileName(image.Url.AbsolutePath)).Contains(keyword, StringComparison.OrdinalIgnoreCase))).ToArray();
+        return images.Where(image => keywords.Length == 0 || keywords.Any(keyword => GetImageFileName(image).Contains(keyword, StringComparison.OrdinalIgnoreCase))).ToArray();
+    }
+
+    public async Task<IReadOnlyList<PageImage>> FilterDimensionsAsync(IEnumerable<PageImage> images, int minimumWidth, int minimumHeight, CancellationToken token)
+    {
+        if (minimumWidth == 0 && minimumHeight == 0) return images.ToArray();
+        var result = new List<PageImage>();
+        foreach (var image in images)
+        {
+            token.ThrowIfCancellationRequested();
+            try
+            {
+                var bytes = await ReadRemoteAsync(image.Url, MaximumImageBytes, token);
+                using var stream = new MemoryStream(bytes);
+                using var randomAccess = stream.AsRandomAccessStream();
+                var decoder = await BitmapDecoder.CreateAsync(randomAccess).AsTask(token);
+                if (decoder.PixelWidth >= minimumWidth && decoder.PixelHeight >= minimumHeight) result.Add(image);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex) when (ex is HttpRequestException or IOException or System.Runtime.InteropServices.COMException or TaskCanceledException) { }
+        }
+        return result;
+    }
+
+    public static IReadOnlyList<IReadOnlyList<PageImage>> GroupImages(IEnumerable<PageImage> images, bool groupByPrefix)
+        => images.GroupBy(image => groupByPrefix ? GetImageSetKey(image) : image.Url.AbsoluteUri, StringComparer.Ordinal)
+            .Select(group => (IReadOnlyList<PageImage>)group.ToArray()).ToArray();
+
+    public static string GetImageSetKey(PageImage image)
+    {
+        var name = Path.GetFileNameWithoutExtension(GetImageFileName(image));
+        return name.Length >= 8 ? name[..8] : image.Url.AbsoluteUri;
     }
 
     public async Task<IReadOnlyList<PageImage>> InspectPageAsync(string address, CancellationToken token)
@@ -60,6 +95,18 @@ public sealed class AnimeImageSourceService
     {
         var result = new Dictionary<string, PageImage>(StringComparer.Ordinal);
         var timeout = TimeSpan.FromSeconds(2);
+        if (origin.Host.Equals("www.lune-soft.jp", StringComparison.OrdinalIgnoreCase) || origin.Host.Equals("lune-soft.jp", StringComparison.OrdinalIgnoreCase))
+        {
+            var gallery = Regex.Match(html, @"<section\b[^>]*\bid\s*=\s*[""']gallery[""'][^>]*>(.*?)</section\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline, timeout);
+            var product = Regex.Match(html, @"<th\b[^>]*>\s*品番\s*</th>\s*<td\b[^>]*>\s*([A-Z]+\d+)\s*</td>", RegexOptions.IgnoreCase | RegexOptions.Singleline, timeout);
+            if (gallery.Success)
+            {
+                var galleryImages = ParsePage(gallery.Groups[1].Value, origin);
+                if (!product.Success) return galleryImages;
+                var code = product.Groups[1].Value.ToUpperInvariant();
+                return galleryImages.Select((image, index) => image with { SuggestedName = $"{code}_{index + 1:00}{Path.GetExtension(image.Url.AbsolutePath)}" }).ToArray();
+            }
+        }
         html = Regex.Replace(html, @"<!--.*?-->|<(script|style)\b[^>]*>.*?</\1\s*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline, timeout);
         Dictionary<string, string> Attributes(string tag)
         {
@@ -184,7 +231,7 @@ public sealed class AnimeImageSourceService
         return output.ToArray();
     }
 
-    public async Task<string?> ImportAsync(AnimeSourceImage image, string libraryRoot, string folder, string video, string episodeNumber, CancellationToken token)
+    public async Task<string?> ImportAsync(AnimeSourceImage image, string libraryRoot, string folder, string video, string episodeNumber, CancellationToken token, string? sourceNumber = null)
     {
         folder = Path.GetFullPath(folder);
         var root = Path.GetFullPath(libraryRoot).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
@@ -194,8 +241,8 @@ public sealed class AnimeImageSourceService
         for (var directory = new DirectoryInfo(folder); directory is not null && directory.FullName.StartsWith(root, StringComparison.OrdinalIgnoreCase); directory = directory.Parent)
             if (directory.Attributes.HasFlag(FileAttributes.ReparsePoint)) throw new InvalidDataException("Linked target folders are not supported.");
         if (!int.TryParse(episodeNumber, out var episode) || episode < 1) throw new InvalidDataException("Invalid episode number.");
-        var stem = image.Kind == "poster" ? Path.GetFileNameWithoutExtension(video) : $"{episode:00}插图";
-        if (image.Kind == "poster" && new[] { ".jpg", ".jpeg", ".png", ".webp" }.Any(extension => File.Exists(Path.Combine(folder, stem + extension)))) return null;
+        if (sourceNumber is not null && !Regex.IsMatch(sourceNumber, @"^[0-9]{5}$")) throw new InvalidDataException("Invalid image source number.");
+        var stem = $"{episode:00}插图" + (sourceNumber is null ? string.Empty : "_" + sourceNumber);
         var bytes = await ReadRemoteAsync(image.OriginalUrl, MaximumImageBytes, token);
         var extension = DetectExtension(bytes);
         var hash = SHA256.HashData(bytes);
@@ -206,13 +253,13 @@ public sealed class AnimeImageSourceService
             var existingHash = await SHA256.HashDataAsync(stream, token);
             if (hash.SequenceEqual(existingHash)) return null;
         }
-        var target = Path.Combine(folder, stem + extension);
-        if (image.Kind == "illustration")
+        var existingIndices = Directory.EnumerateFiles(folder).Select(path =>
         {
-            var index = 1;
-            while (new[] { ".jpg", ".jpeg", ".png", ".webp" }.Any(ext => File.Exists(Path.Combine(folder, $"{stem} ({index}){ext}")))) index++;
-            target = Path.Combine(folder, $"{stem} ({index}){extension}");
-        }
+            var match = Regex.Match(Path.GetFileNameWithoutExtension(path), "^" + Regex.Escape(stem) + @" \((\d+)\)$", RegexOptions.IgnoreCase);
+            return match.Success && int.TryParse(match.Groups[1].Value, out var value) ? value : 0;
+        });
+        var index = checked(existingIndices.DefaultIfEmpty(0).Max() + 1);
+        var target = Path.Combine(folder, $"{stem} ({index}){extension}");
         var temporary = Path.Combine(folder, $".files-image-{Guid.NewGuid():N}.tmp");
         try
         {

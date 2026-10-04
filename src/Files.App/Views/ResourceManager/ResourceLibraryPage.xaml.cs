@@ -75,6 +75,7 @@ public sealed partial class ResourceLibraryPage : Page
     private ResourceBrowserItemViewModel? _activeVideoItem;
 
     public System.Collections.ObjectModel.ObservableCollection<ResourceBrowserItemViewModel> BrowserItems { get; } = [];
+    public bool IsAnimeLibrary => _animeLibrary;
     public string CurrentPath => _locations.Count > 0 ? _locations[^1].Path : _libraryPath;
 
     private sealed record ActorVideoGroup(string Name, IReadOnlyList<ResourceBrowserItem> Items);
@@ -287,6 +288,31 @@ public sealed partial class ResourceLibraryPage : Page
     private void ApplyBrowserSorting()
     {
         var current = BrowserItems.ToArray();
+        if (_animeLibrary && current.Length > 0 && current.All(item => item.Kind == ResourceBrowserItemKind.VideoFile))
+        {
+            var episodes = current.OrderBy(item => item.Name, new EpisodeNameComparer()).ToArray();
+            for (var index = 0; index < episodes.Length; index++)
+            {
+                var oldIndex = BrowserItems.IndexOf(episodes[index]);
+                if (oldIndex != index) BrowserItems.Move(oldIndex, index);
+            }
+            return;
+        }
+        if (_animeLibrary && _displayContext.SortOption == SortOption.AnimeAirDate)
+        {
+            var dated = current.Select(item => (Item: item, Date: GetAnimeAirDate(item))).ToArray();
+            var ordered = dated.OrderBy(item => item.Date is null);
+            var sortedByDate = (_displayContext.SortDirection == SortDirection.Ascending
+                ? ordered.ThenBy(item => item.Date)
+                : ordered.ThenByDescending(item => item.Date))
+                .ThenBy(item => item.Item.Name, new EpisodeNameComparer()).Select(item => item.Item).ToArray();
+            for (var index = 0; index < sortedByDate.Length; index++)
+            {
+                var oldIndex = BrowserItems.IndexOf(sortedByDate[index]);
+                if (oldIndex != index) BrowserItems.Move(oldIndex, index);
+            }
+            return;
+        }
         foreach (var stale in _sortItems.Keys.Except(current).ToArray()) _sortItems.Remove(stale);
         foreach (var item in current)
         {
@@ -314,6 +340,23 @@ public sealed partial class ResourceLibraryPage : Page
             var oldIndex = BrowserItems.IndexOf(byItem[sorted[index]]);
             if (oldIndex != index) BrowserItems.Move(oldIndex, index);
         }
+    }
+
+    private DateTimeOffset? GetAnimeAirDate(ResourceBrowserItemViewModel item)
+    {
+        var date = _workspace.GetVideoDetails(item.Path).AirDate;
+        if (date is not null || item.Kind != ResourceBrowserItemKind.VideoFolder) return date;
+        try
+        {
+            var folders = new[] { item.Path }.Concat(Directory.EnumerateDirectories(item.Path)
+                .Where(folder => AnimeLibraryService.IsSeasonFolder(Path.GetFileName(folder))
+                    && !File.GetAttributes(folder).HasFlag(System.IO.FileAttributes.ReparsePoint)));
+            return folders.SelectMany(folder => Directory.EnumerateFiles(folder))
+                .Where(file => _workspace.Settings.VideoExtensions.Contains(Path.GetExtension(file).TrimStart('.'), StringComparer.OrdinalIgnoreCase))
+                .Select(file => _workspace.GetVideoDetails(file).AirDate).Where(value => value is not null).Min();
+        }
+        catch (IOException) { return null; }
+        catch (UnauthorizedAccessException) { return null; }
     }
 
     public async Task RefreshAsync()
@@ -486,8 +529,16 @@ public sealed partial class ResourceLibraryPage : Page
             SetNativeSelection(null);
             BrowserGrid.SelectedItems.Clear();
             LoadingRing.IsActive = true;
-            AnimeMetadataEditor.Visibility = Visibility.Collapsed;
-            AnimeMetadataDisplay.Visibility = Visibility.Visible;
+            var animeHome = _animeLibrary && location.Kind == ResourceBrowserLocationKind.LibraryRoot;
+            AnimeHomeHeader.Visibility = animeHome ? Visibility.Visible : Visibility.Collapsed;
+            BrowserGrid.Width = double.NaN;
+            BrowserGrid.MaxWidth = animeHome ? 1080 : double.PositiveInfinity;
+            BrowserGrid.HorizontalAlignment = animeHome ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
+            BrowserGrid.Padding = animeHome ? new Thickness(12, 8, 12, 24) : new Thickness(12);
+            _animeEditingPath = null;
+            VideoDetailTitle.Visibility = Visibility.Visible;
+            SetAnimeEditing(false);
+
             if (_pendingAnimeEditPath is not null && !PathEquals(_pendingAnimeEditPath, location.Path)) _pendingAnimeEditPath = null;
             BrowserItems.Clear();
             VideoFileList.SelectedItems.Clear();
@@ -595,6 +646,8 @@ public sealed partial class ResourceLibraryPage : Page
         }
     }
 
+    private void BrowserViewport_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateActorGridLayout();
+
     private void BrowserGrid_SizeChanged(object sender, SizeChangedEventArgs e)
         => UpdateActorGridLayout();
 
@@ -661,6 +714,21 @@ public sealed partial class ResourceLibraryPage : Page
     {
         if (BrowserGrid.ItemsPanelRoot is not ItemsWrapGrid itemsPanel)
             return;
+
+        if (_animeLibrary && _locations.Count > 0 && _locations[^1].Kind == ResourceBrowserLocationKind.LibraryRoot)
+        {
+            var homeWidth = Math.Min(1080, BrowserViewport.ActualWidth);
+            if (homeWidth <= 0) return;
+            BrowserGrid.Width = homeWidth;
+            AnimeHomeHeader.Width = Math.Max(0, homeWidth - 48);
+            var availableWidth = homeWidth - BrowserGrid.Padding.Left - BrowserGrid.Padding.Right;
+            if (availableWidth <= 0) return;
+            var columns = availableWidth >= 620 ? 2 : 1;
+            itemsPanel.ItemWidth = availableWidth / columns;
+            foreach (var item in BrowserItems.Where(item => item.Kind == ResourceBrowserItemKind.CategoryFolder))
+                item.SetAdaptiveCardWidth(Math.Max(160, itemsPanel.ItemWidth - 26));
+            return;
+        }
 
         const double defaultItemWidth = 276;
         var hasAdaptiveCards = BrowserItems.Any(item => item.Kind is ResourceBrowserItemKind.ActorFolder or ResourceBrowserItemKind.VideoFolder);
@@ -794,8 +862,9 @@ public sealed partial class ResourceLibraryPage : Page
             return;
         var list = (ListViewBase)sender;
         _animeEditingPath = null;
-        AnimeMetadataEditor.Visibility = Visibility.Collapsed;
-        AnimeMetadataDisplay.Visibility = Visibility.Visible;
+        VideoDetailTitle.Visibility = Visibility.Visible;
+        SetAnimeEditing(false);
+
         _activeVideoItem = list.SelectedItem as ResourceBrowserItemViewModel;
         ShowActiveVideoDetails();
         if (_animeLibrary) UpdateAnimeIllustrations();
@@ -856,7 +925,12 @@ public sealed partial class ResourceLibraryPage : Page
         if (!_animeLibrary || _detailFolderItem is null) return;
         var details = _workspace.GetVideoDetails(AnimeMetadataPath!);
         AnimeSynopsis.Text = string.IsNullOrWhiteSpace(details.Synopsis) ? Strings.AnimeLibraryNoSynopsis.GetLocalizedResource() : details.Synopsis;
-        AnimeAirDate.Text = string.Format(CultureInfo.CurrentCulture, Strings.AnimeLibraryAirDate.GetLocalizedResource(), details.AirDate?.ToString("yyyy-MM", CultureInfo.CurrentCulture) ?? "—");
+        AnimeAirDate.Text = details.AirDate?.ToString("Y", CultureInfo.CurrentCulture) ?? "—";
+        if (_animeEditingPath is null)
+        {
+            AnimeSynopsisEditor.Text = details.Synopsis;
+            AnimeMonthEditor.Text = details.AirDate?.ToString("yyyy-MM", CultureInfo.InvariantCulture) ?? string.Empty;
+        }
         if (_pendingAnimeEditPath is not null && PathEquals(_pendingAnimeEditPath, _detailFolderItem.Path) && (_activeVideoItem is not null || BrowserItems.Count == 0))
         {
             _pendingAnimeEditPath = null;
@@ -876,6 +950,15 @@ public sealed partial class ResourceLibraryPage : Page
         return Task.CompletedTask;
     }
 
+    private void SetAnimeEditing(bool editing)
+    {
+        AnimeMonthEditor.Visibility = AnimeSynopsisEditor.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+        AnimeAirDate.Visibility = AnimeSynopsisFrame.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+        AnimeDetailCancelButton.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+        AnimeDetailEditButton.Content = (editing ? Strings.AnimeLibrarySave : Strings.AnimeLibraryEditDetails).GetLocalizedResource();
+        AnimeDetailEditButton.Style = editing ? (Style)Application.Current.Resources["AccentButtonStyle"] : null;
+    }
+
     private void BeginAnimeEdit()
     {
         if (AnimeMetadataPath is null) return;
@@ -884,8 +967,18 @@ public sealed partial class ResourceLibraryPage : Page
         AnimeSynopsisEditor.Text = details.Synopsis;
         AnimeMonthEditor.Text = details.AirDate?.ToString("yyyy-MM", CultureInfo.InvariantCulture) ?? string.Empty;
         AnimeEditError.Visibility = Visibility.Collapsed;
-        AnimeMetadataDisplay.Visibility = Visibility.Collapsed;
-        AnimeMetadataEditor.Visibility = Visibility.Visible;
+        SetAnimeEditing(true);
+    }
+
+    private void AnimeMonthEditor_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        var text = AnimeMonthEditor.Text.Trim();
+        if (text.Length == 6 && DateTime.TryParseExact(text, "yyyyMM", CultureInfo.InvariantCulture, DateTimeStyles.None, out var month))
+        {
+            AnimeMonthEditor.Text = month.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+            AnimeMonthEditor.SelectionStart = AnimeMonthEditor.Text.Length;
+        }
+        AnimeEditError.Visibility = Visibility.Collapsed;
     }
 
     private void AnimeMetadataSave_Click(object sender, RoutedEventArgs e)
@@ -894,22 +987,41 @@ public sealed partial class ResourceLibraryPage : Page
         DateTimeOffset? month = null;
         if (!string.IsNullOrWhiteSpace(AnimeMonthEditor.Text))
         {
-            if (!DateTime.TryParseExact(AnimeMonthEditor.Text.Trim(), "yyyy-MM", CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date))
+            if (!DateTime.TryParseExact(AnimeMonthEditor.Text.Trim(), new[] { "yyyy-MM", "yyyyMM" }, CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date))
             { AnimeEditError.Visibility = Visibility.Visible; return; }
             month = new DateTimeOffset(date);
         }
-        _workspace.SetVideoDetails(_animeEditingPath, new ResourceVideoDetails { Synopsis = AnimeSynopsisEditor.Text, AirDate = month });
+        var editingPath = _animeEditingPath;
+        _workspace.SetVideoDetails(editingPath, new ResourceVideoDetails { Synopsis = AnimeSynopsisEditor.Text, AirDate = month });
+        _animeEditingPath = null;
         if (_activeVideoItem is not null) UpdateResourceSelection([_activeVideoItem]);
-        AnimeMetadataEditor.Visibility = Visibility.Collapsed;
-        AnimeMetadataDisplay.Visibility = Visibility.Visible;
+        VideoDetailTitle.Visibility = Visibility.Visible;
+        SetAnimeEditing(false);
+
         UpdateAnimeMetadata();
     }
 
     private void AnimeMetadataCancel_Click(object sender, RoutedEventArgs e)
     {
         _animeEditingPath = null;
-        AnimeMetadataEditor.Visibility = Visibility.Collapsed;
-        AnimeMetadataDisplay.Visibility = Visibility.Visible;
+        VideoDetailTitle.Visibility = Visibility.Visible;
+        SetAnimeEditing(false);
+        UpdateAnimeMetadata();
+    }
+
+    private void AnimeEditor_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (_animeEditingPath is null || e.Key != Windows.System.VirtualKey.Enter) return;
+        var shift = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Shift);
+        if (shift.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down)) return;
+        e.Handled = true;
+        AnimeMetadataSave_Click(sender, e);
+    }
+
+    private void AnimeDetailEdit_Click(object sender, RoutedEventArgs e)
+    {
+        if (_animeEditingPath is null) BeginAnimeEdit();
+        else AnimeMetadataSave_Click(sender, e);
     }
 
     private void VideoDetailPlay_Click(object sender, RoutedEventArgs e)
@@ -1014,12 +1126,19 @@ public sealed partial class ResourceLibraryPage : Page
 
     private void UpdateAnimePosterLayout()
     {
+        VideoInfoColumn.Width = _animeLibrary ? new GridLength(0.65, GridUnitType.Star) : new GridLength(0);
+        Grid.SetColumn(VideoFileInfoPanel, _animeLibrary ? 2 : 1);
+        Grid.SetRow(VideoFileInfoPanel, _animeLibrary ? 0 : 1);
+        VideoFileInfoPanel.Margin = _animeLibrary ? new Thickness(0) : new Thickness(0, 20, 0, 0);
+        AnimeDetailEditButton.Visibility = _animeLibrary ? Visibility.Visible : Visibility.Collapsed;
+        VideoDetailPoster.Stretch = _animeLibrary ? Stretch.UniformToFill : Stretch.Uniform;
+        VideoDetailInfoPanel.Height = _animeLibrary ? (VideoDetailLayout.ActualWidth is > 0 and < 700 ? 280 : 380) : double.NaN;
         if (!_animeLibrary) return;
-        var width = VideoDetailLayout.ActualWidth is > 0 and < 700 ? 150 : 210;
+        var width = VideoDetailInfoPanel.Height * 2 / 3;
         VideoPosterColumn.Width = GridLength.Auto;
         VideoDetailLayout.ColumnDefinitions[1].Width = new GridLength(1, GridUnitType.Star);
         VideoPosterFrame.Width = width;
-        VideoPosterFrame.Height = width * 1.5;
+        VideoPosterFrame.Height = VideoDetailInfoPanel.Height;
         VideoPosterFrame.HorizontalAlignment = HorizontalAlignment.Left;
     }
 
@@ -1617,8 +1736,9 @@ public sealed partial class ResourceLibraryPage : Page
     {
         try
         {
-            var content = new AnimeImageImportDialog(item.Path, _workspace);
-            var dialog = ResourceDialogPresentation.Create(XamlRoot, content);
+            var folder = item.Kind == ResourceBrowserItemKind.VideoFile ? Path.GetDirectoryName(item.Path)! : item.Path;
+            var content = new AnimeImageImportDialog(folder, _workspace, item.Kind == ResourceBrowserItemKind.VideoFile ? item.Path : null);
+            var dialog = ResourceDialogPresentation.Create(XamlRoot, content, 860, 600);
             content.RequestClose += (_, _) => dialog.Hide();
             dialog.Closing += (_, args) => args.Cancel = content.IsBusy;
             await dialog.ShowAsync();
@@ -1644,7 +1764,7 @@ public sealed partial class ResourceLibraryPage : Page
             flyout.Items.Add(edit);
             var import = new MenuFlyoutItem { Text = Strings.AnimeImagesImport.GetLocalizedResource() };
             import.Click += async (_, _) => await ImportAnimeImagesAsync(item);
-            if (item.Kind == ResourceBrowserItemKind.VideoFolder) flyout.Items.Add(import);
+            flyout.Items.Add(import);
         }
         if (item.Kind == ResourceBrowserItemKind.ActorFolder)
         {

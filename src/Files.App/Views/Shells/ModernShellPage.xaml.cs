@@ -579,7 +579,15 @@ namespace Files.App.Views.Shells
 			arguments.NavPathParam = arguments.NavPathParam == "AnimeLibrary" ? "AnimeLibrary" : "ResourceManager";
 			arguments.IsResourceLibraryPage = true;
 			arguments.IsResourceManagerMode = false;
-			arguments.ResourceLibraryPath ??= _resourceWorkspaceService.LibraryPath;
+			arguments.ResourceLibraryPath ??= arguments.NavPathParam == "AnimeLibrary"
+				? Ioc.Default.GetRequiredService<Files.App.Services.ResourceManager.AnimeLibraryService>().Workspace.LibraryPath
+				: _resourceWorkspaceService.LibraryPath;
+			if ((arguments.ResourceLocationPaths is null || arguments.ResourceLocationPaths.Length == 0) && !string.IsNullOrWhiteSpace(arguments.ResourceLibraryPath))
+			{
+				arguments.ResourceLocationPaths = [arguments.ResourceLibraryPath];
+				arguments.ResourceLocationTitles = [arguments.ResourceLibraryPath];
+				arguments.ResourceLocationKinds = [ResourceBrowserLocationKind.LibraryRoot];
+			}
 			arguments.AssociatedTabInstance = this;
 			ToolbarViewModel.SelectedItems = null;
 			itemDisplayFrame.Navigate(
