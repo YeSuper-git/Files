@@ -1,4 +1,4 @@
-﻿// Copyright (c) Files Community
+// Copyright (c) Files Community
 // Licensed under the MIT License.
 
 namespace Files.App.Actions
@@ -40,6 +40,16 @@ namespace Files.App.Actions
 
 		public override string Description
 			=> Strings.SortByDateCreatedDescription.GetLocalizedResource();
+	}
+
+	[GeneratedRichCommand]
+	internal sealed partial class SortByAnimeAirDateAction : SortByAction
+	{
+		protected override SortOption SortOption => SortOption.AnimeAirDate;
+		public override string Label => Strings.AnimeLibraryAirDateLabel.GetLocalizedResource();
+		public override string Description => Strings.AnimeLibrarySortAirDate.GetLocalizedResource();
+		protected override bool GetIsExecutable(ContentPageTypes pageType)
+			=> pageType is ContentPageTypes.Folder;
 	}
 
 	[GeneratedRichCommand]

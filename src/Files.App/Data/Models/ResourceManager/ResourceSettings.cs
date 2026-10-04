@@ -9,6 +9,9 @@ public sealed class ResourceSettings
     public List<string> ImageExtensions { get; set; } = ["jpg", "jpeg", "png", "webp"];
     public List<string> AnimeImageIncludedNames { get; set; } = [];
     public string AnimeImageWebsitePrefix { get; set; } = string.Empty;
+    public int AnimeImageMinimumWidth { get; set; }
+    public int AnimeImageMinimumHeight { get; set; }
+    public bool AnimeImageGroupByPrefix { get; set; }
     public string AnimeImageSource { get; set; } = string.Empty;
     public bool AnimeFlattenSeasons { get; set; } = true;
     public int AnimePosterWidth { get; set; } = 160;
@@ -24,6 +27,9 @@ public sealed class ResourceSettings
         AnimeImageIncludedNames = [.. (AnimeImageIncludedNames ?? [])],
         AnimeImageWebsitePrefix = AnimeImageWebsitePrefix,
         AnimeImageSource = AnimeImageSource,
+        AnimeImageMinimumWidth = AnimeImageMinimumWidth,
+        AnimeImageMinimumHeight = AnimeImageMinimumHeight,
+        AnimeImageGroupByPrefix = AnimeImageGroupByPrefix,
         AnimeFlattenSeasons = AnimeFlattenSeasons,
         AnimePosterWidth = AnimePosterWidth,
         AnimePosterEpisodeLimit = AnimePosterEpisodeLimit,
@@ -43,6 +49,8 @@ public sealed class ResourceSettings
             ? keywords
             : ["中文字幕", "中字", "中文", "chinese", "chs", "cht", "sub"];
         AnimeImageIncludedNames = (AnimeImageIncludedNames ?? []).Select(value => value.Trim()).Where(value => value.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        AnimeImageMinimumWidth = Math.Clamp(AnimeImageMinimumWidth, 0, 65535);
+        AnimeImageMinimumHeight = Math.Clamp(AnimeImageMinimumHeight, 0, 65535);
         AnimePosterWidth = Math.Clamp(AnimePosterWidth, 100, 240);
         AnimePosterEpisodeLimit = Math.Clamp(AnimePosterEpisodeLimit, 0, 30);
         PosterQualityKb = Math.Clamp(PosterQualityKb, 1, 1024 * 1024);

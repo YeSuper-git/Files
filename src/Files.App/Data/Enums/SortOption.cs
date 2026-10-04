@@ -65,6 +65,8 @@ namespace Files.App.Data.Enums
 		/// <remarks>
 		/// Preserved for search results.
 		/// </remarks>
-		Path = 9
+		Path = 9,
+
+		AnimeAirDate = 10
 	}
 }

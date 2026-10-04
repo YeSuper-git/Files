@@ -19,7 +19,7 @@ public static class AnimeFormatOptimizationService
             foreach (var file in Directory.EnumerateFiles(group.Key))
             {
                 if (!settings.ImageExtensions.Contains(Path.GetExtension(file).TrimStart('.'), StringComparer.OrdinalIgnoreCase)) continue;
-                var match = Regex.Match(Path.GetFileNameWithoutExtension(file), @"^(\d{2,})插图 \(([1-9]\d*)\)$");
+                var match = Regex.Match(Path.GetFileNameWithoutExtension(file), @"^(\d{2,})插图(?:_[0-9]{5})? \(([1-9]\d*)\)$");
                 if (!match.Success) continue;
                 var number = int.Parse(match.Groups[1].Value).ToString();
                 if (!used.TryGetValue(number, out var indexes)) used[number] = indexes = [];
@@ -95,7 +95,7 @@ public static class AnimeFormatOptimizationService
                 var usedIndexes = new Dictionary<string, HashSet<int>>();
                 foreach (var existing in images)
                 {
-                    var canonical = Regex.Match(Path.GetFileNameWithoutExtension(existing.Name), @"^(\d{2,})插图 \(([1-9]\d*)\)$");
+                    var canonical = Regex.Match(Path.GetFileNameWithoutExtension(existing.Name), @"^(\d{2,})插图(?:_[0-9]{5})? \(([1-9]\d*)\)$");
                     if (!canonical.Success) continue;
                     var key = int.Parse(canonical.Groups[1].Value).ToString();
                     if (!usedIndexes.TryGetValue(key, out var used)) usedIndexes[key] = used = [];
@@ -113,7 +113,7 @@ public static class AnimeFormatOptimizationService
                     if (matches.Length == 0 && videos.Length == 1) { matches = videos; number = AnimeLibraryService.GetEpisodeNumber(videos[0].Name) ?? "1"; }
                     if (matches.Length != 1 || number is null)
                     { Add(image.FullName, image.FullName, "无法确定对应集数"); continue; }
-                    if (Regex.IsMatch(Path.GetFileNameWithoutExtension(image.Name), @"^\d{2,}插图 \([1-9]\d*\)$")) continue;
+                    if (Regex.IsMatch(Path.GetFileNameWithoutExtension(image.Name), @"^\d{2,}插图(?:_[0-9]{5})? \([1-9]\d*\)$")) continue;
                     if (!usedIndexes.TryGetValue(number, out var used)) usedIndexes[number] = used = [];
                     indexes.TryGetValue(number, out var index);
                     do { index++; } while (used.Contains(index));

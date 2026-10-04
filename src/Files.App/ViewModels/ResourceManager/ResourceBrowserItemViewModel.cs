@@ -70,6 +70,7 @@ public sealed partial class ResourceBrowserItemViewModel : ObservableObject
     {
         get
         {
+            if (_animeLibrary && Kind == ResourceBrowserItemKind.CategoryFolder) return string.Empty;
             if (Kind != ResourceBrowserItemKind.ActorFolder)
                 return Subtitle;
 
@@ -80,7 +81,7 @@ public sealed partial class ResourceBrowserItemViewModel : ObservableObject
     public Visibility DescriptionVisibility => string.IsNullOrWhiteSpace(DescriptionText) ? Visibility.Collapsed : Visibility.Visible;
     public string ActorWorkCountText => ActorWorkCount is { } count ? $"{count} 部作品" : "作品统计中";
     public Visibility ActorWorkCountVisibility => Kind == ResourceBrowserItemKind.ActorFolder ? Visibility.Visible : Visibility.Collapsed;
-    public Visibility KindLabelVisibility => Kind is ResourceBrowserItemKind.ActorFolder or ResourceBrowserItemKind.VideoFolder or ResourceBrowserItemKind.VideoFile
+    public Visibility KindLabelVisibility => (_animeLibrary && Kind == ResourceBrowserItemKind.CategoryFolder) || Kind is ResourceBrowserItemKind.ActorFolder or ResourceBrowserItemKind.VideoFolder or ResourceBrowserItemKind.VideoFile
         ? Visibility.Collapsed
         : Visibility.Visible;
     public Stretch PosterStretch => Stretch.UniformToFill;
@@ -191,17 +192,19 @@ public sealed partial class ResourceBrowserItemViewModel : ObservableObject
             : ResourceManagerTranslationProvider.AliyunMachineTranslation;
         return _videoAssistantSearch.GetVideoTitleTranslationKey(itemName, Model.Path, provider.ToString());
     }
+    public double NameFontSize => _animeLibrary && Kind == ResourceBrowserItemKind.CategoryFolder ? 22 : 16;
     public double CardWidth => Kind switch
     {
         ResourceBrowserItemKind.ActorFolder or ResourceBrowserItemKind.VideoFolder => _actorCardWidth,
         ResourceBrowserItemKind.VideoFile => _animeLibrary ? 168 : 244,
+        ResourceBrowserItemKind.CategoryFolder when _animeLibrary => _actorCardWidth,
         _ => 176,
     };
     public double PosterHeight => _animeLibrary && Kind is ResourceBrowserItemKind.VideoFolder or ResourceBrowserItemKind.VideoFile ? CardWidth * 1.5 : Kind switch
     {
         ResourceBrowserItemKind.ActorFolder => CardWidth * 1.32,
         ResourceBrowserItemKind.VideoFolder => CardWidth * (9d / 16d),
-        ResourceBrowserItemKind.CategoryFolder => 136,
+        ResourceBrowserItemKind.CategoryFolder => _animeLibrary ? Math.Min(CardWidth * 0.42, 220) : 136,
         _ => 138,
     };
 

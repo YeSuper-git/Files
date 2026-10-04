@@ -175,6 +175,7 @@
 							<ToggleMenuFlyoutItem IsChecked="{x:Bind Commands.SortByName.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByName.Label}" />
 							<ToggleMenuFlyoutItem IsChecked="{x:Bind Commands.SortByDateModified.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByDateModified.Label}" />
 							<ToggleMenuFlyoutItem IsChecked="{x:Bind Commands.SortByDateCreated.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByDateCreated.Label}" />
+							<ToggleMenuFlyoutItem IsChecked="{x:Bind Commands.SortByAnimeAirDate.IsOn, Mode=TwoWay}" IsEnabled="{x:Bind Commands.SortByAnimeAirDate.IsExecutable, Mode=OneWay}" Text="{x:Bind Commands.SortByAnimeAirDate.Label}" />
 							<ToggleMenuFlyoutItem IsChecked="{x:Bind Commands.SortBySize.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortBySize.Label}" />
 							<ToggleMenuFlyoutItem IsChecked="{x:Bind Commands.SortByType.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByType.Label}" />
 							<ToggleMenuFlyoutItem

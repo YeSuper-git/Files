@@ -5043,7 +5043,7 @@
   <data name="AnimeLibraryPosterEpisodeLimit" xml:space="preserve"><value>Maximum episodes for poster cards (0 uses buttons for all)</value></data>
   <data name="AnimeLibraryVideoExtensions" xml:space="preserve"><value>Video file extensions</value></data>
   <data name="AnimeLibraryImageExtensions" xml:space="preserve"><value>Poster image extensions</value></data>
-  <data name="AnimeLibraryInvalidMonth" xml:space="preserve"><value>Enter a year and month, e.g. 2026-10</value></data>
+  <data name="AnimeLibraryInvalidMonth" xml:space="preserve"><value>Enter a valid year and month, e.g. 202205 or 2022-05</value></data>
   <data name="AnimeOptimizationTitle" xml:space="preserve"><value>Anime format optimization</value></data>
   <data name="AnimeOptimizationFolders" xml:space="preserve"><value>Optimize folder names</value></data>
   <data name="AnimeOptimizationPosters" xml:space="preserve"><value>Optimize poster names</value></data>
@@ -5061,10 +5061,10 @@
   <data name="AnimeOptimizationAssignGroup" xml:space="preserve"><value>Assign video to entire group</value></data>
   <data name="AnimeImagesSource" xml:space="preserve"><value>Image source URL</value></data>
   <data name="AnimeImagesSourceHelp" xml:space="preserve"><value>Enter a regular anime page URL. You can change it when importing.</value></data>
-  <data name="AnimeImagesImport" xml:space="preserve"><value>Import posters and illustrations</value></data>
+  <data name="AnimeImagesImport" xml:space="preserve"><value>Smart image search</value></data>
   <data name="AnimeImagesScan" xml:space="preserve"><value>Find images</value></data>
   <data name="AnimeImagesSave" xml:space="preserve"><value>Download selected images</value></data>
-  <data name="AnimeImagesHelp" xml:space="preserve"><value>Finds image links in static HTML without running scripts. Confirm the image type and episode. Downloads preserve source bytes and do not overwrite existing posters.</value></data>
+  <data name="AnimeImagesHelp" xml:space="preserve"><value>Finds image links in static HTML without running scripts. Downloads illustrations only, in natural filename order, into the selected video folder. Names use the assigned episode and a sequence such as 02插图 (18). Duplicate illustrations are skipped; new files continue the sequence without overwriting existing files.</value></data>
   <data name="AnimeImagesLoading" xml:space="preserve"><value>Finding images…</value></data>
   <data name="AnimeImagesDeclared" xml:space="preserve"><value>Page-declared full image; original quality unverified</value></data>
   <data name="AnimeImagesLargest" xml:space="preserve"><value>Largest page candidate; original unconfirmed</value></data>
@@ -5073,7 +5073,7 @@
   <data name="AnimeImagesIllustration" xml:space="preserve"><value>Illustration</value></data>
   <data name="AnimeImagesPreview" xml:space="preserve"><value>Preview</value></data>
   <data name="AnimeImagesNoVideos" xml:space="preserve"><value>No videos to associate. Open a folder containing videos.</value></data>
-  <data name="AnimeImagesEmpty" xml:space="preserve"><value>No identifiable images. Dynamically loaded pages are not supported yet.</value></data>
+  <data name="AnimeImagesEmpty" xml:space="preserve"><value>No identifiable illustration links were found on the page.</value></data>
   <data name="AnimeImagesFound" xml:space="preserve"><value>Found {0} candidate images. Select images and their videos.</value></data>
   <data name="AnimeImagesCancelled" xml:space="preserve"><value>Cancelled. Completed downloads are retained.</value></data>
   <data name="AnimeImagesFailed" xml:space="preserve"><value>Image import failed:</value></data>
@@ -5081,7 +5081,21 @@
   <data name="AnimeImagesChooseSeries" xml:space="preserve"><value>Choose work / series</value></data>
   <data name="AnimeImagesChooseVideo" xml:space="preserve"><value>Choose video</value></data>
   <data name="AnimeImagesPrefix" xml:space="preserve"><value>Website prefix preset</value></data>
-  <data name="AnimeImagesPrefixHelp" xml:space="preserve"><value>For example https://example.org/anime/. Enter only the suffix when importing, or enter a full URL to override.</value></data>
+  <data name="AnimeImagesPrefixHelp" xml:space="preserve"><value>For example https://example.org/anime/. Enter only the suffix when importing. Change the prefix here.</value></data>
   <data name="AnimeImagesIncludedNames" xml:space="preserve"><value>Included image name keywords</value></data>
   <data name="AnimeImagesIncludedNamesHelp" xml:space="preserve"><value>Keep images whose filename contains any keyword, ignoring case. Separate keywords with commas. Leave empty to keep all images.</value></data>
+  <data name="AnimeImagesMinimumWidth" xml:space="preserve"><value>Minimum image width (pixels; 0 for no limit)</value></data>
+  <data name="AnimeImagesMinimumHeight" xml:space="preserve"><value>Minimum image height (pixels; 0 for no limit)</value></data>
+  <data name="AnimeImagesGroupByPrefix" xml:space="preserve"><value>Group images by the first 8 filename characters</value></data>
+  <data name="AnimeImagesGroupByPrefixHelp" xml:space="preserve"><value>Images in a set share one episode selection and must be assigned to the same episode.</value></data>
+  <data name="AnimeImagesSuffix" xml:space="preserve"><value>Enter the page suffix</value></data>
+  <data name="AnimeImagesSharedEpisode" xml:space="preserve"><value>Image set {0}: shares the episode selected for the first image.</value></data>
+  <data name="AnimeImagesSetTitle" xml:space="preserve"><value>Image set {0} ({1} images)</value></data>
+  <data name="AnimeImagesSelectSet" xml:space="preserve"><value>Select all</value></data>
+  <data name="AnimeImagesConfirm" xml:space="preserve"><value>Confirm</value></data>
+  <data name="AnimeImagesFilteredNames" xml:space="preserve"><value>Images were found, but none match the filename keywords. Check the name filter settings.</value></data>
+  <data name="AnimeImagesFilteredDimensions" xml:space="preserve"><value>Images are below the minimum dimensions or their dimensions could not be read. Check the pixel filter settings.</value></data>
+  <data name="AnimeLibrarySortAirDate" xml:space="preserve"><value>Sort by air date</value></data>
+  <data name="AnimeImagesAllAdded" xml:space="preserve"><value>All images have been added successfully</value></data>
+  <data name="AnimeLibraryBrowseCategories" xml:space="preserve"><value>Browse anime by category</value></data>
 </root>

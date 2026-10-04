@@ -96,7 +96,7 @@ public sealed class AnimeLibraryService
 	{
 		if (GetIllustrationGroup(image) is not null) return null;
 		var name = Path.GetFileNameWithoutExtension(image);
-		var leading = System.Text.RegularExpressions.Regex.Match(name, @"^0*(\d{1,3})(?:\s*插图(?:\s*[（(]\d+[）)])?$|\s*[（(]\d+[）)]$|$)");
+		var leading = System.Text.RegularExpressions.Regex.Match(name, @"^0*(\d{1,3})(?:\s*插图(?:_[0-9]{5})?(?:\s*[（(]\d+[）)])?$|\s*[（(]\d+[）)]$|$)");
 		return leading.Success ? int.Parse(leading.Groups[1].Value).ToString() : GetEpisodeNumber(image);
 	}
 

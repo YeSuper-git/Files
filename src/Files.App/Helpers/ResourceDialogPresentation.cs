@@ -8,10 +8,10 @@ namespace Files.App.Helpers;
 
 internal static class ResourceDialogPresentation
 {
-	public static ContentDialog Create(XamlRoot root, FrameworkElement content)
+	public static ContentDialog Create(XamlRoot root, FrameworkElement content, double maximumWidth = 1200, double maximumHeight = 800)
 	{
-		var width = Math.Max(320, Math.Min(1200, root.Size.Width - 80));
-		var height = Math.Max(240, Math.Min(800, root.Size.Height - 100));
+		var width = Math.Max(320, Math.Min(maximumWidth, root.Size.Width - 80));
+		var height = Math.Max(240, Math.Min(maximumHeight, root.Size.Height - 100));
 		content.Width = width - 64;
 		content.MaxWidth = width - 64;
 		content.HorizontalAlignment = HorizontalAlignment.Stretch;

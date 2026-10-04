@@ -25,6 +25,10 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
+                    <StackPanel x:Name="AnimeHomeHeader" Grid.Row="0" Margin="24,20,24,8" Spacing="6" MaxWidth="1032" Visibility="Collapsed">
+                        <TextBlock Text="{helpers:ResourceString Name=AnimeLibraryTitle}" Style="{StaticResource TitleTextBlockStyle}" />
+                        <TextBlock Text="{helpers:ResourceString Name=AnimeLibraryBrowseCategories}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
                     <ScrollViewer
                         x:Name="ActorGroupSelector"
                         Grid.Row="0"
@@ -34,7 +38,7 @@
                         Visibility="Collapsed">
                         <StackPanel x:Name="ActorGroupButtons" Orientation="Horizontal" Spacing="8" />
                     </ScrollViewer>
-                    <Grid x:Name="BrowserViewport" Grid.Row="1">
+                    <Grid x:Name="BrowserViewport" Grid.Row="1" SizeChanged="BrowserViewport_SizeChanged">
                     <ProgressRing x:Name="LoadingRing" Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" IsActive="False" />
                     <GridView
                         x:Name="BrowserGrid"
@@ -112,7 +116,7 @@
                                         </Grid>
                                     </Border>
                                     <StackPanel Padding="14,12,14,14">
-                                        <TextBlock Text="{Binding Name, Mode=OneWay}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Name, Mode=OneWay}" FontSize="{Binding NameFontSize, Mode=OneWay}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                         <TextBlock Margin="0,4,0,0" Text="{Binding DescriptionText, Mode=OneWay}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" MaxLines="2" Visibility="{Binding DescriptionVisibility, Mode=OneWay}" />
                                     </StackPanel>
                                 </StackPanel>
@@ -127,40 +131,61 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition x:Name="VideoPosterColumn" Width="2*" />
                                     <ColumnDefinition Width="*" MinWidth="260" />
+                                    <ColumnDefinition x:Name="VideoInfoColumn" Width="0" />
                                 </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                                 <Border x:Name="VideoPosterFrame" Height="400" Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="12">
                                     <Image x:Name="VideoDetailPoster" Stretch="Uniform" />
                                 </Border>
-                                <StackPanel Grid.Column="1" Spacing="14">
-                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                                        <TextBlock x:Name="VideoDetailTitle" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
+                                <Grid x:Name="VideoDetailInfoPanel" Grid.Column="1" RowSpacing="12" PreviewKeyDown="AnimeEditor_PreviewKeyDown">
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                    <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="12" HorizontalAlignment="Left" Height="44">
+                                        <TextBlock x:Name="VideoDetailTitle" MaxWidth="420" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
                                         <Button x:Name="DetailTitleAction" Grid.Column="1" VerticalAlignment="Top" Content="{helpers:ResourceString Name=ResourceDetailTranslate}" Click="DetailTitleAction_Click" />
                                     </Grid>
-                                    <StackPanel x:Name="AnimeDetailMetadata" Spacing="8" Visibility="Collapsed">
-                                        <StackPanel x:Name="AnimeMetadataDisplay" Spacing="8">
-                                            <TextBlock x:Name="AnimeAirDate" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                            <TextBlock x:Name="AnimeSynopsis" TextWrapping="Wrap" MaxWidth="760" HorizontalAlignment="Left" />
+                                    <Grid x:Name="AnimeDetailMetadata" Grid.Row="1" RowSpacing="12" Margin="0,16,0,0" Visibility="Collapsed">
+                                        <Grid.Resources>
+                                            <StaticResource x:Key="TextControlBorderBrush" ResourceKey="ControlStrokeColorDefaultBrush" />
+                                            <StaticResource x:Key="TextControlBorderBrushPointerOver" ResourceKey="ControlStrokeColorDefaultBrush" />
+                                            <StaticResource x:Key="TextControlBorderBrushFocused" ResourceKey="ControlStrokeColorDefaultBrush" />
+                                            <Thickness x:Key="TextControlBorderThemeThicknessFocused">1</Thickness>
+                                        </Grid.Resources>
+                                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Text="{helpers:ResourceString Name=AnimeLibraryAirDateLabel}" />
+                                            <Grid Height="32">
+                                                <TextBlock x:Name="AnimeAirDate" VerticalAlignment="Center" />
+                                                <TextBox x:Name="AnimeMonthEditor" Visibility="Collapsed" TextChanged="AnimeMonthEditor_TextChanged" Width="180" HorizontalAlignment="Left" />
+                                            </Grid>
                                         </StackPanel>
-                                        <StackPanel x:Name="AnimeMetadataEditor" Spacing="10" Visibility="Collapsed" MaxWidth="760" HorizontalAlignment="Stretch">
-                                            <TextBox x:Name="AnimeSynopsisEditor" Header="{helpers:ResourceString Name=AnimeLibrarySynopsis}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100" MaxLength="4000" />
-                                            <TextBox x:Name="AnimeMonthEditor" Header="{helpers:ResourceString Name=AnimeLibraryAirDateLabel}" PlaceholderText="yyyy-MM" Width="180" HorizontalAlignment="Left" />
+                                        <Grid Grid.Row="1" RowSpacing="8">
+                                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                            <TextBlock Text="{helpers:ResourceString Name=AnimeLibrarySynopsis}" />
+                                            <Border x:Name="AnimeSynopsisFrame" Grid.Row="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="12,8">
+                                                <TextBlock x:Name="AnimeSynopsis" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" />
+                                            </Border>
+                                            <TextBox x:Name="AnimeSynopsisEditor" Grid.Row="1" Visibility="Collapsed" AcceptsReturn="True" TextWrapping="Wrap" MaxLength="4000" ScrollViewer.VerticalScrollBarVisibility="Hidden" ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+                                        </Grid>
+                                        <StackPanel Grid.Row="2" Spacing="8">
                                             <TextBlock x:Name="AnimeEditError" Visibility="Collapsed" Text="{helpers:ResourceString Name=AnimeLibraryInvalidMonth}" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <Button Content="{helpers:ResourceString Name=AnimeLibrarySave}" Click="AnimeMetadataSave_Click" Style="{StaticResource AccentButtonStyle}" />
-                                                <Button Content="{helpers:ResourceString Name=AnimeLibraryCancel}" Click="AnimeMetadataCancel_Click" />
-                                            </StackPanel>
+                                            <ItemsControl ItemsSource="{Binding PosterTags}" Visibility="{Binding PosterTagListVisibility}">
+                                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><ItemsWrapGrid Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate><DataTemplate><Border CornerRadius="4" Padding="8,4" Margin="0,0,6,6" Background="{ThemeResource SubtleFillColorSecondaryBrush}"><TextBlock Text="{Binding}" /></Border></DataTemplate></ItemsControl.ItemTemplate>
+                                            </ItemsControl>
                                         </StackPanel>
-                                        <ItemsControl ItemsSource="{Binding PosterTags}" Visibility="{Binding PosterTagListVisibility}">
-                                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><ItemsWrapGrid Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate><DataTemplate><Border CornerRadius="4" Padding="8,4" Margin="0,0,6,6" Background="{ThemeResource SubtleFillColorSecondaryBrush}"><TextBlock Text="{Binding}" /></Border></DataTemplate></ItemsControl.ItemTemplate>
-                                        </ItemsControl>
+                                    </Grid>
+                                    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
+                                        <Button Content="{helpers:ResourceString Name=ResourceVideoPlay}" Click="VideoDetailPlay_Click" />
+                                        <Button x:Name="AnimeDetailEditButton" MinWidth="52" Content="{helpers:ResourceString Name=AnimeLibraryEditDetails}" Click="AnimeDetailEdit_Click" Visibility="Collapsed" />
+                                        <Button x:Name="AnimeDetailCancelButton" Content="{helpers:ResourceString Name=AnimeLibraryCancel}" Click="AnimeMetadataCancel_Click" Visibility="Collapsed" />
                                     </StackPanel>
+                                </Grid>
+                                <StackPanel x:Name="VideoFileInfoPanel" Grid.Column="1" Grid.Row="1" Spacing="12" Margin="0,20,0,0">
                                     <TextBlock Text="{helpers:ResourceString Name=ResourceVideoInfo}" Style="{StaticResource SubtitleTextBlockStyle}" />
                                     <TextBlock x:Name="VideoDetailFileName" TextWrapping="Wrap" />
                                     <TextBlock x:Name="VideoDetailFileSize" />
                                     <TextBlock x:Name="VideoDetailModified" />
                                     <TextBlock x:Name="VideoDetailPath" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                    <Button Content="{helpers:ResourceString Name=ResourceVideoPlay}" Click="VideoDetailPlay_Click" HorizontalAlignment="Left" />
                                 </StackPanel>
                             </Grid>
                             <StackPanel Spacing="10">
