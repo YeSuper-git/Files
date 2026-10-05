@@ -5097,4 +5097,12 @@
   <data name="SortingMenuAvailableOnly" xml:space="preserve"><value>仅可用时显示</value></data>
   <data name="SortingMenuAlwaysShow" xml:space="preserve"><value>始终显示</value></data>
   <data name="SortingMenuHide" xml:space="preserve"><value>隐藏</value></data>
+  <data name="AnimeImagesChromeReading" xml:space="preserve"><value>正在读取 Chrome 地址…</value></data>
+  <data name="AnimeImagesChromeSkipped" xml:space="preserve"><value>你已开始输入或查找，已跳过自动填入。</value></data>
+  <data name="AnimeImagesChromeSuccess" xml:space="preserve"><value>已从 Chrome 自动填入编号：{0}</value></data>
+  <data name="AnimeImagesChromeNotOpen" xml:space="preserve"><value>未打开 Chrome，已保留原值。</value></data>
+  <data name="AnimeImagesChromeNoNumber" xml:space="preserve"><value>Chrome 地址末尾没有五位数字编号，已保留原值。</value></data>
+  <data name="AnimeImagesChromeTimedOut" xml:space="preserve"><value>读取 Chrome 地址超时，请手动输入编号。</value></data>
+  <data name="AnimeImagesChromeFailed" xml:space="preserve"><value>未能读取 Chrome 地址，请手动输入编号。</value></data>
+  <data name="AnimeImagesChromeRecognize" xml:space="preserve"><value>重新识别</value></data>
 </root>

@@ -5103,4 +5103,12 @@
   <data name="SortingMenuAvailableOnly" xml:space="preserve"><value>Show when available</value></data>
   <data name="SortingMenuAlwaysShow" xml:space="preserve"><value>Always show</value></data>
   <data name="SortingMenuHide" xml:space="preserve"><value>Hide</value></data>
+  <data name="AnimeImagesChromeReading" xml:space="preserve"><value>Reading the Chrome address...</value></data>
+  <data name="AnimeImagesChromeSkipped" xml:space="preserve"><value>Automatic fill skipped because you started editing or searching.</value></data>
+  <data name="AnimeImagesChromeSuccess" xml:space="preserve"><value>Filled in Chrome page number: {0}</value></data>
+  <data name="AnimeImagesChromeNotOpen" xml:space="preserve"><value>Chrome is not open. The original value was kept.</value></data>
+  <data name="AnimeImagesChromeNoNumber" xml:space="preserve"><value>The Chrome address does not end with a five-digit number. The original value was kept.</value></data>
+  <data name="AnimeImagesChromeTimedOut" xml:space="preserve"><value>Reading the Chrome address timed out. Enter the page number manually.</value></data>
+  <data name="AnimeImagesChromeFailed" xml:space="preserve"><value>Could not read the Chrome address. Enter the page number manually.</value></data>
+  <data name="AnimeImagesChromeRecognize" xml:space="preserve"><value>Recognize again</value></data>
 </root>

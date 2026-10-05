@@ -1769,6 +1769,7 @@ public sealed partial class ResourceLibraryPage : Page
             var folder = item.Kind == ResourceBrowserItemKind.VideoFile ? Path.GetDirectoryName(item.Path)! : item.Path;
             var content = new AnimeImageImportDialog(folder, _workspace, item.Kind == ResourceBrowserItemKind.VideoFile ? item.Path : null);
             var dialog = ResourceDialogPresentation.Create(XamlRoot, content, 860, 600);
+            dialog.Opened += async (_, _) => await content.InitializeSourceAsync();
             content.RequestClose += (_, _) => dialog.Hide();
             dialog.Closing += (_, args) => args.Cancel = content.IsBusy;
             await dialog.ShowAsync();
