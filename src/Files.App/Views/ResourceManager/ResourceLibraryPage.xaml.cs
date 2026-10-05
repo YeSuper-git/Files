@@ -977,6 +977,25 @@ public sealed partial class ResourceLibraryPage : Page
         AnimeMonthEditor.Text = details.AirDate?.ToString("yyyy-MM", CultureInfo.InvariantCulture) ?? string.Empty;
         AnimeEditError.Visibility = Visibility.Collapsed;
         SetAnimeEditing(true);
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (_animeEditingPath is null) return;
+            AnimeMonthEditor.Focus(FocusState.Programmatic);
+            AnimeMonthEditor.SelectAll();
+        });
+    }
+
+    private static bool TryParseAnimeMonth(string text, out DateTime month)
+    {
+        text = text.Trim();
+        if (text.Length == 4 && text.All(char.IsAsciiDigit)) text = "20" + text;
+        return DateTime.TryParseExact(text, new[] { "yyyy-MM", "yyyyMM" }, CultureInfo.InvariantCulture, DateTimeStyles.None, out month);
+    }
+
+    private void AnimeMonthEditor_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (TryParseAnimeMonth(AnimeMonthEditor.Text, out var month))
+            AnimeMonthEditor.Text = month.ToString("yyyy-MM", CultureInfo.InvariantCulture);
     }
 
     private void AnimeMonthEditor_TextChanged(object sender, TextChangedEventArgs e)
@@ -996,7 +1015,7 @@ public sealed partial class ResourceLibraryPage : Page
         DateTimeOffset? month = null;
         if (!string.IsNullOrWhiteSpace(AnimeMonthEditor.Text))
         {
-            if (!DateTime.TryParseExact(AnimeMonthEditor.Text.Trim(), new[] { "yyyy-MM", "yyyyMM" }, CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date))
+            if (!TryParseAnimeMonth(AnimeMonthEditor.Text, out var date))
             { AnimeEditError.Visibility = Visibility.Visible; return; }
             month = new DateTimeOffset(date);
         }

@@ -5092,4 +5092,9 @@
   <data name="AnimeLibrarySortAirDate" xml:space="preserve"><value>按播出日期排序</value></data>
   <data name="AnimeImagesAllAdded" xml:space="preserve"><value>已全部添加成功</value></data>
   <data name="AnimeLibraryBrowseCategories" xml:space="preserve"><value>按分类浏览番剧</value></data>
+  <data name="SortingMenuItems" xml:space="preserve"><value>排序项目显示</value></data>
+  <data name="SortingMenuItemsDescription" xml:space="preserve"><value>逐项控制排序菜单；默认隐藏不可用的项目。</value></data>
+  <data name="SortingMenuAvailableOnly" xml:space="preserve"><value>仅可用时显示</value></data>
+  <data name="SortingMenuAlwaysShow" xml:space="preserve"><value>始终显示</value></data>
+  <data name="SortingMenuHide" xml:space="preserve"><value>隐藏</value></data>
 </root>

@@ -1,4 +1,4 @@
-﻿<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
+<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
 <Page
 	x:Class="Files.App.Views.Settings.LayoutPage"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -97,6 +97,24 @@
 							<ComboBoxItem Content="{helpers:ResourceString Name=SortFilesAndFoldersTogether}" />
 						</uc:ComboBoxEx>
 					</wctcontrols:SettingsCard>
+				</wctcontrols:SettingsExpander.Items>
+			</wctcontrols:SettingsExpander>
+
+			<wctcontrols:SettingsExpander Header="{helpers:ResourceString Name=SortingMenuItems}" Description="{helpers:ResourceString Name=SortingMenuItemsDescription}">
+				<wctcontrols:SettingsExpander.Items>
+					<ItemsControl ItemsSource="{x:Bind ViewModel.SortingMenuItems}">
+						<ItemsControl.ItemTemplate>
+							<DataTemplate x:DataType="vm:SortingMenuItemViewModel">
+								<wctcontrols:SettingsCard Header="{x:Bind Label}">
+									<ComboBox Width="180" AutomationProperties.Name="{x:Bind Label}" SelectedIndex="{x:Bind VisibilityMode, Mode=TwoWay}">
+										<ComboBoxItem Content="{helpers:ResourceString Name=SortingMenuAvailableOnly}" />
+										<ComboBoxItem Content="{helpers:ResourceString Name=SortingMenuAlwaysShow}" />
+										<ComboBoxItem Content="{helpers:ResourceString Name=SortingMenuHide}" />
+									</ComboBox>
+								</wctcontrols:SettingsCard>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
 				</wctcontrols:SettingsExpander.Items>
 			</wctcontrols:SettingsExpander>
 
