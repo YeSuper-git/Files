@@ -34,10 +34,10 @@ public sealed class AnimeImageSourceService
     public static string GetImageFileName(PageImage image)
         => image.SuggestedName ?? Uri.UnescapeDataString(Path.GetFileName(image.Url.AbsolutePath));
 
-    public static IReadOnlyList<PageImage> FilterImages(IEnumerable<PageImage> images, IEnumerable<string> includedNames)
+    public static IReadOnlyList<PageImage> FilterImages(IEnumerable<PageImage> images, IEnumerable<string> includedNames, bool matchAll = false)
     {
         var keywords = includedNames.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim()).ToArray();
-        return images.Where(image => keywords.Length == 0 || keywords.Any(keyword => GetImageFileName(image).Contains(keyword, StringComparison.OrdinalIgnoreCase))).ToArray();
+        return images.Where(image => keywords.Length == 0 || (matchAll ? keywords.All(keyword => GetImageFileName(image).Contains(keyword, StringComparison.OrdinalIgnoreCase)) : keywords.Any(keyword => GetImageFileName(image).Contains(keyword, StringComparison.OrdinalIgnoreCase)))).ToArray();
     }
 
     public async Task<IReadOnlyList<PageImage>> FilterDimensionsAsync(IEnumerable<PageImage> images, int minimumWidth, int minimumHeight, CancellationToken token)

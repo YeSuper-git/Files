@@ -24,9 +24,9 @@ namespace Files.App.Helpers
 			SectionType.WSL => Resolve("Wsl"),
 			SectionType.FileTag => Resolve("Tags"),
 #if FILES_RESOURCE_MANAGER
-			SectionType.ResourceManager => Resolve("Home"),
+			SectionType.ResourceManager => Resolve("ResourceManager"),
 			SectionType.VideoEditor => Resolve("VideoEditor"),
-			SectionType.AnimeLibrary => Resolve("VideoEditor"),
+			SectionType.AnimeLibrary => Resolve("AnimeLibrary"),
 #endif
 			_ => null
 		};

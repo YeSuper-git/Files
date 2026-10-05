@@ -37,8 +37,14 @@ using WinRT;
 
 namespace Files.App.Views.ResourceManager;
 
-public sealed partial class ResourceLibraryPage : Page
+public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
 {
+    public SettingsPageKind SettingsPage => _animeLibrary ? SettingsPageKind.AnimeLibraryPage : SettingsPageKind.ResourceManagerPage;
+    private Dictionary<string, ResourceBrowserViewState> _viewStates = new(StringComparer.OrdinalIgnoreCase);
+    private string? _loadedLocationKey;
+    private string? _currentAnimeSeasonPath;
+    private bool _restoringPosition;
+    private bool _restoringSorting;
     private ResourceBrowserItemViewModel? _detailFolderItem;
     private ResourceVideoFolderListedItem? _detailFolderListedItem;
     private string? _pendingAnimeEditPath;
@@ -92,7 +98,7 @@ public sealed partial class ResourceLibraryPage : Page
             list.AddHandler(PointerReleasedEvent, new PointerEventHandler(BrowserGrid_PointerReleased), true);
             list.AddHandler(PointerCanceledEvent, new PointerEventHandler(BrowserGrid_PointerReleased), true);
         }
-        Loaded += (_, _) => { _displayContext.PropertyChanged -= OnSortingChanged; _displayContext.PropertyChanged += OnSortingChanged; ApplyBrowserSorting(); };
+        Loaded += (_, _) => { _displayContext.PropertyChanged -= OnSortingChanged; _displayContext.PropertyChanged += OnSortingChanged; RestoreBrowserSorting(); ApplyBrowserSorting(); };
         Unloaded += OnPageUnloaded;
     }
 
@@ -181,6 +187,8 @@ public sealed partial class ResourceLibraryPage : Page
         {
             base.OnNavigatedTo(e);
             var args = e.Parameter as NavigationArguments;
+            _viewStates = args?.ResourceViewStates ?? new(StringComparer.OrdinalIgnoreCase);
+            if (args is not null) args.ResourceViewStates = _viewStates;
             _animeLibrary = args?.NavPathParam == "AnimeLibrary";
             _pendingAnimeEditPath = _animeLibrary ? args?.AnimeEditPath : null;
             if (args is not null) args.AnimeEditPath = null;
@@ -195,6 +203,9 @@ public sealed partial class ResourceLibraryPage : Page
                 UpdateAnimePosterLayout();
                 AssistantEntry.Visibility = Visibility.Collapsed;
             }
+            VideoIllustrationsHeading.Text = (_animeLibrary ? Strings.AnimePreviewImages : Strings.ResourceVideoIllustrations).GetLocalizedResource();
+            AddIllustrationsButton.Content = (_animeLibrary ? Strings.AnimeManualAddImages : Strings.ResourceVideoAddIllustration).GetLocalizedResource();
+            AutoRecognizeIllustrations.Visibility = _animeLibrary ? Visibility.Visible : Visibility.Collapsed;
             var libraryPath = args?.ResourceLibraryPath ?? _workspace.LibraryPath;
             if (string.IsNullOrWhiteSpace(libraryPath)) { EmptyText.Visibility = Visibility.Visible; return; }
             _libraryPath = Path.GetFullPath(libraryPath);
@@ -265,6 +276,13 @@ public sealed partial class ResourceLibraryPage : Page
         return true;
     }
 
+    protected override void OnNavigatedFrom(NavigationEventArgs e)
+    {
+        RememberBrowserPosition();
+        _displayContext.PropertyChanged -= OnSortingChanged;
+        base.OnNavigatedFrom(e);
+    }
+
     private void OnPageUnloaded(object sender, RoutedEventArgs e)
     {
         _displayContext.PropertyChanged -= OnSortingChanged;
@@ -282,8 +300,36 @@ public sealed partial class ResourceLibraryPage : Page
             or nameof(IDisplayPageContext.SortFilesFirst) or nameof(IDisplayPageContext.SortDirectoriesAlongsideFiles))
         {
             if (_contentPageContext.ShellPage is ModernShellPage shell && ReferenceEquals(shell.CurrentResourceLibraryPage, this))
+            {
+                if (_restoringSorting || _loadedLocationKey is null) return;
+                var settings = _workspace.Settings.Clone();
+                settings.BrowserSortOption = (int)_displayContext.SortOption;
+                settings.BrowserSortDirection = (int)_displayContext.SortDirection;
+                settings.BrowserSortFilesFirst = _displayContext.SortFilesFirst;
+                settings.BrowserSortDirectoriesAlongsideFiles = _displayContext.SortDirectoriesAlongsideFiles;
+                _workspace.UpdateSettings(settings);
                 ApplyBrowserSorting();
+            }
         }
+    }
+
+    private void RestoreBrowserSorting()
+    {
+        var settings = _workspace.Settings;
+        _restoringSorting = true;
+        try
+        {
+            if (settings.BrowserSortOption is int option && Enum.IsDefined(typeof(SortOption), option))
+                _displayContext.SortOption = (SortOption)option;
+            if (settings.BrowserSortDirection is int direction && Enum.IsDefined(typeof(SortDirection), direction))
+                _displayContext.SortDirection = (SortDirection)direction;
+            if (settings.BrowserSortOption is not null)
+            {
+                _displayContext.SortFilesFirst = settings.BrowserSortFilesFirst;
+                _displayContext.SortDirectoriesAlongsideFiles = settings.BrowserSortDirectoriesAlongsideFiles;
+            }
+        }
+        finally { _restoringSorting = false; }
     }
 
     private void ApplyBrowserSorting()
@@ -358,6 +404,66 @@ public sealed partial class ResourceLibraryPage : Page
         }
         catch (IOException) { return null; }
         catch (UnauthorizedAccessException) { return null; }
+    }
+
+    private string GetLocationKey(ResourceBrowserLocation location) => $"{_animeLibrary}:{location.Kind}:{NormalizeForComparison(location.Path)}";
+
+    private ScrollViewer? BrowserScroller => VideoDetailView.Visibility == Visibility.Visible
+        ? VideoDetailView : DependencyObjectHelpers.FindChild<ScrollViewer>(BrowserGrid);
+
+    private void RememberBrowserPosition()
+    {
+        if (_restoringPosition || _loadedLocationKey is null || BrowserScroller is not { } scroller) return;
+        string? anchor = null;
+        double anchorTop = 0;
+        if (BrowserGrid.Visibility == Visibility.Visible)
+        {
+            for (var index = 0; index < BrowserItems.Count; index++)
+            {
+                if (BrowserGrid.ContainerFromIndex(index) is not FrameworkElement container) continue;
+                var top = container.TransformToVisual(scroller).TransformPoint(new(0, 0)).Y;
+                if (top + container.ActualHeight <= 0) continue;
+                anchor = BrowserItems[index].Path;
+                anchorTop = top;
+                break;
+            }
+        }
+        _viewStates[_loadedLocationKey] = new(scroller.VerticalOffset, anchor, anchorTop, _activeVideoItem?.Path, _currentAnimeSeasonPath);
+    }
+
+    private async Task RestoreBrowserPositionAsync(CancellationToken token)
+    {
+        if (_loadedLocationKey is null || !_viewStates.TryGetValue(_loadedLocationKey, out var state)) return;
+        _restoringPosition = true;
+        try
+        {
+            if (state.SelectedVideoPath is not null && BrowserItems.FirstOrDefault(item => PathEquals(item.Path, state.SelectedVideoPath)) is { } video)
+                ActiveBrowserList.SelectedItem = video;
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                await Task.Delay(30, token);
+                token.ThrowIfCancellationRequested();
+                UpdateLayout();
+                if (BrowserScroller is not { } scroller) continue;
+                scroller.ChangeView(null, Math.Min(state.Offset, scroller.ScrollableHeight), null, true);
+            }
+            if (state.AnchorPath is not null && BrowserGrid.Visibility == Visibility.Visible && BrowserScroller is { } gridScroller)
+            {
+                var index = BrowserItems.ToList().FindIndex(item => PathEquals(item.Path, state.AnchorPath));
+                if (index >= 0)
+                {
+                    BrowserGrid.ScrollIntoView(BrowserItems[index]);
+                    await Task.Delay(30, token);
+                    UpdateLayout();
+                    if (BrowserGrid.ContainerFromIndex(index) is FrameworkElement container)
+                    {
+                        var top = container.TransformToVisual(gridScroller).TransformPoint(new(0, 0)).Y;
+                        gridScroller.ChangeView(null, Math.Clamp(gridScroller.VerticalOffset + top - state.AnchorTop, 0, gridScroller.ScrollableHeight), null, true);
+                    }
+                }
+            }
+        }
+        finally { _restoringPosition = false; }
     }
 
     public async Task RefreshAsync()
@@ -513,6 +619,8 @@ public sealed partial class ResourceLibraryPage : Page
 
     private async Task LoadLocationAsync(ResourceBrowserLocation location)
     {
+        RememberBrowserPosition();
+        _loadedLocationKey = null;
         var preferredActorGroupName = location.Kind == ResourceBrowserLocationKind.ActorFolder &&
             _selectedActorGroupActorPath is not null && PathEquals(_selectedActorGroupActorPath, location.Path)
             ? _selectedActorGroupName
@@ -606,6 +714,7 @@ public sealed partial class ResourceLibraryPage : Page
                 BrowserItems.Add(viewModel);
             }
 
+            RestoreBrowserSorting();
             ApplyBrowserSorting();
             EmptyText.Visibility = BrowserItems.Count == 0 && location.Kind != ResourceBrowserLocationKind.VideoFolder ? Visibility.Visible : Visibility.Collapsed;
             if (location.Kind == ResourceBrowserLocationKind.VideoFolder)
@@ -625,6 +734,8 @@ public sealed partial class ResourceLibraryPage : Page
             SetResourceStatusMessage(string.Empty);
             UpdateActorGridLayout();
             UpdateNativeResourceStatus();
+            _loadedLocationKey = GetLocationKey(location);
+            await RestoreBrowserPositionAsync(cancellationToken);
 
             if (!_animeLibrary && location.Kind == ResourceBrowserLocationKind.LibraryRoot && BrowserItems.Count > 0)
                 _ = LoadActorWorkCountsAsync(BrowserItems.ToArray(), cancellationToken);
@@ -889,6 +1000,9 @@ public sealed partial class ResourceLibraryPage : Page
     private void ShowActiveVideoDetails()
     {
         var item = _activeVideoItem;
+        var hasVideo = item is not null && !item.Model.IsPosterOnly && File.Exists(item.Path);
+        VideoDetailPlayButton.Content = (hasVideo ? Strings.ResourceVideoPlay : Strings.ResourceVideoNoResource).GetLocalizedResource();
+        VideoDetailPlayButton.IsEnabled = hasVideo;
         VideoDetailModified.Visibility = _animeLibrary ? Visibility.Collapsed : Visibility.Visible;
         VideoDetailPath.Visibility = _animeLibrary ? Visibility.Collapsed : Visibility.Visible;
         VideoDetailPoster.Source = item?.Poster ?? _detailFolderItem?.Poster;
@@ -897,8 +1011,9 @@ public sealed partial class ResourceLibraryPage : Page
         UpdateAnimeMetadata();
         VideoDetailFileName.Text = item?.Name ?? Strings.ResourceVideoNoFiles.GetLocalizedResource();
         VideoDetailPath.Text = item?.Path ?? _detailFolderItem?.Path ?? string.Empty;
-        if (item is null)
+        if (item is null || item.Model.IsPosterOnly)
         {
+            if (item?.Model.IsPosterOnly == true) VideoDetailFileName.Text = Strings.ResourceVideoNoFiles.GetLocalizedResource();
             VideoDetailFileSize.Text = string.Empty;
             VideoDetailModified.Text = string.Empty;
             return;
@@ -1056,7 +1171,7 @@ public sealed partial class ResourceLibraryPage : Page
 
     private void VideoDetailPlay_Click(object sender, RoutedEventArgs e)
     {
-        if (_activeVideoItem is null)
+        if (_activeVideoItem is null || _activeVideoItem.Model.IsPosterOnly)
             return;
         try { Process.Start(new ProcessStartInfo { FileName = _activeVideoItem.Path, UseShellExecute = true }); }
         catch (Exception ex) { SetResourceStatusMessage($"无法打开视频：{ex.Message}"); }
@@ -1137,6 +1252,7 @@ public sealed partial class ResourceLibraryPage : Page
             VideoFileList.Visibility = Visibility.Collapsed;
             foreach (var model in models) BrowserItems.Add(model);
             ApplyBrowserSorting();
+            _currentAnimeSeasonPath = path;
             ActiveBrowserList.SelectedItem = BrowserItems.FirstOrDefault();
             _activeVideoItem = ActiveBrowserList.SelectedItem as ResourceBrowserItemViewModel;
             ShowActiveVideoDetails(); UpdateNativeResourceStatus();
@@ -1149,7 +1265,9 @@ public sealed partial class ResourceLibraryPage : Page
             button.Click += async (_, _) => { try { await SelectSeasonAsync(path); } catch (OperationCanceledException) { } catch (Exception ex) { SetResourceStatusMessage(ex.Message); } };
             ActorGroupButtons.Children.Add(button);
         }
-        await SelectSeasonAsync(seasons[0]);
+        var preferredSeason = _viewStates.TryGetValue(GetLocationKey(location), out var state) ? state.SeasonPath : null;
+        var restoredSeason = preferredSeason is null ? null : seasons.FirstOrDefault(path => PathEquals(path, preferredSeason));
+        await SelectSeasonAsync(restoredSeason ?? seasons[0]);
     }
 
     private void VideoDetailLayout_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateAnimePosterLayout();
@@ -1315,7 +1433,11 @@ public sealed partial class ResourceLibraryPage : Page
             {
                 if (PathEquals(Path.GetDirectoryName(file.Path) ?? string.Empty, folder))
                     continue;
-                var destination = Path.Combine(folder, $"illustration-{Guid.NewGuid():N}{Path.GetExtension(file.Name)}");
+                var number = _animeLibrary && _activeVideoItem is not null ? AnimeLibraryService.GetIllustrationNumber(_activeVideoItem.Path, BrowserItems.OrderBy(item => item.EpisodeIndex).Select(item => item.Path).ToArray()) : null;
+                var index = 1;
+                var stem = number is null ? $"illustration-{Guid.NewGuid():N}" : $"{int.Parse(number):00}\u63D2\u56FE";
+                var destination = Path.Combine(folder, $"{stem} ({index}){Path.GetExtension(file.Name)}");
+                while (File.Exists(destination)) destination = Path.Combine(folder, $"{stem} ({++index}){Path.GetExtension(file.Name)}");
                 File.Copy(file.Path, destination);
             }
             await LoadVideoIllustrationsAsync(folder, CancellationToken.None);
@@ -1508,6 +1630,7 @@ public sealed partial class ResourceLibraryPage : Page
         e.Handled = true;
         if (item.Kind == ResourceBrowserItemKind.VideoFile)
         {
+            if (item.Model.IsPosterOnly) return;
             try
             {
                 Process.Start(new ProcessStartInfo { FileName = item.Path, UseShellExecute = true });
@@ -1680,8 +1803,10 @@ public sealed partial class ResourceLibraryPage : Page
 
     private void NavigateToLocation(IReadOnlyList<ResourceBrowserLocation> locations)
     {
+        RememberBrowserPosition();
         var arguments = new NavigationArguments
         {
+            ResourceViewStates = _viewStates,
             NavPathParam = _animeLibrary ? "AnimeLibrary" : "ResourceManager",
             IsResourceLibraryPage = true,
             IsResourceManagerMode = false,
@@ -1762,6 +1887,13 @@ public sealed partial class ResourceLibraryPage : Page
             await LoadLocationAsync(_locations[^1]);
     }
 
+    private async void AutoRecognizeIllustrations_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_animeLibrary || _locations.Count == 0 || _locations[^1].Kind != ResourceBrowserLocationKind.VideoFolder) return;
+        var item = _activeVideoItem ?? _detailFolderItem;
+        if (item is not null) await ImportAnimeImagesAsync(item);
+    }
+
     private async Task ImportAnimeImagesAsync(ResourceBrowserItemViewModel item)
     {
         try
@@ -1793,9 +1925,6 @@ public sealed partial class ResourceLibraryPage : Page
             var edit = new MenuFlyoutItem { Text = Strings.AnimeLibraryEditDetails.GetLocalizedResource() };
             edit.Click += async (_, _) => { if (item.Kind == ResourceBrowserItemKind.VideoFile) { ActiveBrowserList.SelectedItem = item; BeginAnimeEdit(clickedVideo: item); } else await EditAnimeDetailsAsync(item); };
             flyout.Items.Add(edit);
-            var import = new MenuFlyoutItem { Text = Strings.AnimeImagesImport.GetLocalizedResource() };
-            import.Click += async (_, _) => await ImportAnimeImagesAsync(item);
-            flyout.Items.Add(import);
         }
         if (item.Kind == ResourceBrowserItemKind.ActorFolder)
         {
@@ -1869,7 +1998,7 @@ public sealed partial class ResourceLibraryPage : Page
     }
 
     private void OnOpenTranslationSettings(object sender, RoutedEventArgs e)
-        => _contentPageContext.ShellPage?.NavigateToSettings("ResourceManagerPage");
+        => _contentPageContext.ShellPage?.NavigateToSettings();
 
     private async Task ToggleVideoFolderTitleAsync(ResourceBrowserItemViewModel item, ResourceVideoFolderListedItem listedItem)
     {

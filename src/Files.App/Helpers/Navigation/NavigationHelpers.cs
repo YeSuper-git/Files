@@ -304,7 +304,7 @@ namespace Files.App.Helpers
 			else if (currentPath.Equals("ResourceManager", StringComparison.OrdinalIgnoreCase))
 			{
 				tabLocationHeader = "资源管理";
-				iconSource = new FontIconSource() { Glyph = "\uE8B7" };
+				((ImageIconSource)iconSource).ImageSource = new BitmapImage(new Uri(SidebarSectionIcons.For(SectionType.ResourceManager)!));
 				toolTipText = tabLocationHeader;
 			}
 			else if (currentPath.Equals("AnimeLibrary", StringComparison.OrdinalIgnoreCase))

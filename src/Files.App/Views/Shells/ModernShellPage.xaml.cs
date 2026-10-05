@@ -617,6 +617,8 @@ namespace Files.App.Views.Shells
 
 		public override void NavigateToSettings(string? selectItem = null)
 		{
+			if (string.IsNullOrWhiteSpace(selectItem) && ItemDisplayFrame.Content is Files.App.Data.Contracts.IPageSettingsContext context)
+				selectItem = context.SettingsPage.ToString();
 			InstanceViewModel.IsResourceManagerMode = false;
 			InstanceViewModel.ResourceLibraryPath = null;
 			ItemDisplayFrame.Navigate(

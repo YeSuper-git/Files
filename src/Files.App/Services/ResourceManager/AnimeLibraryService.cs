@@ -16,6 +16,19 @@ public sealed class AnimeLibraryService
 		Browser = new ResourceBrowserService(Workspace, browserLogger, true);
 	}
 
+    public static IReadOnlyList<string> GetEpisodeTargets(string folder, ResourceSettings settings)
+    {
+        var files = Directory.EnumerateFiles(folder).ToArray();
+        var videos = files.Where(file => settings.VideoExtensions.Contains(Path.GetExtension(file).TrimStart('.'), StringComparer.OrdinalIgnoreCase)).ToArray();
+        var posters = files.Where(file => settings.ImageExtensions.Contains(Path.GetExtension(file).TrimStart('.'), StringComparer.OrdinalIgnoreCase)
+            && GetIllustrationGroup(file) is null
+            && !Path.GetFileNameWithoutExtension(file).Contains("\u63D2\u56FE", StringComparison.OrdinalIgnoreCase)
+            && !Path.GetFileNameWithoutExtension(file).StartsWith("illustration-", StringComparison.OrdinalIgnoreCase)
+            && (videos.Length == 0 || (GetEpisodeNumber(file) is not null && !videos.Any(video => PosterMatchScore(Path.GetFileNameWithoutExtension(file), Path.GetFileNameWithoutExtension(video)) < 10))))
+            .GroupBy(file => Path.GetFileNameWithoutExtension(file), StringComparer.OrdinalIgnoreCase).Select(group => group.First());
+        return videos.Concat(posters).OrderBy(file => Path.GetFileNameWithoutExtension(file), new EpisodeNameComparer()).ToArray();
+    }
+
 	public static string? ResolveEpisodePoster(string episode, string season, string series, ResourceSettings settings, string? fallback)
 	{
 		var target = Path.GetFileNameWithoutExtension(episode);

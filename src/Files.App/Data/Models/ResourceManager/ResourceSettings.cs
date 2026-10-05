@@ -8,6 +8,11 @@ public sealed class ResourceSettings
     public List<string> VideoExtensions { get; set; } = ["mp4", "mkv", "avi", "mov", "wmv", "flv", "m4v", "ts"];
     public List<string> ImageExtensions { get; set; } = ["jpg", "jpeg", "png", "webp"];
     public List<string> AnimeImageIncludedNames { get; set; } = [];
+    public bool AnimeImageMatchAllNames { get; set; }
+    public int? BrowserSortOption { get; set; }
+    public int? BrowserSortDirection { get; set; }
+    public bool BrowserSortFilesFirst { get; set; }
+    public bool BrowserSortDirectoriesAlongsideFiles { get; set; }
     public string AnimeImageWebsitePrefix { get; set; } = string.Empty;
     public int AnimeImageMinimumWidth { get; set; }
     public int AnimeImageMinimumHeight { get; set; }
@@ -25,6 +30,11 @@ public sealed class ResourceSettings
         ImageExtensions = [.. (ImageExtensions ?? [])],
         PosterQualityKb = PosterQualityKb,
         AnimeImageIncludedNames = [.. (AnimeImageIncludedNames ?? [])],
+        AnimeImageMatchAllNames = AnimeImageMatchAllNames,
+        BrowserSortOption = BrowserSortOption,
+        BrowserSortDirection = BrowserSortDirection,
+        BrowserSortFilesFirst = BrowserSortFilesFirst,
+        BrowserSortDirectoriesAlongsideFiles = BrowserSortDirectoriesAlongsideFiles,
         AnimeImageWebsitePrefix = AnimeImageWebsitePrefix,
         AnimeImageSource = AnimeImageSource,
         AnimeImageMinimumWidth = AnimeImageMinimumWidth,
@@ -38,8 +48,8 @@ public sealed class ResourceSettings
 
     public void Normalize()
     {
-        VideoExtensions = NormalizeExtensions(VideoExtensions, ["mp4", "mkv", "avi", "mov", "wmv", "flv", "m4v", "ts"]);
-        ImageExtensions = NormalizeExtensions(ImageExtensions, ["jpg", "jpeg", "png", "webp"]);
+        VideoExtensions = NormalizeExtensions(null, ["mp4", "mkv", "avi", "mov", "wmv", "flv", "m4v", "ts"]);
+        ImageExtensions = NormalizeExtensions(null, ["jpg", "jpeg", "png", "webp"]);
         var keywords = (SubtitleKeywords ?? [])
             .Select(x => x?.Trim() ?? string.Empty)
             .Where(x => x.Length > 0)
