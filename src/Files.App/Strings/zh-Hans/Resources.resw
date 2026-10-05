@@ -5099,9 +5099,9 @@
   <data name="SortingMenuHide" xml:space="preserve"><value>隐藏</value></data>
   <data name="AnimeImagesChromeReading" xml:space="preserve"><value>正在读取 Chrome 地址…</value></data>
   <data name="AnimeImagesChromeSkipped" xml:space="preserve"><value>你已开始输入或查找，已跳过自动填入。</value></data>
-  <data name="AnimeImagesChromeSuccess" xml:space="preserve"><value>已从 Chrome 自动填入编号：{0}</value></data>
+  <data name="AnimeImagesChromeSuccess" xml:space="preserve"><value>已从 Chrome 自动填入地址后缀：{0}</value></data>
   <data name="AnimeImagesChromeNotOpen" xml:space="preserve"><value>未打开 Chrome，已保留原值。</value></data>
-  <data name="AnimeImagesChromeNoNumber" xml:space="preserve"><value>Chrome 地址末尾没有五位数字编号，已保留原值。</value></data>
+  <data name="AnimeImagesChromeNoNumber" xml:space="preserve"><value>Chrome 地址没有可识别的路径后缀，已保留原值。</value></data>
   <data name="AnimeImagesChromeTimedOut" xml:space="preserve"><value>读取 Chrome 地址超时，请手动输入编号。</value></data>
   <data name="AnimeImagesChromeFailed" xml:space="preserve"><value>未能读取 Chrome 地址，请手动输入编号。</value></data>
   <data name="AnimeImagesChromeRecognize" xml:space="preserve"><value>重新识别</value></data>
@@ -5117,4 +5117,14 @@
   <data name="AnimeImagesDownload" xml:space="preserve"><value>下载</value></data>
   <data name="AnimeImagesMatchMode" xml:space="preserve"><value>条件匹配方式</value></data>
   <data name="ResourceVideoNoResource" xml:space="preserve"><value>暂无资源</value></data>
+  <data name="AnimeVideosFiles" xml:space="preserve"><value>视频文件</value></data>
+  <data name="AnimeVideosMinimumSeconds" xml:space="preserve"><value>最短视频时长（秒，0 不过滤）</value></data>
+  <data name="AnimeVideosLoading" xml:space="preserve"><value>正在识别视频并读取时长…</value></data>
+  <data name="AnimeVideosDuration" xml:space="preserve"><value>{0:0.##} 秒</value></data>
+  <data name="AnimeVideosUnknownDuration" xml:space="preserve"><value>时长未知</value></data>
+  <data name="AnimeVideosFound" xml:space="preserve"><value>找到 {0} 个视频，过滤 {1} 个过短视频、{2} 个时长无法确认的视频。</value></data>
+  <data name="AnimeVideosDownloading" xml:space="preserve"><value>正在下载 {0}：{1:0.0} MiB</value></data>
+  <data name="AnimeVideosResult" xml:space="preserve"><value>下载成功 {0} 个，失败 {1} 个。</value></data>
+  <data name="AnimeVideosTooShort" xml:space="preserve"><value>视频时长低于设置的最短时长。</value></data>
+  <data name="AnimeVideosAllDownloaded" xml:space="preserve"><value>已全部下载成功</value></data>
 </root>

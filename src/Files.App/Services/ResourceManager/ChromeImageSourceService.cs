@@ -1,7 +1,6 @@
 // Copyright (c) Files Community. Licensed under the MIT License.
 using System.Diagnostics;
 using System.Runtime.InteropServices.Marshalling;
-using System.Text.RegularExpressions;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.System.Com;
@@ -12,17 +11,17 @@ namespace Files.App.Services.ResourceManager;
 
 internal static class ChromeImageSourceService
 {
-    internal enum ReadStatus { Success, NoChrome, Unavailable, NoNumber, TimedOut }
-    internal sealed record ReadResult(ReadStatus Status, string? Number = null);
+    internal enum ReadStatus { Success, NoChrome, Unavailable, NoSuffix, TimedOut }
+    internal sealed record ReadResult(ReadStatus Status, string? Suffix = null);
 
     private static readonly SemaphoreSlim Reader = new(1, 1);
 
-    public static async Task<ReadResult> ReadSourceNumberAsync()
+    public static async Task<ReadResult> ReadSourceSuffixAsync()
     {
         if (!Reader.Wait(0)) return new(ReadStatus.Unavailable);
         var read = Task.Run(() =>
         {
-            try { return ReadSourceNumber(); }
+            try { return ReadSourceSuffix(); }
             catch (Exception) { return new ReadResult(ReadStatus.Unavailable); }
             finally { Reader.Release(); }
         });
@@ -30,15 +29,16 @@ internal static class ChromeImageSourceService
         catch (TimeoutException) { return new(ReadStatus.TimedOut); }
     }
 
-    internal static string? ExtractSourceNumber(string address)
+    internal static string? ExtractSourceSuffix(string address)
     {
         if (!Uri.TryCreate(address.Contains("://", StringComparison.Ordinal) ? address : "https://" + address, UriKind.Absolute, out var uri)
             || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)) return null;
-        var match = Regex.Match(uri.AbsolutePath.TrimEnd('/'), @"(?<![0-9])([0-9]{5})$");
-        return match.Success ? match.Groups[1].Value : null;
+        var path = uri.AbsolutePath.TrimEnd('/');
+        var suffix = path[(path.LastIndexOf('/') + 1)..];
+        return string.IsNullOrWhiteSpace(suffix) ? null : suffix;
     }
 
-    private static unsafe ReadResult ReadSourceNumber()
+    private static unsafe ReadResult ReadSourceSuffix()
     {
         var initialized = PInvoke.CoInitializeEx(null, COINIT.COINIT_MULTITHREADED);
         if (initialized.Failed) return new(ReadStatus.Unavailable);
@@ -56,7 +56,7 @@ internal static class ChromeImageSourceService
                 using var process = Process.GetProcessById((int)processId);
                 if (!string.Equals(process.ProcessName, "chrome", StringComparison.OrdinalIgnoreCase)) continue;
                 result = ReadAddress(window);
-                if (result.Status == ReadStatus.Success || result.Status == ReadStatus.NoNumber) return result;
+                if (result.Status == ReadStatus.Success || result.Status == ReadStatus.NoSuffix) return result;
             }
             return result ?? new(ReadStatus.NoChrome);
         }
@@ -85,8 +85,8 @@ internal static class ChromeImageSourceService
                 {
                     var address = ReadProperty(element, UIA_PROPERTY_ID.UIA_ValueValuePropertyId);
                     if (string.IsNullOrWhiteSpace(address)) return new(ReadStatus.Unavailable);
-                    var number = ExtractSourceNumber(address);
-                    return number is null ? new(ReadStatus.NoNumber) : new(ReadStatus.Success, number);
+                    var suffix = ExtractSourceSuffix(address);
+                    return suffix is null ? new(ReadStatus.NoSuffix) : new(ReadStatus.Success, suffix);
                 }
             }
             if (depth >= 12 || walker.GetFirstChildElement(element, out var child).Failed) continue;

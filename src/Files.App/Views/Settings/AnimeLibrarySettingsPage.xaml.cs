@@ -147,6 +147,7 @@ public sealed partial class AnimeLibrarySettingsPage : Page
             Grid.SetColumn(spins, 1); control.Children.Add(spins);
             section.Children.Add(new SettingsCard { Header = label, Content = control });
         }
+        AddNumber(images, Strings.AnimeVideosMinimumSeconds.GetLocalizedResource(), () => workspace.Settings.AnimeVideoMinimumSeconds, 0, 86400, (settings, value) => settings.AnimeVideoMinimumSeconds = value);
         AddNumber(images, Strings.AnimeImagesMinimumWidth.GetLocalizedResource(), () => workspace.Settings.AnimeImageMinimumWidth, 0, 65535, (settings, value) => settings.AnimeImageMinimumWidth = value);
         AddNumber(images, Strings.AnimeImagesMinimumHeight.GetLocalizedResource(), () => workspace.Settings.AnimeImageMinimumHeight, 0, 65535, (settings, value) => settings.AnimeImageMinimumHeight = value);
         AddNumber(display, Strings.AnimeLibraryPosterWidth.GetLocalizedResource(), () => workspace.Settings.AnimePosterWidth, 100, 240, (settings, value) => settings.AnimePosterWidth = value);

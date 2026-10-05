@@ -5,7 +5,7 @@ namespace Files.App.Data.Models.ResourceManager;
 
 public sealed class ResourceSettings
 {
-    public List<string> VideoExtensions { get; set; } = ["mp4", "mkv", "avi", "mov", "wmv", "flv", "m4v", "ts"];
+    public List<string> VideoExtensions { get; set; } = ["mp4", "mkv", "avi", "mov", "wmv", "flv", "m4v", "ts", "webm", "mpg", "mpeg"];
     public List<string> ImageExtensions { get; set; } = ["jpg", "jpeg", "png", "webp"];
     public List<string> AnimeImageIncludedNames { get; set; } = [];
     public bool AnimeImageMatchAllNames { get; set; }
@@ -14,6 +14,7 @@ public sealed class ResourceSettings
     public bool BrowserSortFilesFirst { get; set; }
     public bool BrowserSortDirectoriesAlongsideFiles { get; set; }
     public string AnimeImageWebsitePrefix { get; set; } = string.Empty;
+    public int AnimeVideoMinimumSeconds { get; set; }
     public int AnimeImageMinimumWidth { get; set; }
     public int AnimeImageMinimumHeight { get; set; }
     public bool AnimeImageGroupByPrefix { get; set; }
@@ -37,6 +38,7 @@ public sealed class ResourceSettings
         BrowserSortDirectoriesAlongsideFiles = BrowserSortDirectoriesAlongsideFiles,
         AnimeImageWebsitePrefix = AnimeImageWebsitePrefix,
         AnimeImageSource = AnimeImageSource,
+        AnimeVideoMinimumSeconds = AnimeVideoMinimumSeconds,
         AnimeImageMinimumWidth = AnimeImageMinimumWidth,
         AnimeImageMinimumHeight = AnimeImageMinimumHeight,
         AnimeImageGroupByPrefix = AnimeImageGroupByPrefix,
@@ -48,7 +50,7 @@ public sealed class ResourceSettings
 
     public void Normalize()
     {
-        VideoExtensions = NormalizeExtensions(null, ["mp4", "mkv", "avi", "mov", "wmv", "flv", "m4v", "ts"]);
+        VideoExtensions = NormalizeExtensions(null, ["mp4", "mkv", "avi", "mov", "wmv", "flv", "m4v", "ts", "webm", "mpg", "mpeg"]);
         ImageExtensions = NormalizeExtensions(null, ["jpg", "jpeg", "png", "webp"]);
         var keywords = (SubtitleKeywords ?? [])
             .Select(x => x?.Trim() ?? string.Empty)
@@ -59,6 +61,7 @@ public sealed class ResourceSettings
             ? keywords
             : ["中文字幕", "中字", "中文", "chinese", "chs", "cht", "sub"];
         AnimeImageIncludedNames = (AnimeImageIncludedNames ?? []).Select(value => value.Trim()).Where(value => value.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        AnimeVideoMinimumSeconds = Math.Clamp(AnimeVideoMinimumSeconds, 0, 86400);
         AnimeImageMinimumWidth = Math.Clamp(AnimeImageMinimumWidth, 0, 65535);
         AnimeImageMinimumHeight = Math.Clamp(AnimeImageMinimumHeight, 0, 65535);
         AnimePosterWidth = Math.Clamp(AnimePosterWidth, 100, 240);

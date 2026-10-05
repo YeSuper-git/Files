@@ -15,7 +15,11 @@ public sealed partial class AnimeImageImportDialog : UserControl
     private readonly AnimeImageSourceService _service = new();
     private readonly IResourceWorkspaceService _workspace;
     private readonly string _folder;
-    private readonly string[] _videos;
+    private string[] _videos;
+    private readonly AnimeVideoSourceService _videoService = new(Ioc.Default.GetRequiredService<Files.App.Services.VideoEditor.VideoProbeService>());
+    private readonly ComboBox _mediaMode = new() { Width = 130 };
+    private bool VideoMode => _mediaMode.SelectedIndex == 1;
+    private readonly List<(CheckBox Selected, AnimeVideoSourceService.PageVideo Video)> _videoChoices = [];
     private readonly Grid _previewOverlay = new() { Visibility = Visibility.Collapsed };
     private readonly Image _previewImage = new() { Stretch = Stretch.Uniform };
     private readonly TextBox _source;
@@ -80,6 +84,10 @@ public sealed partial class AnimeImageImportDialog : UserControl
         Grid.SetColumn(_chromeStatus, 3); input.Children.Add(_chromeStatus);
         Grid.SetRow(input, 1); grid.Children.Add(input);
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        _mediaMode.Items.Add(Strings.AnimePreviewImages.GetLocalizedResource());
+        _mediaMode.Items.Add(Strings.AnimeVideosFiles.GetLocalizedResource());
+        _mediaMode.SelectedIndex = 0;
+        actions.Children.Add(_mediaMode);
         actions.Children.Add(_targetVideo); actions.Children.Add(_scan); actions.Children.Add(_scanAndDownload); actions.Children.Add(_save);
         _save.Style = (Style)Application.Current.Resources["AccentButtonStyle"];
         Grid.SetRow(actions, 2); grid.Children.Add(actions);
@@ -104,7 +112,7 @@ public sealed partial class AnimeImageImportDialog : UserControl
         {
             var select = _selectAll.IsChecked == true;
             _updatingSelection = true;
-            foreach (var row in _choices.Where(row => row.Selected.IsEnabled)) row.Selected.IsChecked = select;
+            foreach (var selected in SelectionBoxes().Where(box => box.IsEnabled)) selected.IsChecked = select;
             _updatingSelection = false;
             UpdateSave();
         };
@@ -114,13 +122,19 @@ public sealed partial class AnimeImageImportDialog : UserControl
             e.Handled = true;
             if (!IsBusy && _scan.IsEnabled) await ScanAsync();
         };
+        _mediaMode.SelectionChanged += (_, _) =>
+        {
+            _rows.Children.Clear(); _choices.Clear(); _videoChoices.Clear(); _scanSucceeded = false; _allAdded = false;
+            _targetVideo.Visibility = VideoMode ? Visibility.Collapsed : Visibility.Visible;
+            ReloadTargets(); _status.Text = string.Empty; UpdateSave();
+        };
         _recognize.Click += async (_, _) => await RecognizeChromeAsync();
         _scan.Click += async (_, _) => await ScanAsync();
         _scanAndDownload.Click += async (_, _) =>
         {
-            if (_targetVideo.SelectedIndex < 0) { _status.Text = Strings.AnimeImagesChooseVideo.GetLocalizedResource(); return; }
+            if (!VideoMode && _targetVideo.SelectedIndex < 0) { _status.Text = Strings.AnimeImagesChooseVideo.GetLocalizedResource(); return; }
             await ScanAsync();
-            if (_scanSucceeded && !IsBusy && _choices.Any(row => row.Selected.IsEnabled && row.Selected.IsChecked == true)) await SaveAsync();
+            if (_scanSucceeded && !IsBusy && SelectionBoxes().Any(box => box.IsEnabled && box.IsChecked == true)) await SaveAsync();
         };
         _save.Click += async (_, _) => await SaveAsync();
         _cancel.Click += (_, _) => _operation?.Cancel();
@@ -152,7 +166,7 @@ public sealed partial class AnimeImageImportDialog : UserControl
         try
         {
             _chromeStatus.Text = Strings.AnimeImagesChromeReading.GetLocalizedResource();
-            var result = await ChromeImageSourceService.ReadSourceNumberAsync();
+            var result = await ChromeImageSourceService.ReadSourceSuffixAsync();
             if (!IsLoaded) return;
             if (IsBusy || revision != _sourceRevision || !string.Equals(sourceBeforeReading, _source.Text, StringComparison.Ordinal))
             {
@@ -161,14 +175,14 @@ public sealed partial class AnimeImageImportDialog : UserControl
             }
             _chromeStatus.Text = result.Status switch
             {
-                ChromeImageSourceService.ReadStatus.Success => string.Format(Strings.AnimeImagesChromeSuccess.GetLocalizedResource(), result.Number),
+                ChromeImageSourceService.ReadStatus.Success => string.Format(Strings.AnimeImagesChromeSuccess.GetLocalizedResource(), result.Suffix),
                 ChromeImageSourceService.ReadStatus.NoChrome => Strings.AnimeImagesChromeNotOpen.GetLocalizedResource(),
-                ChromeImageSourceService.ReadStatus.NoNumber => Strings.AnimeImagesChromeNoNumber.GetLocalizedResource(),
+                ChromeImageSourceService.ReadStatus.NoSuffix => Strings.AnimeImagesChromeNoNumber.GetLocalizedResource(),
                 ChromeImageSourceService.ReadStatus.TimedOut => Strings.AnimeImagesChromeTimedOut.GetLocalizedResource(),
                 _ => Strings.AnimeImagesChromeFailed.GetLocalizedResource(),
             };
-            if (result.Number is null) return;
-            _source.Text = result.Number;
+            if (result.Suffix is null) return;
+            _source.Text = result.Suffix;
             _source.Focus(FocusState.Programmatic);
             _source.SelectAll();
         }
@@ -182,24 +196,36 @@ public sealed partial class AnimeImageImportDialog : UserControl
     private void Busy(bool busy)
     {
         _recognize.IsEnabled = !busy && !_readingChrome;
+        _mediaMode.IsEnabled = !busy;
         IsBusy = busy; _source.IsEnabled = _scan.IsEnabled = _scanAndDownload.IsEnabled = _close.IsEnabled = _targetVideo.IsEnabled = !busy;
         _cancel.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
         _rows.IsHitTestVisible = !busy; UpdateSave();
     }
+    private IEnumerable<CheckBox> SelectionBoxes() => VideoMode ? _videoChoices.Select(row => row.Selected) : _choices.Select(row => row.Selected);
+    private void ReloadTargets()
+    {
+        var previous = _targetVideo.SelectedIndex >= 0 && _targetVideo.SelectedIndex < _videos.Length ? _videos[_targetVideo.SelectedIndex] : null;
+        try { _videos = AnimeLibraryService.GetEpisodeTargets(_folder, _workspace.Settings).ToArray(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { _videos = []; }
+        _targetVideo.Items.Clear();
+        foreach (var video in _videos) _targetVideo.Items.Add(Path.GetFileName(video));
+        _targetVideo.SelectedIndex = previous is null ? (_videos.Length == 1 ? 0 : -1) : Array.FindIndex(_videos, path => string.Equals(path, previous, StringComparison.OrdinalIgnoreCase));
+    }
     private void UpdateSave()
     {
         if (_updatingSelection) return;
-        _selectAll.Visibility = _choices.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        var remaining = _choices.Where(row => row.Selected.IsEnabled).ToArray();
+        _selectAll.Visibility = SelectionBoxes().Any() ? Visibility.Visible : Visibility.Collapsed;
+        var remaining = SelectionBoxes().Where(box => box.IsEnabled).ToArray();
         _selectAll.IsEnabled = !IsBusy && remaining.Length > 0;
-        _selectAll.IsChecked = remaining.Length > 0 && remaining.All(row => row.Selected.IsChecked == true) ? true
-            : remaining.Any(row => row.Selected.IsChecked == true) ? null : false;
-        var hasSelectedImages = _scanSucceeded && remaining.Any(row => row.Selected.IsChecked == true);
+        _selectAll.IsChecked = remaining.Length > 0 && remaining.All(box => box.IsChecked == true) ? true
+            : remaining.Any(box => box.IsChecked == true) ? null : false;
+        var hasSelectedImages = _scanSucceeded && remaining.Any(box => box.IsChecked == true);
         _save.Visibility = hasSelectedImages ? Visibility.Visible : Visibility.Collapsed;
-        _save.IsEnabled = !IsBusy && _targetVideo.SelectedIndex >= 0 && hasSelectedImages;
+        _save.IsEnabled = !IsBusy && (VideoMode || _targetVideo.SelectedIndex >= 0) && hasSelectedImages;
     }
     private async Task ScanAsync()
     {
+        if (VideoMode) { await ScanVideosAsync(); return; }
         _sourceRevision++;
         _allAdded = false;
         _scanSucceeded = false;
@@ -256,6 +282,7 @@ public sealed partial class AnimeImageImportDialog : UserControl
     }
     private async Task SaveAsync()
     {
+        if (VideoMode) { await SaveVideosAsync(); return; }
         if (_allAdded) return;
         if (_targetVideo.SelectedIndex < 0) return;
         var file = _videos[_targetVideo.SelectedIndex];
@@ -285,4 +312,62 @@ public sealed partial class AnimeImageImportDialog : UserControl
         catch (OperationCanceledException) { _status.Text = Strings.AnimeImagesCancelled.GetLocalizedResource() + " " + string.Format(CultureInfo.CurrentCulture, Strings.AnimeImagesResult.GetLocalizedResource(), saved, skipped, failed); }
         finally { Busy(false); }
     }
+    private async Task ScanVideosAsync()
+    {
+        _sourceRevision++; _allAdded = false; _scanSucceeded = false;
+        _operation?.Dispose(); _operation = new(); _rows.Children.Clear(); _videoChoices.Clear(); Busy(true);
+        _status.Text = Strings.AnimeVideosLoading.GetLocalizedResource();
+        try
+        {
+            var address = AnimeImageSourceService.ResolvePageAddress(_source.Text.Trim(), _prefix);
+            var result = await _videoService.InspectPageAsync(address, _workspace.Settings.AnimeVideoMinimumSeconds, _operation.Token);
+            var settings = _workspace.Settings.Clone(); settings.AnimeImageSource = _source.Text.Trim(); _workspace.UpdateSettings(settings);
+            foreach (var video in result.Videos)
+            {
+                var selected = new CheckBox { Content = video.Name, IsChecked = true, VerticalAlignment = VerticalAlignment.Center };
+                ToolTipService.SetToolTip(selected, video.Url.AbsoluteUri);
+                var duration = new TextBlock { Text = video.DurationSeconds is double seconds ? string.Format(CultureInfo.CurrentCulture, Strings.AnimeVideosDuration.GetLocalizedResource(), seconds) : Strings.AnimeVideosUnknownDuration.GetLocalizedResource(), VerticalAlignment = VerticalAlignment.Center };
+                var row = new Grid { Padding = new Thickness(12, 8, 12, 8), ColumnSpacing = 12 };
+                row.ColumnDefinitions.Add(new ColumnDefinition()); row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                selected.MaxWidth = 500; row.Children.Add(selected); Grid.SetColumn(duration, 1); row.Children.Add(duration);
+                _rows.Children.Add(row); _videoChoices.Add((selected, video));
+                selected.Checked += (_, _) => UpdateSave(); selected.Unchecked += (_, _) => UpdateSave();
+            }
+            _scanSucceeded = true;
+            _status.Text = string.Format(CultureInfo.CurrentCulture, Strings.AnimeVideosFound.GetLocalizedResource(), result.Videos.Count, result.TooShort, result.UnknownDuration);
+        }
+        catch (OperationCanceledException) { _status.Text = Strings.AnimeImagesCancelled.GetLocalizedResource(); }
+        catch (Exception ex) { _status.Text = Strings.AnimeImagesFailed.GetLocalizedResource() + " " + ex.Message; }
+        finally { Busy(false); }
+    }
+
+    private async Task SaveVideosAsync()
+    {
+        var selected = _videoChoices.Where(row => row.Selected.IsEnabled && row.Selected.IsChecked == true).ToArray();
+        if (selected.Length == 0) return;
+        _operation?.Dispose(); _operation = new(); Busy(true); var saved = 0; var failed = 0;
+        try
+        {
+            var referer = new Uri(AnimeImageSourceService.ResolvePageAddress(_source.Text.Trim(), _prefix));
+            foreach (var row in selected)
+            {
+                _operation.Token.ThrowIfCancellationRequested();
+                try
+                {
+                    var progress = new Progress<long>(bytes => { if (IsBusy && row.Selected.IsEnabled) _status.Text = string.Format(CultureInfo.CurrentCulture, Strings.AnimeVideosDownloading.GetLocalizedResource(), row.Video.Name, bytes / 1048576d); });
+                    await _videoService.DownloadAsync(row.Video, _workspace.LibraryPath, _folder, referer, _workspace.Settings.AnimeVideoMinimumSeconds, progress, _operation.Token);
+                    saved++; HasChanges = true; row.Selected.IsChecked = false; row.Selected.IsEnabled = false;
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex) { failed++; ToolTipService.SetToolTip(row.Selected, ex.Message); }
+                _status.Text = string.Format(CultureInfo.CurrentCulture, Strings.AnimeVideosResult.GetLocalizedResource(), saved, failed);
+            }
+            _allAdded = _videoChoices.Count > 0 && _videoChoices.All(row => !row.Selected.IsEnabled);
+            if (_allAdded) _status.Text = Strings.AnimeVideosAllDownloaded.GetLocalizedResource();
+        }
+        catch (OperationCanceledException) { _status.Text = Strings.AnimeImagesCancelled.GetLocalizedResource(); }
+        catch (Exception ex) { _status.Text = Strings.AnimeImagesFailed.GetLocalizedResource() + " " + ex.Message; }
+        finally { ReloadTargets(); Busy(false); }
+    }
+
 }
