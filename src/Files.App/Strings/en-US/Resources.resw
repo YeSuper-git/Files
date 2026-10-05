@@ -5105,9 +5105,9 @@
   <data name="SortingMenuHide" xml:space="preserve"><value>Hide</value></data>
   <data name="AnimeImagesChromeReading" xml:space="preserve"><value>Reading the Chrome address...</value></data>
   <data name="AnimeImagesChromeSkipped" xml:space="preserve"><value>Automatic fill skipped because you started editing or searching.</value></data>
-  <data name="AnimeImagesChromeSuccess" xml:space="preserve"><value>Filled in Chrome page number: {0}</value></data>
+  <data name="AnimeImagesChromeSuccess" xml:space="preserve"><value>Filled in Chrome address suffix: {0}</value></data>
   <data name="AnimeImagesChromeNotOpen" xml:space="preserve"><value>Chrome is not open. The original value was kept.</value></data>
-  <data name="AnimeImagesChromeNoNumber" xml:space="preserve"><value>The Chrome address does not end with a five-digit number. The original value was kept.</value></data>
+  <data name="AnimeImagesChromeNoNumber" xml:space="preserve"><value>The Chrome address has no usable path suffix. The original value was kept.</value></data>
   <data name="AnimeImagesChromeTimedOut" xml:space="preserve"><value>Reading the Chrome address timed out. Enter the page number manually.</value></data>
   <data name="AnimeImagesChromeFailed" xml:space="preserve"><value>Could not read the Chrome address. Enter the page number manually.</value></data>
   <data name="AnimeImagesChromeRecognize" xml:space="preserve"><value>Recognize again</value></data>
@@ -5123,4 +5123,14 @@
   <data name="AnimeImagesDownload" xml:space="preserve"><value>Download</value></data>
   <data name="AnimeImagesMatchMode" xml:space="preserve"><value>Condition matching</value></data>
   <data name="ResourceVideoNoResource" xml:space="preserve"><value>No resource</value></data>
+  <data name="AnimeVideosFiles" xml:space="preserve"><value>Video files</value></data>
+  <data name="AnimeVideosMinimumSeconds" xml:space="preserve"><value>Minimum video duration (seconds, 0 disables filtering)</value></data>
+  <data name="AnimeVideosLoading" xml:space="preserve"><value>Finding videos and reading durations...</value></data>
+  <data name="AnimeVideosDuration" xml:space="preserve"><value>{0:0.##} seconds</value></data>
+  <data name="AnimeVideosUnknownDuration" xml:space="preserve"><value>Unknown duration</value></data>
+  <data name="AnimeVideosFound" xml:space="preserve"><value>Found {0} videos. Filtered {1} short videos and {2} videos with unconfirmed duration.</value></data>
+  <data name="AnimeVideosDownloading" xml:space="preserve"><value>Downloading {0}: {1:0.0} MiB</value></data>
+  <data name="AnimeVideosResult" xml:space="preserve"><value>Downloaded {0} videos; {1} failed.</value></data>
+  <data name="AnimeVideosTooShort" xml:space="preserve"><value>The video is shorter than the minimum duration.</value></data>
+  <data name="AnimeVideosAllDownloaded" xml:space="preserve"><value>All videos downloaded successfully</value></data>
 </root>

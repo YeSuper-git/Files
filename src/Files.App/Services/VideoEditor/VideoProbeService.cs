@@ -12,12 +12,16 @@ public sealed class VideoProbeService(VideoToolchain toolchain)
 {
 	private readonly VideoToolchain _toolchain = toolchain;
 
-	public async Task<VideoMetadata> ProbeAsync(string path, CancellationToken cancellationToken = default)
+	public async Task<VideoMetadata> ProbeAsync(string path, CancellationToken cancellationToken = default, Uri? referer = null)
 	{
 		if (_toolchain.FfprobePath is null)
 			throw new InvalidOperationException(_toolchain.StatusMessage);
 
 		var startInfo = CreateStartInfo(_toolchain.FfprobePath);
+		if (referer is not null)
+		{
+			foreach (var argument in new[] { "-protocol_whitelist", "http,https,tcp,tls", "-rw_timeout", "15000000", "-headers", $"Referer: {referer.AbsoluteUri}\r\nUser-Agent: Mozilla/5.0 FilesMax/1.0\r\n" }) startInfo.ArgumentList.Add(argument);
+		}
 		foreach (var argument in new[]
 		{
 			"-v", "error",
