@@ -39,6 +39,8 @@ namespace Files.App.Data.EventArguments
 		/// <summary>Marks a navigation entry as a virtual location inside the resource-library browser.</summary>
 		public bool IsResourceLibraryPage { get; set; }
 
+		public Dictionary<string, Files.App.Data.Models.ResourceManager.ResourceBrowserViewState>? ResourceViewStates { get; set; }
+
 		public string? AnimeEditPath { get; set; }
 
 		public string[]? ResourceLocationPaths { get; set; }

@@ -5061,8 +5061,8 @@
   <data name="AnimeOptimizationAssignGroup" xml:space="preserve"><value>Assign video to entire group</value></data>
   <data name="AnimeImagesSource" xml:space="preserve"><value>Image source URL</value></data>
   <data name="AnimeImagesSourceHelp" xml:space="preserve"><value>Enter a regular anime page URL. You can change it when importing.</value></data>
-  <data name="AnimeImagesImport" xml:space="preserve"><value>Smart image search</value></data>
-  <data name="AnimeImagesScan" xml:space="preserve"><value>Find images</value></data>
+  <data name="AnimeImagesImport" xml:space="preserve"><value>Auto recognize</value></data>
+  <data name="AnimeImagesScan" xml:space="preserve"><value>Find</value></data>
   <data name="AnimeImagesSave" xml:space="preserve"><value>Download selected images</value></data>
   <data name="AnimeImagesHelp" xml:space="preserve"><value>Finds image links in static HTML without running scripts. Downloads illustrations only, in natural filename order, into the selected video folder. Names use the assigned episode and a sequence such as 02插图 (18). Duplicate illustrations are skipped; new files continue the sequence without overwriting existing files.</value></data>
   <data name="AnimeImagesLoading" xml:space="preserve"><value>Finding images…</value></data>
@@ -5083,7 +5083,7 @@
   <data name="AnimeImagesPrefix" xml:space="preserve"><value>Website prefix preset</value></data>
   <data name="AnimeImagesPrefixHelp" xml:space="preserve"><value>For example https://example.org/anime/. Enter only the suffix when importing. Change the prefix here.</value></data>
   <data name="AnimeImagesIncludedNames" xml:space="preserve"><value>Included image name keywords</value></data>
-  <data name="AnimeImagesIncludedNamesHelp" xml:space="preserve"><value>Keep images whose filename contains any keyword, ignoring case. Separate keywords with commas. Leave empty to keep all images.</value></data>
+  <data name="AnimeImagesIncludedNamesHelp" xml:space="preserve"><value>Add multiple filename conditions and choose whether any or all must match. Matching ignores case; leave empty to keep all images.</value></data>
   <data name="AnimeImagesMinimumWidth" xml:space="preserve"><value>Minimum image width (pixels; 0 for no limit)</value></data>
   <data name="AnimeImagesMinimumHeight" xml:space="preserve"><value>Minimum image height (pixels; 0 for no limit)</value></data>
   <data name="AnimeImagesGroupByPrefix" xml:space="preserve"><value>Group images by the first 8 filename characters</value></data>
@@ -5111,4 +5111,16 @@
   <data name="AnimeImagesChromeTimedOut" xml:space="preserve"><value>Reading the Chrome address timed out. Enter the page number manually.</value></data>
   <data name="AnimeImagesChromeFailed" xml:space="preserve"><value>Could not read the Chrome address. Enter the page number manually.</value></data>
   <data name="AnimeImagesChromeRecognize" xml:space="preserve"><value>Recognize again</value></data>
+  <data name="AnimeSettingsLibrarySection" xml:space="preserve"><value>Library</value></data>
+  <data name="AnimeSettingsDisplaySection" xml:space="preserve"><value>Browsing and posters</value></data>
+  <data name="AnimeImagesKeywordPlaceholder" xml:space="preserve"><value>Image filename keyword</value></data>
+  <data name="AnimeImagesAddCondition" xml:space="preserve"><value>Add condition</value></data>
+  <data name="AnimeImagesMatchAny" xml:space="preserve"><value>Match any condition</value></data>
+  <data name="AnimeImagesMatchAll" xml:space="preserve"><value>Match all conditions</value></data>
+  <data name="AnimeImagesFindAndDownload" xml:space="preserve"><value>Find and download</value></data>
+  <data name="AnimePreviewImages" xml:space="preserve"><value>Preview images</value></data>
+  <data name="AnimeManualAddImages" xml:space="preserve"><value>Add manually</value></data>
+  <data name="AnimeImagesDownload" xml:space="preserve"><value>Download</value></data>
+  <data name="AnimeImagesMatchMode" xml:space="preserve"><value>Condition matching</value></data>
+  <data name="ResourceVideoNoResource" xml:space="preserve"><value>No resource</value></data>
 </root>

@@ -20,20 +20,22 @@ public sealed partial class AnimeImageImportDialog : UserControl
     private readonly Image _previewImage = new() { Stretch = Stretch.Uniform };
     private readonly TextBox _source;
     private readonly string _prefix;
-    private readonly StackPanel _rows = new() { Spacing = 12 };
+    private readonly StackPanel _rows = new() { Spacing = 8 };
     private readonly TextBlock _chromeStatus = new() { TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap };
     private readonly Button _recognize = new() { Content = Strings.AnimeImagesChromeRecognize.GetLocalizedResource() };
     private bool _readingChrome;
     private readonly Button _scan = new() { Content = Strings.AnimeImagesScan.GetLocalizedResource() };
-    private readonly Button _save = new() { Content = Strings.AnimeImagesConfirm.GetLocalizedResource(), IsEnabled = false };
+    private readonly Button _scanAndDownload = new() { Content = Strings.AnimeImagesFindAndDownload.GetLocalizedResource() };
+    private readonly Button _save = new() { Content = Strings.AnimeImagesDownload.GetLocalizedResource(), IsEnabled = false, Visibility = Visibility.Collapsed };
     private readonly ComboBox _targetVideo = new() { PlaceholderText = Strings.AnimeImagesChooseVideo.GetLocalizedResource(), Width = 260, MaxDropDownHeight = 360 };
     private readonly Button _cancel = new() { Content = Strings.Cancel.GetLocalizedResource(), Visibility = Visibility.Collapsed };
     private readonly Button _close = ResourceDialogPresentation.CreateIconButton("\uE8BB", Strings.Close.GetLocalizedResource());
     private readonly List<(CheckBox Selected, AnimeImageSourceService.PageImage Image)> _choices = [];
-    private readonly CheckBox _selectAll = new() { Content = Strings.AnimeImagesSelectSet.GetLocalizedResource(), VerticalAlignment = VerticalAlignment.Center, IsEnabled = false };
+    private readonly CheckBox _selectAll = new() { Content = Strings.AnimeImagesSelectSet.GetLocalizedResource(), VerticalAlignment = VerticalAlignment.Center, IsEnabled = false, Visibility = Visibility.Collapsed };
     private bool _updatingSelection;
     private bool _allAdded;
+    private bool _scanSucceeded;
     private int _sourceRevision;
     private bool _sourceInitialized;
     private string? _sourceNumber;
@@ -45,8 +47,7 @@ public sealed partial class AnimeImageImportDialog : UserControl
     public AnimeImageImportDialog(string folder, IResourceWorkspaceService workspace, string? selectedVideo = null)
     {
         _folder = folder; _workspace = workspace;
-        _videos = Directory.EnumerateFiles(folder).Where(file => workspace.Settings.VideoExtensions.Contains(Path.GetExtension(file).TrimStart('.'), StringComparer.OrdinalIgnoreCase))
-            .OrderBy(file => file, new EpisodeNameComparer()).ToArray();
+        _videos = AnimeLibraryService.GetEpisodeTargets(folder, workspace.Settings).ToArray();
         foreach (var video in _videos) _targetVideo.Items.Add(Path.GetFileName(video));
         if (selectedVideo is not null) _targetVideo.SelectedIndex = Array.FindIndex(_videos, video => string.Equals(video, selectedVideo, StringComparison.OrdinalIgnoreCase));
         else if (_videos.Length == 1) _targetVideo.SelectedIndex = 0;
@@ -59,17 +60,37 @@ public sealed partial class AnimeImageImportDialog : UserControl
         var prefixLabel = new TextBlock { Text = _prefix, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 350, TextTrimming = TextTrimming.CharacterEllipsis, IsTextSelectionEnabled = true };
         ToolTipService.SetToolTip(prefixLabel, _prefix);
         var grid = new Grid { RowSpacing = 12 };
-        foreach (var height in new[] { GridLength.Auto, GridLength.Auto, GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto }) grid.RowDefinitions.Add(new RowDefinition { Height = height });
+        foreach (var height in new[] { GridLength.Auto, GridLength.Auto, GridLength.Auto, GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto })
+            grid.RowDefinitions.Add(new RowDefinition { Height = height });
         var header = new Grid(); header.ColumnDefinitions.Add(new ColumnDefinition()); header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.Children.Add(new TextBlock { Text = Strings.AnimeImagesImport.GetLocalizedResource(), Style = (Style)Application.Current.Resources["SubtitleTextBlockStyle"], VerticalAlignment = VerticalAlignment.Center });
+        _close.ClearValue(FrameworkElement.StyleProperty);
+        _close.ClearValue(Control.BackgroundProperty); _close.ClearValue(Control.ForegroundProperty);
+        _close.ClearValue(Control.BorderThicknessProperty);
+        _close.CornerRadius = new CornerRadius(6);
         Grid.SetColumn(_close, 1); header.Children.Add(_close); grid.Children.Add(header);
-        var input = new Grid { ColumnSpacing = 8, HorizontalAlignment = HorizontalAlignment.Left }; foreach (var _ in new[] { 0, 1, 2, 3 }) input.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); input.Children.Add(prefixLabel); Grid.SetColumn(_source, 1); input.Children.Add(_source); Grid.SetColumn(_recognize, 2); input.Children.Add(_recognize); Grid.SetColumn(_scan, 3); input.Children.Add(_scan); Grid.SetRow(input, 1); grid.Children.Add(input);
-        var scroll = new ScrollViewer { Content = _rows, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; Grid.SetRow(_chromeStatus, 2); grid.Children.Add(_chromeStatus);
-        Grid.SetRow(scroll, 3); grid.Children.Add(scroll);
-        Grid.SetRow(_status, 4); grid.Children.Add(_status);
-        var footer = new Grid { ColumnSpacing = 12 };
-        foreach (var width in new[] { GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto, GridLength.Auto }) footer.ColumnDefinitions.Add(new ColumnDefinition { Width = width });
-        footer.Children.Add(_selectAll); Grid.SetColumn(_cancel, 2); footer.Children.Add(_cancel); Grid.SetColumn(_targetVideo, 3); footer.Children.Add(_targetVideo); Grid.SetColumn(_save, 4); footer.Children.Add(_save); Grid.SetRow(footer, 5); grid.Children.Add(footer);
+        var input = new Grid { ColumnSpacing = 8 };
+        foreach (var width in new[] { GridLength.Auto, GridLength.Auto, GridLength.Auto, new GridLength(1, GridUnitType.Star) }) input.ColumnDefinitions.Add(new ColumnDefinition { Width = width });
+        prefixLabel.MaxWidth = 220;
+        input.Children.Add(prefixLabel); Grid.SetColumn(_source, 1); input.Children.Add(_source);
+        Grid.SetColumn(_recognize, 2); input.Children.Add(_recognize);
+        _chromeStatus.VerticalAlignment = VerticalAlignment.Center;
+        _chromeStatus.FontSize = 12;
+        _chromeStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
+        Grid.SetColumn(_chromeStatus, 3); input.Children.Add(_chromeStatus);
+        Grid.SetRow(input, 1); grid.Children.Add(input);
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        actions.Children.Add(_targetVideo); actions.Children.Add(_scan); actions.Children.Add(_scanAndDownload); actions.Children.Add(_save);
+        _save.Style = (Style)Application.Current.Resources["AccentButtonStyle"];
+        Grid.SetRow(actions, 2); grid.Children.Add(actions);
+        Grid.SetRow(_selectAll, 3); grid.Children.Add(_selectAll);
+        var scroll = new ScrollViewer { Content = _rows, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        Grid.SetRow(scroll, 4); grid.Children.Add(scroll);
+        var statusRow = new Grid { ColumnSpacing = 12 };
+        statusRow.ColumnDefinitions.Add(new ColumnDefinition()); statusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _status.VerticalAlignment = VerticalAlignment.Center;
+        statusRow.Children.Add(_status); Grid.SetColumn(_cancel, 1); statusRow.Children.Add(_cancel);
+        Grid.SetRow(statusRow, 5); grid.Children.Add(statusRow);
         _previewOverlay.Background = (Brush)Application.Current.Resources["SolidBackgroundFillColorBaseBrush"];
         _previewOverlay.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         _previewOverlay.RowDefinitions.Add(new RowDefinition());
@@ -95,6 +116,12 @@ public sealed partial class AnimeImageImportDialog : UserControl
         };
         _recognize.Click += async (_, _) => await RecognizeChromeAsync();
         _scan.Click += async (_, _) => await ScanAsync();
+        _scanAndDownload.Click += async (_, _) =>
+        {
+            if (_targetVideo.SelectedIndex < 0) { _status.Text = Strings.AnimeImagesChooseVideo.GetLocalizedResource(); return; }
+            await ScanAsync();
+            if (_scanSucceeded && !IsBusy && _choices.Any(row => row.Selected.IsEnabled && row.Selected.IsChecked == true)) await SaveAsync();
+        };
         _save.Click += async (_, _) => await SaveAsync();
         _cancel.Click += (_, _) => _operation?.Cancel();
         _close.Click += (_, _) => { if (!IsBusy) RequestClose?.Invoke(this, EventArgs.Empty); };
@@ -155,31 +182,36 @@ public sealed partial class AnimeImageImportDialog : UserControl
     private void Busy(bool busy)
     {
         _recognize.IsEnabled = !busy && !_readingChrome;
-        IsBusy = busy; _source.IsEnabled = _scan.IsEnabled = _close.IsEnabled = _targetVideo.IsEnabled = !busy;
+        IsBusy = busy; _source.IsEnabled = _scan.IsEnabled = _scanAndDownload.IsEnabled = _close.IsEnabled = _targetVideo.IsEnabled = !busy;
         _cancel.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
         _rows.IsHitTestVisible = !busy; UpdateSave();
     }
     private void UpdateSave()
     {
         if (_updatingSelection) return;
+        _selectAll.Visibility = _choices.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         var remaining = _choices.Where(row => row.Selected.IsEnabled).ToArray();
         _selectAll.IsEnabled = !IsBusy && remaining.Length > 0;
         _selectAll.IsChecked = remaining.Length > 0 && remaining.All(row => row.Selected.IsChecked == true) ? true
             : remaining.Any(row => row.Selected.IsChecked == true) ? null : false;
-        _save.IsEnabled = !IsBusy && (_allAdded || (_targetVideo.SelectedIndex >= 0 && remaining.Any(row => row.Selected.IsChecked == true)));
+        var hasSelectedImages = _scanSucceeded && remaining.Any(row => row.Selected.IsChecked == true);
+        _save.Visibility = hasSelectedImages ? Visibility.Visible : Visibility.Collapsed;
+        _save.IsEnabled = !IsBusy && _targetVideo.SelectedIndex >= 0 && hasSelectedImages;
     }
     private async Task ScanAsync()
     {
         _sourceRevision++;
         _allAdded = false;
-        _operation?.Dispose(); _operation = new(); Busy(true); _rows.Children.Clear(); _choices.Clear(); _status.Text = Strings.AnimeImagesLoading.GetLocalizedResource();
+        _scanSucceeded = false;
+        _selectAll.Visibility = Visibility.Collapsed;
+        _operation?.Dispose(); _operation = new(); _rows.Children.Clear(); _choices.Clear(); Busy(true); _status.Text = Strings.AnimeImagesLoading.GetLocalizedResource();
         try
         {
             var suffix = _source.Text.Trim();
             _sourceNumber = System.Text.RegularExpressions.Regex.IsMatch(suffix, @"^[0-9]{5}$") ? suffix : null;
             var address = AnimeImageSourceService.ResolvePageAddress(suffix, _prefix);
             var discovered = await _service.InspectPageAsync(address, _operation.Token);
-            var images = AnimeImageSourceService.FilterImages(discovered, _workspace.Settings.AnimeImageIncludedNames);
+            var images = AnimeImageSourceService.FilterImages(discovered, _workspace.Settings.AnimeImageIncludedNames, _workspace.Settings.AnimeImageMatchAllNames);
             var nameMatches = images.Count;
             images = await _service.FilterDimensionsAsync(images, _workspace.Settings.AnimeImageMinimumWidth, _workspace.Settings.AnimeImageMinimumHeight, _operation.Token);
             var settings = _workspace.Settings.Clone(); settings.AnimeImageSource = _source.Text.Trim(); _workspace.UpdateSettings(settings);
@@ -188,14 +220,14 @@ public sealed partial class AnimeImageImportDialog : UserControl
             foreach (var imageSet in imageSets)
             {
                 var firstImage = imageSet[0];
-                var body = new StackPanel { Spacing = 8 };
+                var body = new StackPanel { Spacing = 0 };
                 foreach (var image in imageSet)
                 {
                     var name = AnimeImageSourceService.GetImageFileName(image);
                     var selected = new CheckBox { Content = name, IsChecked = true };
-                    var preview = new Button { Content = Strings.AnimeImagesPreview.GetLocalizedResource() };
+                    var preview = new Button { Content = Strings.AnimeImagesPreview.GetLocalizedResource(), MinWidth = 64 };
                     preview.Click += (_, _) => { _previewImage.Source = new BitmapImage(image.Url) { DecodePixelWidth = 1600 }; _previewOverlay.Visibility = Visibility.Visible; };
-                    var imageRow = new Grid { ColumnSpacing = 8 };
+                    var imageRow = new Grid { ColumnSpacing = 12, Padding = new Thickness(12, 6, 12, 6) };
                     imageRow.ColumnDefinitions.Add(new ColumnDefinition());
                     imageRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                     selected.VerticalAlignment = VerticalAlignment.Center;
@@ -213,9 +245,10 @@ public sealed partial class AnimeImageImportDialog : UserControl
                     _rows.Children.Add(new Expander { Header = setHeader, Content = body, IsExpanded = false, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch });
                 }
                 else
-                    _rows.Children.Add(new Border { Child = body, Padding = new Thickness(12), CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"] });
+                    _rows.Children.Add(new Border { Child = body, Padding = new Thickness(0), CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"] });
             }
             _status.Text = _videos.Length == 0 ? Strings.AnimeImagesNoVideos.GetLocalizedResource() : images.Count == 0 ? (discovered.Count == 0 ? Strings.AnimeImagesEmpty.GetLocalizedResource() : nameMatches == 0 ? Strings.AnimeImagesFilteredNames.GetLocalizedResource() : Strings.AnimeImagesFilteredDimensions.GetLocalizedResource()) : string.Format(CultureInfo.CurrentCulture, Strings.AnimeImagesFound.GetLocalizedResource(), images.Count);
+            _scanSucceeded = true;
         }
         catch (OperationCanceledException) { _status.Text = Strings.AnimeImagesCancelled.GetLocalizedResource(); }
         catch (Exception ex) { _status.Text = Strings.AnimeImagesFailed.GetLocalizedResource() + " " + ex.Message; }
@@ -223,7 +256,7 @@ public sealed partial class AnimeImageImportDialog : UserControl
     }
     private async Task SaveAsync()
     {
-        if (_allAdded) { RequestClose?.Invoke(this, EventArgs.Empty); return; }
+        if (_allAdded) return;
         if (_targetVideo.SelectedIndex < 0) return;
         var file = _videos[_targetVideo.SelectedIndex];
         var number = AnimeLibraryService.GetIllustrationNumber(file, _videos);

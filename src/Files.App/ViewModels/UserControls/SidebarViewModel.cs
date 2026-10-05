@@ -86,9 +86,9 @@ namespace Files.App.ViewModels.UserControls
 				SectionType.WSL,
 				SectionType.FileTag
 #if FILES_RESOURCE_MANAGER
-				, SectionType.ResourceManager,
-				SectionType.VideoEditor,
-				SectionType.AnimeLibrary
+				, SectionType.AnimeLibrary,
+				SectionType.ResourceManager,
+				SectionType.VideoEditor
 #endif
 			];
 

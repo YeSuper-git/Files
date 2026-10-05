@@ -24,8 +24,9 @@ using WinRT.Interop;
 
 namespace Files.App.Views.VideoEditor;
 
-public sealed partial class VideoEditorPage : Page
+public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPageSettingsContext
 {
+	public Files.App.Data.Enums.SettingsPageKind SettingsPage => Files.App.Data.Enums.SettingsPageKind.VideoEditorPage;
 	private static readonly string[] SupportedVideoExtensions = [".mp4", ".mkv", ".mov", ".avi", ".m4v", ".ts", ".webm", ".wmv", ".mxf", ".mts", ".m2ts", ".flv", ".vob", ".mpg", ".mpeg", ".3gp", ".ogv"];
 	private readonly DispatcherTimer _playbackTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
 	private readonly VideoFrameStripService _frameStripService = new(Ioc.Default.GetRequiredService<VideoToolchain>());

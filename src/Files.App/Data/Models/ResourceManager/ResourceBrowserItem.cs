@@ -21,6 +21,7 @@ public enum ResourceBrowserItemKind
 
 public sealed class ResourceBrowserItem
 {
+    public bool IsPosterOnly { get; init; }
     public string Name { get; init; } = string.Empty;
     public string Path { get; init; } = string.Empty;
     public string? PosterPath { get; init; }

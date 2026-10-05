@@ -110,18 +110,19 @@ public sealed class ResourceBrowserService : IResourceBrowserService
         var extensions = settings.VideoExtensions.ToHashSet(StringComparer.OrdinalIgnoreCase);
         try
         {
-            foreach (var file in directory.EnumerateFiles())
+            var targets = _animeLibrary ? AnimeLibraryService.GetEpisodeTargets(directory.FullName, settings) : directory.EnumerateFiles().Where(file => extensions.Contains(file.Extension.TrimStart('.'))).Select(file => file.FullName).ToArray();
+            foreach (var target in targets)
             {
+                var file = new FileInfo(target);
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!extensions.Contains(file.Extension.TrimStart('.')))
-                    continue;
 
                 result.Add(new ResourceBrowserItem
                 {
-                    Name = file.Name,
+                    IsPosterOnly = !extensions.Contains(file.Extension.TrimStart('.')),
+                    Name = extensions.Contains(file.Extension.TrimStart('.')) ? file.Name : Path.GetFileNameWithoutExtension(file.Name),
                     Path = file.FullName,
                     Kind = ResourceBrowserItemKind.VideoFile,
-                    PosterPath = ResolvePoster(file.FullName, directory, Path.GetFileNameWithoutExtension(file.Name), settings),
+                    PosterPath = !extensions.Contains(file.Extension.TrimStart('.')) ? file.FullName : ResolvePoster(file.FullName, directory, Path.GetFileNameWithoutExtension(file.Name), settings),
                 });
             }
         }
@@ -176,6 +177,7 @@ public sealed class ResourceBrowserService : IResourceBrowserService
                 if (File.Exists(targetPath))
                     return AnimeLibraryService.ResolveEpisodePoster(targetPath, directory.FullName, directory.FullName, settings, null);
                 var seriesCover = directory.EnumerateFiles().FirstOrDefault(file => IsImageFile(file.FullName, settings.ImageExtensions)
+                    && !AnimeLibraryService.IsPreviewImage(file.FullName)
                     && AnimeLibraryService.IsSeriesCover(file.FullName, directory.FullName)
                     && !excludedPosterPaths.Contains(file.FullName, StringComparer.OrdinalIgnoreCase));
                 if (seriesCover is not null) return seriesCover.FullName;
@@ -201,6 +203,7 @@ public sealed class ResourceBrowserService : IResourceBrowserService
             }
             var candidates = directory.EnumerateFiles()
                 .Where(file => IsImageFile(file.FullName, settings.ImageExtensions))
+                .Where(file => !_animeLibrary || !AnimeLibraryService.IsPreviewImage(file.FullName))
                 .Where(file => !excludedPosterPaths.Contains(file.FullName, StringComparer.OrdinalIgnoreCase))
                 .Select(file => new
                 {

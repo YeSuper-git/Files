@@ -176,7 +176,7 @@
                                         </StackPanel>
                                     </Grid>
                                     <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
-                                        <Button Content="{helpers:ResourceString Name=ResourceVideoPlay}" Click="VideoDetailPlay_Click" />
+                                        <Button x:Name="VideoDetailPlayButton" Content="{helpers:ResourceString Name=ResourceVideoPlay}" Click="VideoDetailPlay_Click" />
                                         <Button x:Name="AnimeDetailEditButton" MinWidth="52" Content="{helpers:ResourceString Name=AnimeLibraryEditDetails}" Click="AnimeDetailEdit_Click" Visibility="Collapsed" />
                                         <Button x:Name="AnimeDetailCancelButton" Content="{helpers:ResourceString Name=AnimeLibraryCancel}" Click="AnimeMetadataCancel_Click" Visibility="Collapsed" />
                                     </StackPanel>
@@ -225,8 +225,11 @@
                             <StackPanel Spacing="10">
                                 <Grid>
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                    <TextBlock Text="{helpers:ResourceString Name=ResourceVideoIllustrations}" Style="{StaticResource SubtitleTextBlockStyle}" />
-                                    <Button Grid.Column="1" Content="{helpers:ResourceString Name=ResourceVideoAddIllustration}" Click="AddVideoIllustration_Click" />
+                                    <TextBlock x:Name="VideoIllustrationsHeading" Text="{helpers:ResourceString Name=ResourceVideoIllustrations}" Style="{StaticResource SubtitleTextBlockStyle}" />
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                        <Button x:Name="AutoRecognizeIllustrations" Content="{helpers:ResourceString Name=AnimeImagesImport}" Click="AutoRecognizeIllustrations_Click" Visibility="Collapsed" />
+                                        <Button x:Name="AddIllustrationsButton" Content="{helpers:ResourceString Name=ResourceVideoAddIllustration}" Click="AddVideoIllustration_Click" />
+                                    </StackPanel>
                                 </Grid>
                                 <ItemsControl x:Name="VideoIllustrations">
                                     <ItemsControl.ItemsPanel><ItemsPanelTemplate><ItemsWrapGrid Orientation="Horizontal" ItemWidth="210" ItemHeight="160" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
