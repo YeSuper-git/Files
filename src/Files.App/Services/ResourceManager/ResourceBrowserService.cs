@@ -177,6 +177,7 @@ public sealed class ResourceBrowserService : IResourceBrowserService
                 if (File.Exists(targetPath))
                     return AnimeLibraryService.ResolveEpisodePoster(targetPath, directory.FullName, directory.FullName, settings, null);
                 var seriesCover = directory.EnumerateFiles().FirstOrDefault(file => IsImageFile(file.FullName, settings.ImageExtensions)
+                    && !AnimeLibraryService.IsPreviewImage(file.FullName)
                     && AnimeLibraryService.IsSeriesCover(file.FullName, directory.FullName)
                     && !excludedPosterPaths.Contains(file.FullName, StringComparer.OrdinalIgnoreCase));
                 if (seriesCover is not null) return seriesCover.FullName;
@@ -202,6 +203,7 @@ public sealed class ResourceBrowserService : IResourceBrowserService
             }
             var candidates = directory.EnumerateFiles()
                 .Where(file => IsImageFile(file.FullName, settings.ImageExtensions))
+                .Where(file => !_animeLibrary || !AnimeLibraryService.IsPreviewImage(file.FullName))
                 .Where(file => !excludedPosterPaths.Contains(file.FullName, StringComparer.OrdinalIgnoreCase))
                 .Select(file => new
                 {

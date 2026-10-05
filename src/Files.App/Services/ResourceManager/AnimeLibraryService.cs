@@ -16,14 +16,21 @@ public sealed class AnimeLibraryService
 		Browser = new ResourceBrowserService(Workspace, browserLogger, true);
 	}
 
+    public static bool IsPreviewImage(string path)
+    {
+        var name = Path.GetFileNameWithoutExtension(path);
+        return GetIllustrationGroup(path) is not null
+            || name.Contains("\u63D2\u56FE", StringComparison.OrdinalIgnoreCase)
+            || name.StartsWith("illustration-", StringComparison.OrdinalIgnoreCase)
+            || System.Text.RegularExpressions.Regex.IsMatch(name, @"^\d+\s*[\uFF08(]\d+[\uFF09)]$");
+    }
+
     public static IReadOnlyList<string> GetEpisodeTargets(string folder, ResourceSettings settings)
     {
         var files = Directory.EnumerateFiles(folder).ToArray();
         var videos = files.Where(file => settings.VideoExtensions.Contains(Path.GetExtension(file).TrimStart('.'), StringComparer.OrdinalIgnoreCase)).ToArray();
         var posters = files.Where(file => settings.ImageExtensions.Contains(Path.GetExtension(file).TrimStart('.'), StringComparer.OrdinalIgnoreCase)
-            && GetIllustrationGroup(file) is null
-            && !Path.GetFileNameWithoutExtension(file).Contains("\u63D2\u56FE", StringComparison.OrdinalIgnoreCase)
-            && !Path.GetFileNameWithoutExtension(file).StartsWith("illustration-", StringComparison.OrdinalIgnoreCase)
+            && !IsPreviewImage(file)
             && (videos.Length == 0 || (GetEpisodeNumber(file) is not null && !videos.Any(video => PosterMatchScore(Path.GetFileNameWithoutExtension(file), Path.GetFileNameWithoutExtension(video)) < 10))))
             .GroupBy(file => Path.GetFileNameWithoutExtension(file), StringComparer.OrdinalIgnoreCase).Select(group => group.First());
         return videos.Concat(posters).OrderBy(file => Path.GetFileNameWithoutExtension(file), new EpisodeNameComparer()).ToArray();
@@ -35,7 +42,7 @@ public sealed class AnimeLibraryService
 		var candidates = new List<string>();
 		foreach (var folder in new[] { season, series }.Distinct(StringComparer.OrdinalIgnoreCase))
 		{
-			try { candidates.AddRange(Directory.EnumerateFiles(folder).Where(file => settings.ImageExtensions.Contains(Path.GetExtension(file).TrimStart('.'), StringComparer.OrdinalIgnoreCase))); }
+			try { candidates.AddRange(Directory.EnumerateFiles(folder).Where(file => settings.ImageExtensions.Contains(Path.GetExtension(file).TrimStart('.'), StringComparer.OrdinalIgnoreCase) && !IsPreviewImage(file))); }
 			catch (IOException) { }
 			catch (UnauthorizedAccessException) { }
 		}
@@ -44,7 +51,7 @@ public sealed class AnimeLibraryService
 			.Where(item => item.Score < 10).OrderBy(item => item.Score).ThenBy(item => item.Path, StringComparer.OrdinalIgnoreCase).FirstOrDefault();
 		if (matched.Path is not null) return matched.Path;
 		var common = candidates.FirstOrDefault(path => new[] { "poster", "cover", "folder", "海报", "封面" }.Contains(Path.GetFileNameWithoutExtension(path), StringComparer.OrdinalIgnoreCase));
-		return common ?? fallback;
+		return common ?? (fallback is not null && !IsPreviewImage(fallback) ? fallback : null);
 	}
 
     public static string GetIllustrationNumber(string video, IReadOnlyList<string> orderedVideos)
