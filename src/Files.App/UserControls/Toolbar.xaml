@@ -99,26 +99,26 @@
 
 						<AppBarButton.Flyout>
 							<MenuFlyout Opening="ArrangementFlyout_Opening" contract8Present:ShouldConstrainToRootBounds="False" Placement="Bottom">
-								<ToggleMenuFlyoutItem IsChecked="{x:Bind Commands.SortByName.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByName.Label}" />
-								<ToggleMenuFlyoutItem IsChecked="{x:Bind Commands.SortByDateModified.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByDateModified.Label}" />
-								<ToggleMenuFlyoutItem IsChecked="{x:Bind Commands.SortByDateCreated.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByDateCreated.Label}" />
-								<ToggleMenuFlyoutItem IsChecked="{x:Bind Commands.SortByAnimeAirDate.IsOn, Mode=TwoWay}" IsEnabled="{x:Bind Commands.SortByAnimeAirDate.IsExecutable, Mode=OneWay}" Text="{x:Bind Commands.SortByAnimeAirDate.Label}" />
-								<ToggleMenuFlyoutItem IsChecked="{x:Bind Commands.SortBySize.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortBySize.Label}" />
-								<ToggleMenuFlyoutItem IsChecked="{x:Bind Commands.SortByType.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByType.Label}" />
-								<ToggleMenuFlyoutItem
+								<ToggleMenuFlyoutItem Tag="SortByName" IsChecked="{x:Bind Commands.SortByName.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByName.Label}" />
+								<ToggleMenuFlyoutItem Tag="SortByDateModified" IsChecked="{x:Bind Commands.SortByDateModified.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByDateModified.Label}" />
+								<ToggleMenuFlyoutItem Tag="SortByDateCreated" IsChecked="{x:Bind Commands.SortByDateCreated.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByDateCreated.Label}" />
+								<ToggleMenuFlyoutItem Tag="SortByAnimeAirDate" IsChecked="{x:Bind Commands.SortByAnimeAirDate.IsOn, Mode=TwoWay}" IsEnabled="{x:Bind Commands.SortByAnimeAirDate.IsExecutable, Mode=OneWay}" Text="{x:Bind Commands.SortByAnimeAirDate.Label}" />
+								<ToggleMenuFlyoutItem Tag="SortBySize" IsChecked="{x:Bind Commands.SortBySize.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortBySize.Label}" />
+								<ToggleMenuFlyoutItem Tag="SortByType" IsChecked="{x:Bind Commands.SortByType.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByType.Label}" />
+								<ToggleMenuFlyoutItem Tag="SortBySyncStatus"
 									IsChecked="{x:Bind Commands.SortBySyncStatus.IsOn, Mode=TwoWay}"
 									IsEnabled="{x:Bind Commands.SortBySyncStatus.IsExecutable, Mode=OneWay}"
 									Text="{x:Bind Commands.SortBySyncStatus.Label}" />
-								<ToggleMenuFlyoutItem IsChecked="{x:Bind Commands.SortByTag.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByTag.Label}" />
-								<ToggleMenuFlyoutItem
+								<ToggleMenuFlyoutItem Tag="SortByTag" IsChecked="{x:Bind Commands.SortByTag.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByTag.Label}" />
+								<ToggleMenuFlyoutItem Tag="SortByPath"
 									IsChecked="{x:Bind Commands.SortByPath.IsOn, Mode=TwoWay}"
 									IsEnabled="{x:Bind Commands.SortByPath.IsExecutable, Mode=OneWay}"
 									Text="{x:Bind Commands.SortByPath.Label}" />
-								<ToggleMenuFlyoutItem
+								<ToggleMenuFlyoutItem Tag="SortByOriginalFolder"
 									IsChecked="{x:Bind Commands.SortByOriginalFolder.IsOn, Mode=TwoWay}"
 									IsEnabled="{x:Bind Commands.SortByOriginalFolder.IsExecutable, Mode=OneWay}"
 									Text="{x:Bind Commands.SortByOriginalFolder.Label}" />
-								<ToggleMenuFlyoutItem
+								<ToggleMenuFlyoutItem Tag="SortByDateDeleted"
 									IsChecked="{x:Bind Commands.SortByDateDeleted.IsOn, Mode=TwoWay}"
 									IsEnabled="{x:Bind Commands.SortByDateDeleted.IsExecutable, Mode=OneWay}"
 									Text="{x:Bind Commands.SortByDateDeleted.Label}" />

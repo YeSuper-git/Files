@@ -22,6 +22,7 @@ namespace Files.App.Services.Settings
 	[JsonSerializable(typeof(float))]
 	[JsonSerializable(typeof(List<string>))]
 	[JsonSerializable(typeof(Dictionary<string, bool>))]
+	[JsonSerializable(typeof(Dictionary<string, int>))]
 	[JsonSerializable(typeof(List<ActionWithParameterItem>))]
 	[JsonSerializable(typeof(Dictionary<string, List<ToolbarItemSettingsEntry>>))]
 	[JsonSerializable(typeof(Dictionary<string, List<string>>))]

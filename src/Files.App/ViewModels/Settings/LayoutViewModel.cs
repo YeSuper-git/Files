@@ -11,8 +11,23 @@ namespace Files.App.ViewModels.Settings
 		private readonly int FileTagSortingIndex = 5;
 		private readonly int FileTagGroupingIndex = 6;
 
+		public List<SortingMenuItemViewModel> SortingMenuItems { get; } = [];
+
 		public LayoutViewModel()
 		{
+			var commands = Ioc.Default.GetRequiredService<ICommandManager>();
+			SortingMenuItems.Add(new("SortByName", commands.SortByName.Label, UserSettingsService.AppearanceSettingsService));
+			SortingMenuItems.Add(new("SortByDateModified", commands.SortByDateModified.Label, UserSettingsService.AppearanceSettingsService));
+			SortingMenuItems.Add(new("SortByDateCreated", commands.SortByDateCreated.Label, UserSettingsService.AppearanceSettingsService));
+			SortingMenuItems.Add(new("SortByAnimeAirDate", commands.SortByAnimeAirDate.Label, UserSettingsService.AppearanceSettingsService));
+			SortingMenuItems.Add(new("SortBySize", commands.SortBySize.Label, UserSettingsService.AppearanceSettingsService));
+			SortingMenuItems.Add(new("SortByType", commands.SortByType.Label, UserSettingsService.AppearanceSettingsService));
+			SortingMenuItems.Add(new("SortBySyncStatus", commands.SortBySyncStatus.Label, UserSettingsService.AppearanceSettingsService));
+			SortingMenuItems.Add(new("SortByTag", commands.SortByTag.Label, UserSettingsService.AppearanceSettingsService));
+			SortingMenuItems.Add(new("SortByPath", commands.SortByPath.Label, UserSettingsService.AppearanceSettingsService));
+			SortingMenuItems.Add(new("SortByOriginalFolder", commands.SortByOriginalFolder.Label, UserSettingsService.AppearanceSettingsService));
+			SortingMenuItems.Add(new("SortByDateDeleted", commands.SortByDateDeleted.Label, UserSettingsService.AppearanceSettingsService));
+
 			// Layout mode
 			SelectedDefaultLayoutModeIndex = (int)DefaultLayoutMode;
 

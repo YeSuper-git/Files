@@ -156,7 +156,7 @@
                                             <TextBlock Text="{helpers:ResourceString Name=AnimeLibraryAirDateLabel}" />
                                             <Grid Height="32">
                                                 <TextBlock x:Name="AnimeAirDate" VerticalAlignment="Center" />
-                                                <TextBox x:Name="AnimeMonthEditor" Visibility="Collapsed" TextChanged="AnimeMonthEditor_TextChanged" Width="180" HorizontalAlignment="Left" />
+                                                <TextBox x:Name="AnimeMonthEditor" Visibility="Collapsed" TextChanged="AnimeMonthEditor_TextChanged" LostFocus="AnimeMonthEditor_LostFocus" Width="180" HorizontalAlignment="Left" />
                                             </Grid>
                                         </StackPanel>
                                         <Grid Grid.Row="1" RowSpacing="8">

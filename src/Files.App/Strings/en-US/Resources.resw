@@ -5098,4 +5098,9 @@
   <data name="AnimeLibrarySortAirDate" xml:space="preserve"><value>Sort by air date</value></data>
   <data name="AnimeImagesAllAdded" xml:space="preserve"><value>All images have been added successfully</value></data>
   <data name="AnimeLibraryBrowseCategories" xml:space="preserve"><value>Browse anime by category</value></data>
+  <data name="SortingMenuItems" xml:space="preserve"><value>Sorting menu items</value></data>
+  <data name="SortingMenuItemsDescription" xml:space="preserve"><value>Choose which sorting options appear. Unavailable options are hidden by default.</value></data>
+  <data name="SortingMenuAvailableOnly" xml:space="preserve"><value>Show when available</value></data>
+  <data name="SortingMenuAlwaysShow" xml:space="preserve"><value>Always show</value></data>
+  <data name="SortingMenuHide" xml:space="preserve"><value>Hide</value></data>
 </root>

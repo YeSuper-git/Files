@@ -91,6 +91,12 @@ public sealed partial class AnimeImageImportDialog : UserControl
         _save.Click += async (_, _) => await SaveAsync();
         _cancel.Click += (_, _) => _operation?.Cancel();
         _close.Click += (_, _) => { if (!IsBusy) RequestClose?.Invoke(this, EventArgs.Empty); };
+        Loaded += (_, _) => DispatcherQueue.TryEnqueue(() =>
+        {
+            if (IsBusy) return;
+            _source.Focus(FocusState.Programmatic);
+            _source.Select(_source.Text.Length, 0);
+        });
         Unloaded += (_, _) => _operation?.Cancel();
     }
 

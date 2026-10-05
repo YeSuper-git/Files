@@ -180,6 +180,12 @@ namespace Files.App.Services.Settings
 			set => Set(value);
 		}
 
+		public Dictionary<string, int>? SortingMenuVisibility
+		{
+			get => Get<Dictionary<string, int>?>(null);
+			set => Set(value);
+		}
+
 		protected override void RaiseOnSettingChangedEvent(object sender, SettingChangedEventArgs e)
 		{
 			base.RaiseOnSettingChangedEvent(sender, e);

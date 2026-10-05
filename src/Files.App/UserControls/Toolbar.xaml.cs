@@ -676,8 +676,19 @@ namespace Files.App.UserControls
 
 		[DynamicWindowsRuntimeCast(typeof(MenuFlyoutSubItem))]
 		[DynamicWindowsRuntimeCast(typeof(MenuFlyoutSeparator))]
+		[DynamicWindowsRuntimeCast(typeof(MenuFlyout))]
 		private void ArrangementFlyout_Opening(object sender, object e)
 		{
+			if (sender is MenuFlyout flyout)
+			{
+				var preferences = UserSettingsService.AppearanceSettingsService.SortingMenuVisibility;
+				foreach (var item in flyout.Items)
+				{
+					if (item.Tag is not string code) continue;
+					var mode = preferences?.GetValueOrDefault(code) ?? 0;
+					item.Visibility = (mode == 1 || mode != 2 && item.IsEnabled) ? Visibility.Visible : Visibility.Collapsed;
+				}
+			}
 			var visibility = Visibility.Visible;
 #if FILES_RESOURCE_MANAGER
 			if (PageContext.ShellPage is ModernShellPage { CurrentResourceLibraryPage: not null })
