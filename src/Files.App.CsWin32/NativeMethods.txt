@@ -400,3 +400,12 @@ ShellExecuteW
 SBSP_SAMEBROWSER
 SBSP_ABSOLUTE
 K32EmptyWorkingSet
+IUIAutomation
+CUIAutomation
+UIA_EditControlTypeId
+UIA_ControlTypePropertyId
+UIA_ValueValuePropertyId
+GetWindow
+GetClassName
+CoInitializeEx
+CoUninitialize

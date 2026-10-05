@@ -21,7 +21,10 @@ public sealed partial class AnimeImageImportDialog : UserControl
     private readonly TextBox _source;
     private readonly string _prefix;
     private readonly StackPanel _rows = new() { Spacing = 12 };
+    private readonly TextBlock _chromeStatus = new() { TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap };
+    private readonly Button _recognize = new() { Content = Strings.AnimeImagesChromeRecognize.GetLocalizedResource() };
+    private bool _readingChrome;
     private readonly Button _scan = new() { Content = Strings.AnimeImagesScan.GetLocalizedResource() };
     private readonly Button _save = new() { Content = Strings.AnimeImagesConfirm.GetLocalizedResource(), IsEnabled = false };
     private readonly ComboBox _targetVideo = new() { PlaceholderText = Strings.AnimeImagesChooseVideo.GetLocalizedResource(), Width = 260, MaxDropDownHeight = 360 };
@@ -31,6 +34,8 @@ public sealed partial class AnimeImageImportDialog : UserControl
     private readonly CheckBox _selectAll = new() { Content = Strings.AnimeImagesSelectSet.GetLocalizedResource(), VerticalAlignment = VerticalAlignment.Center, IsEnabled = false };
     private bool _updatingSelection;
     private bool _allAdded;
+    private int _sourceRevision;
+    private bool _sourceInitialized;
     private string? _sourceNumber;
     private CancellationTokenSource? _operation;
     public bool IsBusy { get; private set; }
@@ -54,16 +59,17 @@ public sealed partial class AnimeImageImportDialog : UserControl
         var prefixLabel = new TextBlock { Text = _prefix, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 350, TextTrimming = TextTrimming.CharacterEllipsis, IsTextSelectionEnabled = true };
         ToolTipService.SetToolTip(prefixLabel, _prefix);
         var grid = new Grid { RowSpacing = 12 };
-        foreach (var height in new[] { GridLength.Auto, GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto }) grid.RowDefinitions.Add(new RowDefinition { Height = height });
+        foreach (var height in new[] { GridLength.Auto, GridLength.Auto, GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto }) grid.RowDefinitions.Add(new RowDefinition { Height = height });
         var header = new Grid(); header.ColumnDefinitions.Add(new ColumnDefinition()); header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.Children.Add(new TextBlock { Text = Strings.AnimeImagesImport.GetLocalizedResource(), Style = (Style)Application.Current.Resources["SubtitleTextBlockStyle"], VerticalAlignment = VerticalAlignment.Center });
         Grid.SetColumn(_close, 1); header.Children.Add(_close); grid.Children.Add(header);
-        var input = new Grid { ColumnSpacing = 8, HorizontalAlignment = HorizontalAlignment.Left }; foreach (var _ in new[] { 0, 1, 2 }) input.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); input.Children.Add(prefixLabel); Grid.SetColumn(_source, 1); input.Children.Add(_source); Grid.SetColumn(_scan, 2); input.Children.Add(_scan); Grid.SetRow(input, 1); grid.Children.Add(input);
-        var scroll = new ScrollViewer { Content = _rows, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; Grid.SetRow(scroll, 2); grid.Children.Add(scroll);
-        Grid.SetRow(_status, 3); grid.Children.Add(_status);
+        var input = new Grid { ColumnSpacing = 8, HorizontalAlignment = HorizontalAlignment.Left }; foreach (var _ in new[] { 0, 1, 2, 3 }) input.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); input.Children.Add(prefixLabel); Grid.SetColumn(_source, 1); input.Children.Add(_source); Grid.SetColumn(_recognize, 2); input.Children.Add(_recognize); Grid.SetColumn(_scan, 3); input.Children.Add(_scan); Grid.SetRow(input, 1); grid.Children.Add(input);
+        var scroll = new ScrollViewer { Content = _rows, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; Grid.SetRow(_chromeStatus, 2); grid.Children.Add(_chromeStatus);
+        Grid.SetRow(scroll, 3); grid.Children.Add(scroll);
+        Grid.SetRow(_status, 4); grid.Children.Add(_status);
         var footer = new Grid { ColumnSpacing = 12 };
         foreach (var width in new[] { GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto, GridLength.Auto }) footer.ColumnDefinitions.Add(new ColumnDefinition { Width = width });
-        footer.Children.Add(_selectAll); Grid.SetColumn(_cancel, 2); footer.Children.Add(_cancel); Grid.SetColumn(_targetVideo, 3); footer.Children.Add(_targetVideo); Grid.SetColumn(_save, 4); footer.Children.Add(_save); Grid.SetRow(footer, 4); grid.Children.Add(footer);
+        footer.Children.Add(_selectAll); Grid.SetColumn(_cancel, 2); footer.Children.Add(_cancel); Grid.SetColumn(_targetVideo, 3); footer.Children.Add(_targetVideo); Grid.SetColumn(_save, 4); footer.Children.Add(_save); Grid.SetRow(footer, 5); grid.Children.Add(footer);
         _previewOverlay.Background = (Brush)Application.Current.Resources["SolidBackgroundFillColorBaseBrush"];
         _previewOverlay.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         _previewOverlay.RowDefinitions.Add(new RowDefinition());
@@ -71,7 +77,7 @@ public sealed partial class AnimeImageImportDialog : UserControl
         closePreview.HorizontalAlignment = HorizontalAlignment.Right;
         closePreview.Click += (_, _) => { _previewOverlay.Visibility = Visibility.Collapsed; _previewImage.Source = null; };
         _previewOverlay.Children.Add(closePreview); Grid.SetRow(_previewImage, 1); _previewOverlay.Children.Add(_previewImage);
-        Grid.SetRowSpan(_previewOverlay, 5); grid.Children.Add(_previewOverlay);
+        Grid.SetRowSpan(_previewOverlay, 6); grid.Children.Add(_previewOverlay);
         Content = grid;
         _selectAll.Click += (_, _) =>
         {
@@ -87,21 +93,68 @@ public sealed partial class AnimeImageImportDialog : UserControl
             e.Handled = true;
             if (!IsBusy && _scan.IsEnabled) await ScanAsync();
         };
+        _recognize.Click += async (_, _) => await RecognizeChromeAsync();
         _scan.Click += async (_, _) => await ScanAsync();
         _save.Click += async (_, _) => await SaveAsync();
         _cancel.Click += (_, _) => _operation?.Cancel();
         _close.Click += (_, _) => { if (!IsBusy) RequestClose?.Invoke(this, EventArgs.Empty); };
-        Loaded += (_, _) => DispatcherQueue.TryEnqueue(() =>
-        {
-            if (IsBusy) return;
-            _source.Focus(FocusState.Programmatic);
-            _source.Select(_source.Text.Length, 0);
-        });
         Unloaded += (_, _) => _operation?.Cancel();
+    }
+
+    public async Task InitializeSourceAsync()
+    {
+        if (_sourceInitialized) return;
+        _sourceInitialized = true;
+        var revision = _sourceRevision;
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            if (!IsLoaded || IsBusy || revision != _sourceRevision) return;
+            _source.Focus(FocusState.Programmatic);
+            _source.SelectAll();
+        });
+        await RecognizeChromeAsync();
+    }
+
+    private async Task RecognizeChromeAsync()
+    {
+        if (IsBusy || _readingChrome) return;
+        _readingChrome = true;
+        _recognize.IsEnabled = false;
+        var sourceBeforeReading = _source.Text;
+        var revision = _sourceRevision;
+        try
+        {
+            _chromeStatus.Text = Strings.AnimeImagesChromeReading.GetLocalizedResource();
+            var result = await ChromeImageSourceService.ReadSourceNumberAsync();
+            if (!IsLoaded) return;
+            if (IsBusy || revision != _sourceRevision || !string.Equals(sourceBeforeReading, _source.Text, StringComparison.Ordinal))
+            {
+                _chromeStatus.Text = Strings.AnimeImagesChromeSkipped.GetLocalizedResource();
+                return;
+            }
+            _chromeStatus.Text = result.Status switch
+            {
+                ChromeImageSourceService.ReadStatus.Success => string.Format(Strings.AnimeImagesChromeSuccess.GetLocalizedResource(), result.Number),
+                ChromeImageSourceService.ReadStatus.NoChrome => Strings.AnimeImagesChromeNotOpen.GetLocalizedResource(),
+                ChromeImageSourceService.ReadStatus.NoNumber => Strings.AnimeImagesChromeNoNumber.GetLocalizedResource(),
+                ChromeImageSourceService.ReadStatus.TimedOut => Strings.AnimeImagesChromeTimedOut.GetLocalizedResource(),
+                _ => Strings.AnimeImagesChromeFailed.GetLocalizedResource(),
+            };
+            if (result.Number is null) return;
+            _source.Text = result.Number;
+            _source.Focus(FocusState.Programmatic);
+            _source.SelectAll();
+        }
+        finally
+        {
+            _readingChrome = false;
+            _recognize.IsEnabled = !IsBusy;
+        }
     }
 
     private void Busy(bool busy)
     {
+        _recognize.IsEnabled = !busy && !_readingChrome;
         IsBusy = busy; _source.IsEnabled = _scan.IsEnabled = _close.IsEnabled = _targetVideo.IsEnabled = !busy;
         _cancel.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
         _rows.IsHitTestVisible = !busy; UpdateSave();
@@ -117,6 +170,7 @@ public sealed partial class AnimeImageImportDialog : UserControl
     }
     private async Task ScanAsync()
     {
+        _sourceRevision++;
         _allAdded = false;
         _operation?.Dispose(); _operation = new(); Busy(true); _rows.Children.Clear(); _choices.Clear(); _status.Text = Strings.AnimeImagesLoading.GetLocalizedResource();
         try
