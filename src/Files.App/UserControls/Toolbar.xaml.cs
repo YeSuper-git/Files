@@ -141,6 +141,7 @@ namespace Files.App.UserControls
 			DetachToggleButtons();
 			ContextCommandBar.PrimaryCommands.Clear();
 
+			var sortButtonAdded = false;
 			var active = GetActiveToolbarContexts();
 			var itemsByContext = ToolbarDefaultsTemplate.ResolveToolbarItemsByContext(UserSettingsService.AppearanceSettingsService);
 
@@ -160,10 +161,24 @@ namespace Files.App.UserControls
 						if (el is FrameworkElement btn and not AppBarSeparator && !ToolbarItemDescriptor.IsSeparatorCode(entries[i].CommandCode ?? ""))
 							AttachContextFlyout(btn, contextId, entries[i], i);
 
+						if (!sortButtonAdded && entries[i].CommandCode == nameof(CommandCodes.OpenProperties))
+						{
+							ContextCommandBar.PrimaryCommands.Add(ArrangementOptions);
+							sortButtonAdded = true;
+						}
+
 						ContextCommandBar.PrimaryCommands.Add(el);
+						if (!sortButtonAdded && entries[i].CommandCode == nameof(CommandCodes.DeleteItem))
+						{
+							ContextCommandBar.PrimaryCommands.Add(ArrangementOptions);
+							sortButtonAdded = true;
+						}
 					}
 				}
 			}
+
+			if (!sortButtonAdded)
+				ContextCommandBar.PrimaryCommands.Add(ArrangementOptions);
 
 			UpdateCommandBarSeparatorVisibility(ContextCommandBar.PrimaryCommands);
 			#if FILES_RESOURCE_MANAGER
@@ -661,6 +676,19 @@ namespace Files.App.UserControls
 
 		[DynamicWindowsRuntimeCast(typeof(MenuFlyoutSubItem))]
 		[DynamicWindowsRuntimeCast(typeof(MenuFlyoutSeparator))]
+		private void ArrangementFlyout_Opening(object sender, object e)
+		{
+			var visibility = Visibility.Visible;
+#if FILES_RESOURCE_MANAGER
+			if (PageContext.ShellPage is ModernShellPage { CurrentResourceLibraryPage: not null })
+				visibility = Visibility.Collapsed;
+#endif
+			FileFolderSortSeparator.Visibility = visibility;
+			SortFoldersFirstItem.Visibility = visibility;
+			SortFilesFirstItem.Visibility = visibility;
+			SortFilesAndFoldersTogetherItem.Visibility = visibility;
+		}
+
 		private void SortGroup_AccessKeyInvoked(UIElement sender, AccessKeyInvokedEventArgs args)
 		{
 			if (sender is not MenuFlyoutSubItem menu) return;

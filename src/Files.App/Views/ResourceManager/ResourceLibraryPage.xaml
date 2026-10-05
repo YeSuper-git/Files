@@ -6,6 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:helpers="using:Files.App.Helpers"
+    xmlns:resourceControls="using:Files.App.UserControls.ResourceManager"
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
@@ -16,7 +17,7 @@
     <Grid Padding="0" RowDefinitions="Auto,*">
         <StackPanel x:Name="AnimeRootPanel" Orientation="Horizontal" Spacing="12" Padding="16,8" Visibility="Collapsed">
             <Button x:Name="AnimeRootButton" Click="AnimeRoot_Click" />
-            <TextBlock x:Name="AnimeRootPath" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            <TextBlock x:Name="AnimeRootPath" ToolTipService.ToolTip="{Binding Text, ElementName=AnimeRootPath}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
         </StackPanel>
         <Border Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
             <Grid>
@@ -116,7 +117,7 @@
                                         </Grid>
                                     </Border>
                                     <StackPanel Padding="14,12,14,14">
-                                        <TextBlock Text="{Binding Name, Mode=OneWay}" FontSize="{Binding NameFontSize, Mode=OneWay}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Name, Mode=OneWay}" FontSize="{Binding NameFontSize, Mode=OneWay}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{Binding Name, Mode=OneWay}" />
                                         <TextBlock Margin="0,4,0,0" Text="{Binding DescriptionText, Mode=OneWay}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" MaxLines="2" Visibility="{Binding DescriptionVisibility, Mode=OneWay}" />
                                     </StackPanel>
                                 </StackPanel>
@@ -139,10 +140,10 @@
                                 </Border>
                                 <Grid x:Name="VideoDetailInfoPanel" Grid.Column="1" RowSpacing="12" PreviewKeyDown="AnimeEditor_PreviewKeyDown">
                                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                                    <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="12" HorizontalAlignment="Left" Height="44">
-                                        <TextBlock x:Name="VideoDetailTitle" MaxWidth="420" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
-                                        <Button x:Name="DetailTitleAction" Grid.Column="1" VerticalAlignment="Top" Content="{helpers:ResourceString Name=ResourceDetailTranslate}" Click="DetailTitleAction_Click" />
-                                    </Grid>
+                                    <resourceControls:TitleActionPanel Height="80">
+                                        <TextBlock x:Name="VideoDetailTitle" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2" LineHeight="36" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Top" ToolTipService.ToolTip="{Binding Text, ElementName=VideoDetailTitle}" />
+                                        <Button x:Name="DetailTitleAction" VerticalAlignment="Top" Content="{helpers:ResourceString Name=ResourceDetailTranslate}" Click="DetailTitleAction_Click" />
+                                    </resourceControls:TitleActionPanel>
                                     <Grid x:Name="AnimeDetailMetadata" Grid.Row="1" RowSpacing="12" Margin="0,16,0,0" Visibility="Collapsed">
                                         <Grid.Resources>
                                             <StaticResource x:Key="TextControlBorderBrush" ResourceKey="ControlStrokeColorDefaultBrush" />
@@ -198,7 +199,7 @@
                                                 <Border Height="198" CornerRadius="8,8,0,0" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
                                                     <Grid><Image Source="{Binding Poster}" Stretch="UniformToFill" /><FontIcon Glyph="&#xE714;" FontSize="32" Visibility="{Binding FallbackVisibility}" /></Grid>
                                                 </Border>
-                                                <TextBlock Text="{Binding Name}" Margin="8" MaxLines="2" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Name}" Margin="8" MaxLines="2" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{Binding Name, Mode=OneWay}" />
                                             </StackPanel>
                                         </Border>
                                     </DataTemplate></GridView.ItemTemplate>
@@ -215,7 +216,7 @@
                                     <ListView.ItemTemplate>
                                         <DataTemplate>
                                             <Border RightTapped="OnBrowserItemRightTapped" DoubleTapped="OnBrowserItemDoubleTapped">
-                                                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{Binding Name, Mode=OneWay}" />
                                             </Border>
                                         </DataTemplate>
                                     </ListView.ItemTemplate>

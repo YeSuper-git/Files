@@ -81,6 +81,12 @@ public sealed partial class AnimeImageImportDialog : UserControl
             _updatingSelection = false;
             UpdateSave();
         };
+        _source.PreviewKeyDown += async (_, e) =>
+        {
+            if (e.Key != Windows.System.VirtualKey.Enter) return;
+            e.Handled = true;
+            if (!IsBusy && _scan.IsEnabled) await ScanAsync();
+        };
         _scan.Click += async (_, _) => await ScanAsync();
         _save.Click += async (_, _) => await SaveAsync();
         _cancel.Click += (_, _) => _operation?.Cancel();

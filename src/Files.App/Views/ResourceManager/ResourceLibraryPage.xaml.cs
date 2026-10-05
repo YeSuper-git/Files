@@ -43,6 +43,7 @@ public sealed partial class ResourceLibraryPage : Page
     private ResourceVideoFolderListedItem? _detailFolderListedItem;
     private string? _pendingAnimeEditPath;
     private string? _animeEditingPath;
+    private string[] _animeEditingPaths = [];
     private List<BitmapImage> _illustrationImages = [];
     private readonly Dictionary<BitmapImage, string> _animeIllustrationCache = [];
     private readonly Dictionary<BitmapImage, string> _illustrationPaths = [];
@@ -931,17 +932,17 @@ public sealed partial class ResourceLibraryPage : Page
             AnimeSynopsisEditor.Text = details.Synopsis;
             AnimeMonthEditor.Text = details.AirDate?.ToString("yyyy-MM", CultureInfo.InvariantCulture) ?? string.Empty;
         }
-        if (_pendingAnimeEditPath is not null && PathEquals(_pendingAnimeEditPath, _detailFolderItem.Path) && (_activeVideoItem is not null || BrowserItems.Count == 0))
+        if (_pendingAnimeEditPath is not null && PathEquals(_pendingAnimeEditPath, _detailFolderItem.Path) && (BrowserItems.Any(item => item.Kind == ResourceBrowserItemKind.VideoFile) || BrowserItems.Count == 0))
         {
             _pendingAnimeEditPath = null;
-            BeginAnimeEdit();
+            BeginAnimeEdit(applyToAllVideos: true);
         }
     }
 
     private Task EditAnimeDetailsAsync(ResourceBrowserItemViewModel item)
     {
         if (_detailFolderItem is not null && PathEquals(_detailFolderItem.Path, item.Path) && VideoDetailView.Visibility == Visibility.Visible)
-            BeginAnimeEdit();
+            BeginAnimeEdit(applyToAllVideos: true);
         else
         {
             _pendingAnimeEditPath = item.Path;
@@ -959,10 +960,18 @@ public sealed partial class ResourceLibraryPage : Page
         AnimeDetailEditButton.Style = editing ? (Style)Application.Current.Resources["AccentButtonStyle"] : null;
     }
 
-    private void BeginAnimeEdit()
+    private void BeginAnimeEdit(bool applyToAllVideos = false, ResourceBrowserItemViewModel? clickedVideo = null)
     {
         if (AnimeMetadataPath is null) return;
-        _animeEditingPath = AnimeMetadataPath;
+        _animeEditingPath = clickedVideo?.Path ?? AnimeMetadataPath;
+        IEnumerable<ResourceBrowserItemViewModel> videos = clickedVideo is not null ? [clickedVideo]
+            : applyToAllVideos ? BrowserItems : ActiveBrowserList.SelectedItems.OfType<ResourceBrowserItemViewModel>();
+        _animeEditingPaths = videos.Where(item => item.Kind == ResourceBrowserItemKind.VideoFile)
+            .Select(item => item.Path).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (applyToAllVideos && _detailFolderItem is not null)
+            _animeEditingPaths = _animeEditingPaths.Append(_detailFolderItem.Path).ToArray();
+        else if (_animeEditingPaths.Length == 0)
+            _animeEditingPaths = [_animeEditingPath];
         var details = _workspace.GetVideoDetails(_animeEditingPath);
         AnimeSynopsisEditor.Text = details.Synopsis;
         AnimeMonthEditor.Text = details.AirDate?.ToString("yyyy-MM", CultureInfo.InvariantCulture) ?? string.Empty;
@@ -991,10 +1000,12 @@ public sealed partial class ResourceLibraryPage : Page
             { AnimeEditError.Visibility = Visibility.Visible; return; }
             month = new DateTimeOffset(date);
         }
-        var editingPath = _animeEditingPath;
-        _workspace.SetVideoDetails(editingPath, new ResourceVideoDetails { Synopsis = AnimeSynopsisEditor.Text, AirDate = month });
+        var details = new ResourceVideoDetails { Synopsis = AnimeSynopsisEditor.Text, AirDate = month };
+        foreach (var path in _animeEditingPaths)
+            _workspace.SetVideoDetails(path, details);
+        _animeEditingPaths = [];
         _animeEditingPath = null;
-        if (_activeVideoItem is not null) UpdateResourceSelection([_activeVideoItem]);
+        UpdateResourceSelection(ActiveBrowserList.SelectedItems.OfType<ResourceBrowserItemViewModel>());
         VideoDetailTitle.Visibility = Visibility.Visible;
         SetAnimeEditing(false);
 
@@ -1760,7 +1771,7 @@ public sealed partial class ResourceLibraryPage : Page
         if (_animeLibrary && item.Kind is ResourceBrowserItemKind.VideoFolder or ResourceBrowserItemKind.VideoFile)
         {
             var edit = new MenuFlyoutItem { Text = Strings.AnimeLibraryEditDetails.GetLocalizedResource() };
-            edit.Click += async (_, _) => { if (item.Kind == ResourceBrowserItemKind.VideoFile) { ActiveBrowserList.SelectedItem = item; BeginAnimeEdit(); } else await EditAnimeDetailsAsync(item); };
+            edit.Click += async (_, _) => { if (item.Kind == ResourceBrowserItemKind.VideoFile) { ActiveBrowserList.SelectedItem = item; BeginAnimeEdit(clickedVideo: item); } else await EditAnimeDetailsAsync(item); };
             flyout.Items.Add(edit);
             var import = new MenuFlyoutItem { Text = Strings.AnimeImagesImport.GetLocalizedResource() };
             import.Click += async (_, _) => await ImportAnimeImagesAsync(item);
