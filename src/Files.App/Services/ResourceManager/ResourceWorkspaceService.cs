@@ -39,6 +39,9 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
         MigratePosterReferences();
     }
 
+    public event EventHandler? NavigationChanged;
+    public void NotifyNavigationChanged() => NavigationChanged?.Invoke(this, EventArgs.Empty);
+
     public ResourceSettings Settings => _state.Settings;
 
     public string LibraryPath => _state.LibraryPath;
@@ -542,6 +545,7 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
             normalizedDetails.Name = normalizedDetails.Name.Trim();
             normalizedDetails.Aliases = normalizedDetails.Aliases.Trim();
             normalizedDetails.Biography = normalizedDetails.Biography.Trim();
+            normalizedDetails.InformationUrl = normalizedDetails.InformationUrl?.Trim() ?? string.Empty;
             normalizedDetails.HeightCm = normalizedDetails.HeightCm.Trim();
             normalizedDetails.WeightKg = normalizedDetails.WeightKg.Trim();
             normalizedDetails.Bust = normalizedDetails.Bust.Trim();
@@ -554,6 +558,7 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
                 normalizedDetails.IsCurrentlyActive = false;
             _state.ActorDetails[normalizedPath] = normalizedDetails;
             PersistState();
+            NotifyNavigationChanged();
         }
         catch (Exception ex)
         {
@@ -575,6 +580,7 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
             .Take(MaxRecentLibraries)
             .ToList();
         PersistState();
+        NotifyNavigationChanged();
     }
 
     public void UpdateSettings(ResourceSettings settings)

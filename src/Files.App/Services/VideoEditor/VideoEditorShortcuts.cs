@@ -8,6 +8,8 @@ public static class VideoEditorShortcuts
 {
     public static IReadOnlyList<VideoEditorShortcut> Defaults { get; } = [
         new("Play", VirtualKey.Space, VirtualKeyModifiers.None),
+        new("Backward", VirtualKey.Left, VirtualKeyModifiers.None),
+        new("Forward", VirtualKey.Right, VirtualKeyModifiers.None),
         new("Split", VirtualKey.S, VirtualKeyModifiers.None),
         new("Start", VirtualKey.Home, VirtualKeyModifiers.None),
         new("Open", VirtualKey.O, VirtualKeyModifiers.Control),
@@ -35,6 +37,18 @@ public static class VideoEditorShortcuts
     }
     public static string Save(IEnumerable<VideoEditorShortcut> items)
         => string.Join(";", items.Select(item => $"{item.Action}={(int)item.Key},{(int)item.Modifiers}"));
+    public static VideoEditorShortcut? Resolve(IEnumerable<VideoEditorShortcut> items, VirtualKey key, VirtualKeyModifiers modifiers)
+    {
+        var bindings = items.ToArray();
+        var exact = bindings.FirstOrDefault(item => (int)item.Key != 0 && item.Key == key && item.Modifiers == modifiers);
+        if (exact is not null) return exact;
+        return bindings.FirstOrDefault(item =>
+            (item.Action == "ZoomIn" && (int)item.Key == 187 && item.Modifiers == VirtualKeyModifiers.Control &&
+                ((key == (VirtualKey)187 && modifiers == (VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift)) ||
+                 (key == VirtualKey.Add && modifiers == VirtualKeyModifiers.Control))) ||
+            (item.Action == "ZoomOut" && (int)item.Key == 189 && item.Modifiers == VirtualKeyModifiers.Control &&
+                key == VirtualKey.Subtract && modifiers == VirtualKeyModifiers.Control));
+    }
     public static VirtualKeyModifiers CurrentModifiers()
     {
         var result = VirtualKeyModifiers.None;

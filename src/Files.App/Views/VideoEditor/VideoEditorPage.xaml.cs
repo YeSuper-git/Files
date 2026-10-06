@@ -28,6 +28,8 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 {
 	public Files.App.Data.Enums.SettingsPageKind SettingsPage => Files.App.Data.Enums.SettingsPageKind.VideoEditorPage;
 	private static readonly string[] SupportedVideoExtensions = [".mp4", ".mkv", ".mov", ".avi", ".m4v", ".ts", ".webm", ".wmv", ".mxf", ".mts", ".m2ts", ".flv", ".vob", ".mpg", ".mpeg", ".3gp", ".ogv"];
+	private readonly DispatcherTimer _rulerRefreshTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
+    private readonly DispatcherTimer _storyboardRefreshTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
 	private readonly DispatcherTimer _playbackTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
 	private readonly VideoFrameStripService _frameStripService = new(Ioc.Default.GetRequiredService<VideoToolchain>());
 	private MediaSource? _mediaSource;
@@ -35,7 +37,11 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 	private string? _storyboardPath;
 	private int _storyboardFrameCount;
 	private bool _isSeeking;
+    private double? _pendingSeekSourceSeconds;
+    private long _seekRequestTicks;
 	private double _timelineZoom = 1;
+    private double _savedTimelineOffset;
+    private bool _resumePlaybackOnLoad;
 	private bool _playButtonHovered;
 	private string _playGraphicName = "Play";
 	private double _storyboardSampleInterval;
@@ -47,6 +53,7 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 	public VideoEditorViewModel ViewModel { get; }
 	private readonly SemaphoreSlim _videoLoadGate = new(1, 1);
 	public ObservableCollection<VideoCutJob> ExportingJobs { get; } = [];
+    public ObservableCollection<object> DownloadItems { get; } = [];
 
 	public VideoEditorPage()
 	{
@@ -54,12 +61,21 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 		InitializeComponent();
 		DataContext = ViewModel;
         AddHandler(UIElement.KeyDownEvent, new KeyEventHandler(VideoShortcut_KeyDown), true);
+        PreviewKeyDown += VideoShortcut_KeyDown;
 		_playbackTimer.Tick += PlaybackTimer_Tick;
+        _rulerRefreshTimer.Tick += (_, _) => { _rulerRefreshTimer.Stop(); DrawTimelineRuler(); };
+        _storyboardRefreshTimer.Tick += (_, _) =>
+        {
+            _storyboardRefreshTimer.Stop();
+            if (ViewModel.SourcePath is { } path) StartStoryboardLoad(path);
+        };
 		SelectQueueTab("Pending");
 		UpdateEmptyStates();
 	}
 
-    private void VideoShortcut_KeyDown(object sender, KeyRoutedEventArgs e)
+    private void VideoShortcut_KeyDown(object sender, KeyRoutedEventArgs e) => HandleShortcut(e);
+
+    internal void HandleShortcut(KeyRoutedEventArgs e)
     {
         if (e.Handled || XamlRoot is null) return;
         var focused = FocusManager.GetFocusedElement(XamlRoot) as DependencyObject;
@@ -70,12 +86,14 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
         }
         var settings = Ioc.Default.GetRequiredService<IAppSettingsService>();
         var modifiers = VideoEditorShortcuts.CurrentModifiers();
-        var binding = VideoEditorShortcuts.Load(settings.VideoEditorShortcuts).FirstOrDefault(item => (int)item.Key != 0 && item.Key == e.Key && item.Modifiers == modifiers);
+        var binding = VideoEditorShortcuts.Resolve(VideoEditorShortcuts.Load(settings.VideoEditorShortcuts), e.Key, modifiers);
         if (binding is null || (!ViewModel.HasVideo && binding.Action != "Open")) return;
         e.Handled = true;
         switch (binding.Action)
         {
             case "Play": PlayPause_Click(this, new RoutedEventArgs()); break;
+            case "Backward": SeekTo(ViewModel.CurrentPositionSeconds - 5); break;
+            case "Forward": SeekTo(ViewModel.CurrentPositionSeconds + 5); break;
             case "Split": SplitVideo_Click(this, new RoutedEventArgs()); break;
             case "Start": GoToStart_Click(this, new RoutedEventArgs()); break;
             case "Open": OpenVideo_Click(this, new RoutedEventArgs()); break;
@@ -178,7 +196,7 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 		finally { _videoLoadGate.Release(); }
 	}
 
-	private async Task AttachPreviewAsync(string path)
+	private async Task AttachPreviewAsync(string path, bool preserveTimeline = false)
 	{
 		try
 		{
@@ -190,9 +208,9 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 			Player.Source = _mediaSource;
 			SeekTo(ViewModel.CurrentPositionSeconds);
 			_playbackTimer.Start();
-			_storyboardSampleInterval = 0;
-			SetTimelineZoom(TimelineViewport.ActualWidth / Math.Max(1, ViewModel.DurationSeconds * 120));
-			TimelineViewport.ChangeView(0, null, null, disableAnimation: true);
+            if (!preserveTimeline) _storyboardSampleInterval = 0;
+            SetTimelineZoom(preserveTimeline ? _timelineZoom : TimelineViewport.ActualWidth / Math.Max(1, ViewModel.DurationSeconds * 120));
+            TimelineViewport.ChangeView(preserveTimeline ? _savedTimelineOffset : 0, null, null, disableAnimation: true);
 			StartStoryboardLoad(path);
 		}
 		catch (Exception ex)
@@ -233,15 +251,22 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 			}
 		}
 		if (ViewModel.HasVideo)
-			await AttachPreviewAsync(ViewModel.SourcePath!);
+        {
+            await AttachPreviewAsync(ViewModel.SourcePath!, preserveTimeline: true);
+            if (_resumePlaybackOnLoad) Player.MediaPlayer?.Play();
+        }
+        UpdateEmptyStates();
 		UpdateStoryboardVisuals();
 	}
 
 	private void Page_Unloaded(object sender, RoutedEventArgs e)
 	{
+        _savedTimelineOffset = TimelineViewport.HorizontalOffset;
+        _resumePlaybackOnLoad = Player.MediaPlayer?.PlaybackSession.PlaybackState == MediaPlaybackState.Playing;
 		ViewModel.SavePendingDraft();
 		ViewModel.PendingVideos.CollectionChanged -= Jobs_CollectionChanged;
 		_playbackTimer.Stop();
+        _rulerRefreshTimer.Stop(); _storyboardRefreshTimer.Stop();
 		ViewModel.PropertyChanged -= ViewModel_PropertyChanged;
 		foreach (var job in ViewModel.ProcessingJobs)
 			job.PropertyChanged -= Job_PropertyChanged;
@@ -311,10 +336,10 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 			return;
 
 		SyncQueueGroups();
-		PendingEmptyState.Visibility = ViewModel.PendingVideos.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+		PendingEmptyState.Visibility = DownloadItems.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 		ProcessingEmptyState.Visibility = ExportingJobs.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 		CompletedEmptyState.Visibility = ViewModel.CompletedJobs.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-		UpdateCount(PendingCount, PendingBadge, ViewModel.PendingVideos.Count);
+		UpdateCount(PendingCount, PendingBadge, DownloadItems.Count);
 		UpdateCount(ProcessingCount, ProcessingBadge, ExportingJobs.Count);
 		UpdateCount(CompletedCount, CompletedBadge, ViewModel.CompletedJobs.Count);
 		AllQueueButton.IsEnabled = ViewModel.ProcessingJobs.Any(job => job.Status is VideoCutJobStatus.Waiting or VideoCutJobStatus.Processing or VideoCutJobStatus.Paused);
@@ -322,7 +347,8 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 		var queueAction = canPause
 			? Strings.VideoEditorPauseAll.GetLocalizedResource()
 			: Strings.VideoEditorStartAll.GetLocalizedResource();
-		AllQueueIcon.Glyph = canPause ? "\uE769" : "\uE768";
+		AllQueuePauseIcon.Visibility = canPause ? Visibility.Visible : Visibility.Collapsed;
+        AllQueueDownloadIcon.Visibility = canPause ? Visibility.Collapsed : Visibility.Visible;
 		ToolTipService.SetToolTip(AllQueueButton, queueAction);
 		AutomationProperties.SetName(AllQueueButton, queueAction);
 		EmptyVideoState.Visibility = ViewModel.HasVideo ? Visibility.Collapsed : Visibility.Visible;
@@ -335,7 +361,10 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 
 	private void SyncQueueGroups()
 	{
+        foreach (var video in ViewModel.PendingVideos)
+            video.IsCurrentEditing = ViewModel.HasVideo && string.Equals(video.SourcePath, ViewModel.SourcePath, StringComparison.OrdinalIgnoreCase);
 		SyncGroup(ExportingJobs, ViewModel.ProcessingJobs);
+        SyncGroup(DownloadItems, ViewModel.ProcessingJobs.Cast<object>().Concat(ViewModel.PendingVideos));
 	}
 
 	private static void UpdateCount(TextBlock label, Border badge, int count)
@@ -344,7 +373,7 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 		badge.Visibility = count == 0 ? Visibility.Collapsed : Visibility.Visible;
 	}
 
-	private static void SyncGroup(ObservableCollection<VideoCutJob> target, IEnumerable<VideoCutJob> source)
+	private static void SyncGroup<T>(ObservableCollection<T> target, IEnumerable<T> source)
 	{
 		var wanted = source.ToArray();
 		foreach (var job in target.Where(job => !wanted.Contains(job)).ToArray())
@@ -368,8 +397,8 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 
 	private void SelectQueueTab(string tabName)
 	{
-		var showPending = tabName == "Pending";
-		var showProcessing = tabName == "Processing";
+		var showPending = tabName is "Pending" or "Processing";
+		var showProcessing = false;
 		var showCompleted = tabName == "Completed";
 		PendingTabButton.FontWeight = showPending ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal;
 		ProcessingTabButton.FontWeight = showProcessing ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal;
@@ -413,7 +442,7 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 			DrawTimelineRuler();
 			UpdateStoryboardVisuals();
 		}
-		if (e.PropertyName == nameof(VideoEditorViewModel.HasVideo))
+		if (e.PropertyName is nameof(VideoEditorViewModel.HasVideo) or nameof(VideoEditorViewModel.SourcePath))
 			UpdateEmptyStates();
 		if (e.PropertyName == nameof(VideoEditorViewModel.IsLoading))
 			UpdateEmptyStates();
@@ -432,6 +461,20 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 			return;
 
 		var session = Player.MediaPlayer.PlaybackSession;
+        if (_pendingSeekSourceSeconds is double pending)
+        {
+            if (Math.Abs(session.Position.TotalSeconds - pending) <= 0.15)
+                _pendingSeekSourceSeconds = null;
+            else
+            {
+                if (session.CanSeek && Stopwatch.GetElapsedTime(_seekRequestTicks).TotalSeconds >= 0.25)
+                {
+                    session.Position = TimeSpan.FromSeconds(pending);
+                    _seekRequestTicks = Stopwatch.GetTimestamp();
+                }
+                return;
+            }
+        }
 		if (!_isSeeking && session.PlaybackState == MediaPlaybackState.Playing)
 		{
 			var timelinePosition = ViewModel.SourceToTimeline(session.Position.TotalSeconds);
@@ -440,7 +483,7 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 				session.Position = TimeSpan.FromSeconds(sourcePosition);
 			if (timelinePosition >= ViewModel.DurationSeconds - 0.02) Player.MediaPlayer.Pause();
 		}
-		if (!_isSeeking)
+		if (!_isSeeking && session.PlaybackState == MediaPlaybackState.Playing)
 			ViewModel.CurrentPositionSeconds = ViewModel.SourceToTimeline(session.Position.TotalSeconds);
 		var playing = session.PlaybackState == MediaPlaybackState.Playing;
 		UpdatePlayGraphic();
@@ -551,9 +594,17 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 	private void ShowHelp_Click(object sender, RoutedEventArgs e)
 		=> ViewModel.SetStatusMessage(Strings.VideoEditorTimelineHint.GetLocalizedResource());
 
+    private void ExportAndClose(bool replaceOriginal)
+    {
+        var existingIds = ViewModel.ProcessingJobs.Select(job => job.Id).ToHashSet();
+        ViewModel.ExportCurrent(replaceOriginal);
+        if (ViewModel.ProcessingJobs.Any(job => !existingIds.Contains(job.Id))) CloseVideo_Click(this, new RoutedEventArgs());
+        SelectQueueTab("Processing");
+    }
+
 	private void ExportOnly_Click(object sender, RoutedEventArgs e)
 	{
-		ViewModel.ExportCurrent(replaceOriginal: false);
+		ExportAndClose(replaceOriginal: false);
 		SelectQueueTab("Processing");
 	}
 
@@ -575,7 +626,7 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 			flyout.Hide();
 			if (ViewModel.CanSave && ViewModel.SourcePath == path && ViewModel.Segments.SequenceEqual(segments))
 			{
-				ViewModel.ExportCurrent(replaceOriginal: true);
+				ExportAndClose(replaceOriginal: true);
 				SelectQueueTab("Processing");
 			}
 		};
@@ -592,6 +643,8 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 			return;
 		if (job.Status == VideoCutJobStatus.Paused)
 			ViewModel.Resume(job);
+        else if (job.Status == VideoCutJobStatus.Waiting)
+            ViewModel.StartQueue();
 		else if (job.Status is VideoCutJobStatus.Failed or VideoCutJobStatus.Cancelled)
 			ViewModel.Retry(job);
 		else
@@ -599,9 +652,9 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 		UpdateEmptyStates();
 	}
 
-	private async void ReeditJob_Click(object sender, RoutedEventArgs e)
+	private async Task ReeditJobAsync(VideoCutJob job)
 	{
-		if ((sender as FrameworkElement)?.DataContext is not VideoCutJob job || !await ViewModel.CancelForReeditAsync(job))
+		if (!await ViewModel.CancelForReeditAsync(job))
 			return;
 		await ViewModel.LoadVideoAsync(job.SourcePath);
 		if (string.Equals(ViewModel.SourcePath, job.SourcePath, StringComparison.OrdinalIgnoreCase))
@@ -618,6 +671,60 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 			ViewModel.CancelOrRemove(job);
 	}
 
+    private async void DownloadPending_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not PendingVideo video) return;
+        try
+        {
+            await LoadVideoFileAsync(await StorageFile.GetFileFromPathAsync(video.SourcePath));
+            if (string.Equals(ViewModel.SourcePath, video.SourcePath, StringComparison.OrdinalIgnoreCase)) ExportAndClose(replaceOriginal: false);
+        }
+        catch (Exception ex) { ShowFileActionError(ex); }
+    }
+
+    private void QueueJob_ContextRequested(UIElement sender, ContextRequestedEventArgs e)
+    {
+        if (sender is not FrameworkElement target || target.DataContext is not VideoCutJob job) return;
+        var menu = new MenuFlyout();
+        AddMenuAction(menu, Strings.VideoEditorReedit.GetLocalizedResource(), "\uE70F", async () => await ReeditJobAsync(job));
+        ((MenuFlyoutItem)menu.Items[^1]).IsEnabled = job.CanCancel;
+        AddMenuAction(menu, Strings.Delete.GetLocalizedResource(), "\uE74D", async () => await DeleteJobAsync(job));
+        ((MenuFlyoutItem)menu.Items[^1]).IsEnabled = job.CanCancel;
+        ShowContextMenu(menu, target, e);
+    }
+
+    private async Task DeleteJobAsync(VideoCutJob job)
+    {
+        var removeOutput = new CheckBox { Content = Strings.VideoEditorDeleteOutput.GetLocalizedResource(), IsChecked = false };
+        var content = new StackPanel { Spacing = 12 };
+        content.Children.Add(new TextBlock { Text = string.Format(Strings.VideoEditorDeleteConfirmation.GetLocalizedResource(), job.FileName), TextWrapping = TextWrapping.Wrap });
+        content.Children.Add(removeOutput);
+        var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = Strings.Delete.GetLocalizedResource(), Content = content,
+            PrimaryButtonText = Strings.Delete.GetLocalizedResource(), CloseButtonText = Strings.Cancel.GetLocalizedResource() };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        try
+        {
+            if (job.Status != VideoCutJobStatus.Completed && !await ViewModel.CancelForReeditAsync(job)) return;
+            if (removeOutput.IsChecked == true)
+            {
+                var outputs = job.TemporaryOutputPaths.Concat(job.GeneratedOutputPath is { } generated ? new[] { generated } : Array.Empty<string>())
+                    .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                foreach (var output in outputs)
+                {
+                    if (File.Exists(output))
+                    {
+                        if (string.Equals(ViewModel.SourcePath, output, StringComparison.OrdinalIgnoreCase)) CloseVideo_Click(this, new RoutedEventArgs());
+                        await (await StorageFile.GetFileFromPathAsync(output)).DeleteAsync();
+                    }
+                    job.UntrackTemporaryOutput(output);
+                }
+            }
+            ViewModel.CompletedJobs.Remove(job);
+            UpdateEmptyStates();
+        }
+        catch (Exception ex) { ShowFileActionError(ex); }
+    }
+
 	private void RetryJob_Click(object sender, RoutedEventArgs e)
 	{
 		if ((sender as FrameworkElement)?.DataContext is VideoCutJob job)
@@ -626,20 +733,21 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 
 	private int _storyboardFirstIndex = -1;
 	private double _storyboardSecondsPerTile;
-	private void Storyboard_SizeChanged(object sender, SizeChangedEventArgs e)
-	{
-		DrawTimelineRuler();
-		UpdateStoryboardVisuals();
-		if (ViewModel.SourcePath is { } path)
-			StartStoryboardLoad(path);
-	}
+    private void Storyboard_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        UpdateStoryboardVisuals();
+        ScheduleTimelineRefresh();
+    }
 
-	private void TimelineViewport_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
-	{
-		DrawTimelineRuler();
-		if (ViewModel.SourcePath is { } path)
-			StartStoryboardLoad(path);
-	}
+    private void TimelineViewport_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
+        => ScheduleTimelineRefresh();
+
+    private void ScheduleTimelineRefresh()
+    {
+        if (!_rulerRefreshTimer.IsEnabled) _rulerRefreshTimer.Start();
+        _storyboardRefreshTimer.Stop();
+        _storyboardRefreshTimer.Start();
+    }
 
 	private void StartStoryboardLoad(string path)
 	{
@@ -731,7 +839,7 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 			var results = await Task.WhenAll(frames.Select(async frame =>
 			{
 				await gate.WaitAsync(cancellationToken);
-				try { return (frame.Image, frame.Seconds, Path: await _frameStripService.GetFrameAsync(path, frame.Seconds, 0, cancellationToken)); }
+				try { return (frame.Image, frame.Seconds, Path: await Task.Run(() => _frameStripService.GetFrameAsync(path, frame.Seconds, 0, cancellationToken), cancellationToken)); }
 				finally { gate.Release(); }
 			}));
 			cancellationToken.ThrowIfCancellationRequested();
@@ -748,7 +856,13 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 			{
 				_storyboardImages[frame.Seconds] = frame.Bitmap;
 				frame.Image.Source = frame.Bitmap;
-			}			StoryboardStrip.Opacity = 1;
+            }
+            if (_storyboardImages.Count > 256)
+            {
+                var center = ViewModel.TimelineToSource((TimelineViewport.HorizontalOffset + TimelineViewport.ActualWidth / 2) / Math.Max(1, StoryboardSurface.Width) * ViewModel.DurationSeconds);
+                foreach (var key in _storyboardImages.Keys.OrderByDescending(key => Math.Abs(key - center)).Take(_storyboardImages.Count - 256).ToArray()) _storyboardImages.Remove(key);
+            }
+            StoryboardStrip.Opacity = 1;
 		}
 		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
 		catch (Exception ex)
@@ -764,8 +878,9 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 		_storyboardCancellation = null;
 		_storyboardPath = null;
 		_storyboardFrameCount = 0;
-		if (clearCache)
-		{
+        if (clearCache)
+        {
+            _rulerRefreshTimer.Stop(); _storyboardRefreshTimer.Stop();
 			StoryboardStrip.Children.Clear();
 			StoryboardStrip.Opacity = 1;
 			_storyboardTiles.Clear();
@@ -835,12 +950,15 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 		if (sender is not FrameworkElement target || target.DataContext is not PendingVideo video)
 			return;
 		var menu = new MenuFlyout();
-		AddMenuAction(menu, Strings.VideoEditorCancelExport.GetLocalizedResource(), "\uE8BB", () =>
-		{
-			if (string.Equals(ViewModel.SourcePath, video.SourcePath, StringComparison.OrdinalIgnoreCase))
-				CloseVideo_Click(target, new RoutedEventArgs());
-			ViewModel.PendingVideos.Remove(video);
-		});
+        AddMenuAction(menu, Strings.Delete.GetLocalizedResource(), "\uE74D", async () =>
+        {
+            var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = Strings.Delete.GetLocalizedResource(),
+                Content = string.Format(Strings.VideoEditorDeleteConfirmation.GetLocalizedResource(), video.FileName),
+                PrimaryButtonText = Strings.Delete.GetLocalizedResource(), CloseButtonText = Strings.Cancel.GetLocalizedResource() };
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+            if (string.Equals(ViewModel.SourcePath, video.SourcePath, StringComparison.OrdinalIgnoreCase)) CloseVideo_Click(target, new RoutedEventArgs());
+            ViewModel.PendingVideos.Remove(video);
+        });
 		AddMenuAction(menu, Strings.VideoEditorOpenFolder.GetLocalizedResource(), "\uE838", () => OpenVideoFolder(video.SourcePath));
 		ShowContextMenu(menu, target, e);
 	}
@@ -858,7 +976,7 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 		AddMenuAction(menu, Strings.VideoEditorOpenFolder.GetLocalizedResource(), "\uE838", () => OpenVideoFolder(path));
 		AddMenuAction(menu, Strings.Rename.GetLocalizedResource(), "\uE8AC", async () => await RenameCompletedVideoAsync(job));
 		menu.Items.Add(new MenuFlyoutSeparator());
-		AddMenuAction(menu, Strings.VideoEditorDeleteRecord.GetLocalizedResource(), "\uE74D", () => ViewModel.CompletedJobs.Remove(job));
+		AddMenuAction(menu, Strings.Delete.GetLocalizedResource(), "\uE74D", async () => await DeleteJobAsync(job));
 		ShowContextMenu(menu, target, e);
 	}
 
@@ -1007,12 +1125,17 @@ public sealed partial class VideoEditorPage : Page, Files.App.Data.Contracts.IPa
 	{
 		seconds = Math.Clamp(seconds, 0, ViewModel.DurationSeconds);
 		ViewModel.CurrentPositionSeconds = seconds;
-		if (Player.MediaPlayer is not null && ViewModel.HasVideo)
-			Player.MediaPlayer.PlaybackSession.Position = TimeSpan.FromSeconds(ViewModel.TimelineToSource(seconds));
+        if (Player.MediaPlayer is not null && ViewModel.HasVideo)
+        {
+            _pendingSeekSourceSeconds = ViewModel.TimelineToSource(seconds);
+            _seekRequestTicks = Stopwatch.GetTimestamp();
+            Player.MediaPlayer.PlaybackSession.Position = TimeSpan.FromSeconds(_pendingSeekSourceSeconds.Value);
+        }
 	}
 
 	private void ReleasePlayerSource()
 	{
+        _pendingSeekSourceSeconds = null;
 		if (Player.MediaPlayer is not null)
 			Player.MediaPlayer.Pause();
 		Player.Source = null;

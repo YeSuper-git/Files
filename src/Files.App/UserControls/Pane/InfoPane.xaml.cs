@@ -6,6 +6,8 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Files.App.Data.Items.ResourceManager;
 using WinRT;
+using Files.App.Data.Models.ResourceManager;
+using Microsoft.Extensions.Logging;
 
 namespace Files.App.UserControls
 {
@@ -69,6 +71,14 @@ namespace Files.App.UserControls
 
 		private void PreviewContextFlyout_Opening(object sender, object e)
 			=> LoadCloudItemMenuItem.Visibility = ViewModel.ShowCloudItemButton ? Visibility.Visible : Visibility.Collapsed;
+
+        private async void ActorInformationUrl_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+        {
+            e.Handled = true;
+            if (!ResourceActorDetails.TryGetInformationUri(ViewModel.SelectedActorInformationUrl, out var uri)) return;
+            try { await Windows.System.Launcher.LaunchUriAsync(uri!); }
+            catch (Exception ex) { App.Logger.LogWarning(ex, "Unable to open actor information URL"); }
+        }
 
 		private async void EditActorDetails_Click(object sender, RoutedEventArgs e)
 			=> await ViewModel.EditSelectedResourceActorAsync();

@@ -52,7 +52,12 @@
 
 			<ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
 				<StackPanel Spacing="12">
-					<StackPanel x:Name="ChoiceGroups" Spacing="12" />
+					<Grid x:Name="FunctionOptions" ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <Button x:Name="OptimizeNames" Click="OptimizationFunction_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="16,12" />
+                        <Button Grid.Column="1" x:Name="OptimizeClassification" Click="OptimizationFunction_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="16,12" />
+                        <Button Grid.Column="2" x:Name="OptimizeSubtitleTags" Click="OptimizationFunction_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="16,12" />
+                    </Grid>
+                    <StackPanel x:Name="ChoiceGroups" Spacing="12" />
             <ItemsControl
 				x:Name="PreviewList"
 				Grid.Row="1"
@@ -85,12 +90,13 @@
 					TextWrapping="WrapWholeWords" />
 				<Grid Margin="0,12,8,8" ColumnSpacing="16">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                    <StackPanel x:Name="SelectionButtons" HorizontalAlignment="Left" Orientation="Horizontal" Spacing="8">
+                    <StackPanel x:Name="SelectionButtons" Visibility="Collapsed" HorizontalAlignment="Left" Orientation="Horizontal" Spacing="8">
                         <Button x:Name="SelectAllButton" Click="SelectAll_Click" />
                         <Button x:Name="SelectNoneButton" Click="SelectNone_Click" />
                     </StackPanel>
                 <StackPanel Grid.Column="2" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
-					<Button
+					<Button x:Name="RetryButton" Click="Retry_Click" Visibility="Collapsed" Content="重试" />
+                    <Button
 						x:Name="ExecuteButton"
 						Padding="16,8"
 						Background="{ThemeResource AccentFillColorDefaultBrush}"

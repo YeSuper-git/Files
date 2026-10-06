@@ -7,6 +7,8 @@ namespace Files.App.Services.ResourceManager;
 
 public interface IResourceWorkspaceService
 {
+    event EventHandler? NavigationChanged;
+    void NotifyNavigationChanged();
     ResourceSettings Settings { get; }
     string LibraryPath { get; }
     IReadOnlyList<string> RecentLibraries { get; }

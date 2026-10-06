@@ -3,6 +3,7 @@
 
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 
 namespace Files.App.Services.VideoEditor;
@@ -18,6 +19,7 @@ public sealed class VideoCutQueueService(VideoCutProcessor processor)
 	private bool _workerRunning;
 	private bool _allPaused;
 	private bool _cancelCurrent;
+    private bool _pauseCurrent;
 
 	public ObservableCollection<VideoCutJob> ProcessingJobs { get; } = [];
 	public ObservableCollection<VideoCutJob> CompletedJobs { get; } = [];
@@ -89,6 +91,12 @@ public sealed class VideoCutQueueService(VideoCutProcessor processor)
 		lock (_syncRoot)
 		{
 			_allPaused = false;
+            if (_pauseCurrent && _currentJobId is not null)
+            {
+                _pauseCurrent = false;
+                var current = ProcessingJobs.FirstOrDefault(job => job.Id == _currentJobId);
+                if (current?.Status == VideoCutJobStatus.Paused) current.Status = VideoCutJobStatus.Waiting;
+            }
 			foreach (var job in ProcessingJobs.Where(job => job.Status == VideoCutJobStatus.Paused && job.Id != _currentJobId))
 			{
 				job.Status = VideoCutJobStatus.Waiting;
@@ -105,15 +113,19 @@ public sealed class VideoCutQueueService(VideoCutProcessor processor)
 			RemoveWaiting(job);
 			job.Status = VideoCutJobStatus.Paused;
 		}
-		else if (job.Status == VideoCutJobStatus.Processing)
-		{
-			lock (_syncRoot)
-			{
-				if (_currentJobId == job.Id)
-					_currentCancellation?.Cancel();
-			}
-		}
-	}
+        else if (job.Status == VideoCutJobStatus.Processing)
+        {
+            lock (_syncRoot)
+            {
+                if (_currentJobId == job.Id)
+                {
+                    _pauseCurrent = true;
+                    job.Status = VideoCutJobStatus.Paused;
+                    _currentCancellation?.Cancel();
+                }
+            }
+        }
+    }
 
 	public void Resume(VideoCutJob job)
 	{
@@ -121,8 +133,13 @@ public sealed class VideoCutQueueService(VideoCutProcessor processor)
 			return;
 		lock (_syncRoot)
 		{
-			if (_currentJobId == job.Id)
-				return;
+            if (_currentJobId == job.Id)
+            {
+                _pauseCurrent = false;
+                _allPaused = false;
+                job.Status = VideoCutJobStatus.Waiting;
+                return;
+            }
 			job.Status = VideoCutJobStatus.Waiting;
 			_waitingQueue.Enqueue(job);
 		}
@@ -184,18 +201,15 @@ public sealed class VideoCutQueueService(VideoCutProcessor processor)
 		if (job.Status == VideoCutJobStatus.Replacing)
 			return;
 
-		if (job.Status == VideoCutJobStatus.Processing)
-		{
-			lock (_syncRoot)
-			{
-				if (_currentJobId == job.Id)
-				{
-					_cancelCurrent = true;
-					_currentCancellation?.Cancel();
-				}
-			}
-			return;
-		}
+        lock (_syncRoot)
+        {
+            if (_currentJobId == job.Id)
+            {
+                _cancelCurrent = true;
+                _currentCancellation?.Cancel();
+                return;
+            }
+        }
 
 		if (job.Status is VideoCutJobStatus.Waiting or VideoCutJobStatus.Paused or VideoCutJobStatus.Failed or VideoCutJobStatus.Cancelled)
 		{
@@ -235,6 +249,7 @@ public sealed class VideoCutQueueService(VideoCutProcessor processor)
 				_currentJobId = job.Id;
 				_currentCancellation = cancellation;
 				_cancelCurrent = false;
+                _pauseCurrent = false;
 			}
 
 			RunOnUi(() =>
@@ -244,19 +259,28 @@ public sealed class VideoCutQueueService(VideoCutProcessor processor)
 				job.Progress = 0;
 			});
 
+			var stopwatch = Stopwatch.StartNew();
 			try
 			{
-				var warning = await _processor.ProcessAsync(
+				var result = await _processor.ProcessAsync(
 					job,
-					progress => RunOnUi(() => job.Progress = progress),
+					progress =>
+					{
+						var elapsed = stopwatch.Elapsed;
+						RunOnUi(() => job.UpdateProgress(progress, elapsed));
+					},
 					() => RunOnUiAndWait(() => { if (job.ReplaceOriginal) SourceReserved?.Invoke(job.SourcePath); job.Status = VideoCutJobStatus.Replacing; }),
 					cancellation.Token).ConfigureAwait(false);
 				lock (_syncRoot)
 					_reservedPaths.Remove(job.SourcePath);
-				job.CompletedAt = DateTimeOffset.Now;
 				RunOnUi(() =>
 				{
-					job.WarningMessage = warning;
+					job.OutputPath = result.OutputPath;
+                    job.OutputSizeBytes = result.OutputSizeBytes;
+                    job.VideoEncoder = result.VideoEncoder;
+                    job.HasCommittedOutput = true;
+                    job.CompletedAt = DateTimeOffset.Now;
+                    job.WarningMessage = result.WarningMessage;
 					job.Progress = 1;
 					job.Status = VideoCutJobStatus.Completed;
 					ProcessingJobs.Remove(job);
@@ -280,7 +304,7 @@ public sealed class VideoCutQueueService(VideoCutProcessor processor)
 					bool resumeRequested;
 					lock (_syncRoot)
 					{
-						resumeRequested = !_allPaused;
+						resumeRequested = !_allPaused && !_pauseCurrent;
 						if (resumeRequested)
 						{
 							var remaining = _waitingQueue.ToArray();
@@ -303,6 +327,8 @@ public sealed class VideoCutQueueService(VideoCutProcessor processor)
 			}
 			finally
 			{
+                stopwatch.Stop();
+                RunOnUi(() => job.ProcessingElapsed += stopwatch.Elapsed);
 				lock (_syncRoot)
 				{
 					if (ReferenceEquals(_currentCancellation, cancellation))

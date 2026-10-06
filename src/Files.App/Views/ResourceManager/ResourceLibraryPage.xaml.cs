@@ -45,6 +45,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
     private string? _currentAnimeSeasonPath;
     private bool _restoringPosition;
     private bool _restoringSorting;
+    private ResourceSettings? _tabSortSettings;
     private ResourceBrowserItemViewModel? _detailFolderItem;
     private ResourceVideoFolderListedItem? _detailFolderListedItem;
     private string? _pendingAnimeEditPath;
@@ -69,6 +70,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
     private readonly List<ActorVideoGroup> _actorVideoGroups = [];
     private readonly Dictionary<string, (ListedItem Item, ResourceBrowserItemViewModel ViewModel)> _selectedResourceItems = new(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource? _loadCancellation;
+    private ModernShellPage? _loadingShell;
     private VideoAssistantChatView? _assistantChatView;
     private Storyboard? _assistantButtonScaleAnimation;
     private int _animeSeasonSelection;
@@ -98,7 +100,14 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
             list.AddHandler(PointerReleasedEvent, new PointerEventHandler(BrowserGrid_PointerReleased), true);
             list.AddHandler(PointerCanceledEvent, new PointerEventHandler(BrowserGrid_PointerReleased), true);
         }
-        Loaded += (_, _) => { _displayContext.PropertyChanged -= OnSortingChanged; _displayContext.PropertyChanged += OnSortingChanged; RestoreBrowserSorting(); ApplyBrowserSorting(); };
+        Loaded += (_, _) =>
+        {
+            _displayContext.PropertyChanged -= OnSortingChanged;
+            _displayContext.PropertyChanged += OnSortingChanged;
+            RestoreBrowserSorting();
+            SetNativeSelection(_selectedResourceItems.Values.Select(selected => selected.Item).ToList());
+            UpdateNativeResourceStatus();
+        };
         Unloaded += OnPageUnloaded;
     }
 
@@ -187,6 +196,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         {
             base.OnNavigatedTo(e);
             var args = e.Parameter as NavigationArguments;
+            _loadingShell = args?.AssociatedTabInstance as ModernShellPage ?? _contentPageContext.ShellPage as ModernShellPage;
             _viewStates = args?.ResourceViewStates ?? new(StringComparer.OrdinalIgnoreCase);
             if (args is not null) args.ResourceViewStates = _viewStates;
             _animeLibrary = args?.NavPathParam == "AnimeLibrary";
@@ -203,9 +213,9 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
                 UpdateAnimePosterLayout();
                 AssistantEntry.Visibility = Visibility.Collapsed;
             }
-            VideoIllustrationsHeading.Text = (_animeLibrary ? Strings.AnimePreviewImages : Strings.ResourceVideoIllustrations).GetLocalizedResource();
-            AddIllustrationsButton.Content = (_animeLibrary ? Strings.AnimeManualAddImages : Strings.ResourceVideoAddIllustration).GetLocalizedResource();
-            AutoRecognizeIllustrations.Visibility = _animeLibrary ? Visibility.Visible : Visibility.Collapsed;
+            VideoIllustrationsHeading.Text = Strings.AnimePreviewImages.GetLocalizedResource();
+            AddIllustrationsButton.Content = Strings.AnimeManualAddImages.GetLocalizedResource();
+            AutoRecognizeIllustrations.Visibility = Visibility.Visible;
             var libraryPath = args?.ResourceLibraryPath ?? _workspace.LibraryPath;
             if (string.IsNullOrWhiteSpace(libraryPath)) { EmptyText.Visibility = Visibility.Visible; return; }
             _libraryPath = Path.GetFullPath(libraryPath);
@@ -234,7 +244,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
             App.Logger.LogError(ex, "Unable to initialize the resource library page for {LibraryPath}", _libraryPath);
             SetResourceStatusMessage($"资源管理初始化失败：{ex.Message}");
             EmptyText.Visibility = Visibility.Visible;
-            LoadingRing.IsActive = false;
+            SetResourceLoading(false);
         }
     }
 
@@ -279,19 +289,15 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
     protected override void OnNavigatedFrom(NavigationEventArgs e)
     {
         RememberBrowserPosition();
+        _loadCancellation?.Cancel();
         _displayContext.PropertyChanged -= OnSortingChanged;
         base.OnNavigatedFrom(e);
     }
 
     private void OnPageUnloaded(object sender, RoutedEventArgs e)
     {
+        RememberBrowserPosition();
         _displayContext.PropertyChanged -= OnSortingChanged;
-        _sortItems.Clear();
-        _loadCancellation?.Cancel();
-        AssistantFloatingPanel.Visibility = Visibility.Collapsed;
-        ClearSelectedResourceItems();
-        if (GetNativeResourceStatusBarViewModel() is { } statusBarViewModel)
-            statusBarViewModel.DirectoryItemCount = null;
     }
 
     private void OnSortingChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -313,9 +319,22 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         }
     }
 
+    public void ApplyRequestedSorting()
+    {
+        if (_contentPageContext.ShellPage is not ModernShellPage shell || !ReferenceEquals(shell.CurrentResourceLibraryPage, this)) return;
+        var preferences = shell.InstanceViewModel.FolderSettings;
+        var settings = _workspace.Settings.Clone();
+        settings.BrowserSortOption = (int)preferences.DirectorySortOption;
+        settings.BrowserSortDirection = (int)preferences.DirectorySortDirection;
+        settings.BrowserSortFilesFirst = preferences.SortFilesFirst;
+        settings.BrowserSortDirectoriesAlongsideFiles = preferences.SortDirectoriesAlongsideFiles;
+        _workspace.UpdateSettings(settings);
+        if (_loadedLocationKey is not null) ApplyBrowserSorting();
+    }
+
     private void RestoreBrowserSorting()
     {
-        var settings = _workspace.Settings;
+        var settings = _tabSortSettings ?? _workspace.Settings;
         _restoringSorting = true;
         try
         {
@@ -334,6 +353,10 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
 
     private void ApplyBrowserSorting()
     {
+        var settings = _workspace.Settings;
+        _tabSortSettings = settings.Clone();
+        var sortOption = settings.BrowserSortOption is int option && Enum.IsDefined(typeof(SortOption), option) ? (SortOption)option : _displayContext.SortOption;
+        var sortDirection = settings.BrowserSortDirection is int direction && Enum.IsDefined(typeof(SortDirection), direction) ? (SortDirection)direction : _displayContext.SortDirection;
         var current = BrowserItems.ToArray();
         if (_animeLibrary && current.Length > 0 && current.All(item => item.Kind == ResourceBrowserItemKind.VideoFile))
         {
@@ -345,11 +368,11 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
             }
             return;
         }
-        if (_animeLibrary && _displayContext.SortOption == SortOption.AnimeAirDate)
+        if (_animeLibrary && sortOption == SortOption.AnimeAirDate)
         {
             var dated = current.Select(item => (Item: item, Date: GetAnimeAirDate(item))).ToArray();
             var ordered = dated.OrderBy(item => item.Date is null);
-            var sortedByDate = (_displayContext.SortDirection == SortDirection.Ascending
+            var sortedByDate = (sortDirection == SortDirection.Ascending
                 ? ordered.ThenBy(item => item.Date)
                 : ordered.ThenByDescending(item => item.Date))
                 .ThenBy(item => item.Item.Name, new EpisodeNameComparer()).Select(item => item.Item).ToArray();
@@ -377,11 +400,21 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
                     FileTags = item.FileTags.Select(tag => tag.Name).ToArray(),
                 };
             }
-            _sortItems[item].ItemNameRaw = item.Name;
+            var listed = _sortItems[item];
+            listed.ItemNameRaw = item.Name;
+            listed.FileTags = item.FileTags.Select(tag => tag.Name).ToArray();
+            if (sortOption is SortOption.DateModified or SortOption.DateCreated or SortOption.Size)
+            {
+                var info = item.Kind == ResourceBrowserItemKind.VideoFile ? (FileSystemInfo)new FileInfo(item.Path) : new DirectoryInfo(item.Path);
+                info.Refresh();
+                listed.ItemDateModifiedReal = info.LastWriteTimeUtc;
+                listed.ItemDateCreatedReal = info.CreationTimeUtc;
+                listed.FileSizeBytes = info is FileInfo file && file.Exists ? file.Length : 0;
+            }
         }
         var byItem = current.ToDictionary(item => _sortItems[item]);
         var sorted = Files.App.Utils.Storage.SortingHelper.OrderFileList(current.Select(item => _sortItems[item]).ToList(),
-            _displayContext.SortOption, _displayContext.SortDirection, _displayContext.SortDirectoriesAlongsideFiles, _displayContext.SortFilesFirst).ToArray();
+            sortOption, sortDirection, settings.BrowserSortOption is null ? _displayContext.SortDirectoriesAlongsideFiles : settings.BrowserSortDirectoriesAlongsideFiles, settings.BrowserSortOption is null ? _displayContext.SortFilesFirst : settings.BrowserSortFilesFirst).ToArray();
         for (var index = 0; index < sorted.Length; index++)
         {
             var oldIndex = BrowserItems.IndexOf(byItem[sorted[index]]);
@@ -392,7 +425,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
     private DateTimeOffset? GetAnimeAirDate(ResourceBrowserItemViewModel item)
     {
         var date = _workspace.GetVideoDetails(item.Path).AirDate;
-        if (date is not null || item.Kind != ResourceBrowserItemKind.VideoFolder) return date;
+        if (item.Kind != ResourceBrowserItemKind.VideoFolder) return date;
         try
         {
             var folders = new[] { item.Path }.Concat(Directory.EnumerateDirectories(item.Path)
@@ -400,10 +433,10 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
                     && !File.GetAttributes(folder).HasFlag(System.IO.FileAttributes.ReparsePoint)));
             return folders.SelectMany(folder => Directory.EnumerateFiles(folder))
                 .Where(file => _workspace.Settings.VideoExtensions.Contains(Path.GetExtension(file).TrimStart('.'), StringComparer.OrdinalIgnoreCase))
-                .Select(file => _workspace.GetVideoDetails(file).AirDate).Where(value => value is not null).Min();
+                .Select(file => _workspace.GetVideoDetails(file).AirDate).Where(value => value is not null).Min() ?? date;
         }
-        catch (IOException) { return null; }
-        catch (UnauthorizedAccessException) { return null; }
+        catch (IOException) { return date; }
+        catch (UnauthorizedAccessException) { return date; }
     }
 
     private string GetLocationKey(ResourceBrowserLocation location) => $"{_animeLibrary}:{location.Kind}:{NormalizeForComparison(location.Path)}";
@@ -466,10 +499,38 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         finally { _restoringPosition = false; }
     }
 
+    private static async Task WaitForBrowserRenderAsync(CancellationToken token)
+    {
+        var rendered = new TaskCompletionSource<bool>();
+        EventHandler<object> onRendering = (_, _) => rendered.TrySetResult(true);
+        CompositionTarget.Rendering += onRendering;
+        try
+        {
+            await rendered.Task.WaitAsync(TimeSpan.FromMilliseconds(150), token);
+        }
+        catch (TimeoutException)
+        {
+            // Minimized windows may stop rendering; keep navigation cancellable.
+            token.ThrowIfCancellationRequested();
+        }
+        finally { CompositionTarget.Rendering -= onRendering; }
+    }
+
+    public bool IsLoading => LoadingRing.IsActive;
+
+    private void SetResourceLoading(bool loading)
+    {
+        LoadingRing.IsActive = loading;
+        _loadingShell?.UpdateResourceLibraryLoading(this, loading);
+    }
+
     public async Task RefreshAsync()
     {
         if (_locations.Count > 0)
+        {
             await LoadLocationAsync(_locations[^1]);
+            if (_locations[^1].Kind != ResourceBrowserLocationKind.LibraryRoot) _workspace.NotifyNavigationChanged();
+        }
     }
 
     public void SelectAllItems()
@@ -633,11 +694,13 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
             _loadCancellation?.Dispose();
             currentLoad = _loadCancellation = new CancellationTokenSource();
             cancellationToken = currentLoad.Token;
+            BrowserContent.Opacity = _viewStates.ContainsKey(GetLocationKey(location)) ? 0 : 1;
+            BrowserContent.IsHitTestVisible = false;
 
             ClearSelectedResourceItems();
             SetNativeSelection(null);
             BrowserGrid.SelectedItems.Clear();
-            LoadingRing.IsActive = true;
+            SetResourceLoading(true);
             var animeHome = _animeLibrary && location.Kind == ResourceBrowserLocationKind.LibraryRoot;
             AnimeHomeHeader.Visibility = animeHome ? Visibility.Visible : Visibility.Collapsed;
             BrowserGrid.Width = double.NaN;
@@ -735,7 +798,10 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
             UpdateActorGridLayout();
             UpdateNativeResourceStatus();
             _loadedLocationKey = GetLocationKey(location);
+            if (location.Kind == ResourceBrowserLocationKind.LibraryRoot) _workspace.NotifyNavigationChanged();
             await RestoreBrowserPositionAsync(cancellationToken);
+            if (_viewStates.ContainsKey(_loadedLocationKey))
+                await WaitForBrowserRenderAsync(cancellationToken);
 
             if (!_animeLibrary && location.Kind == ResourceBrowserLocationKind.LibraryRoot && BrowserItems.Count > 0)
                 _ = LoadActorWorkCountsAsync(BrowserItems.ToArray(), cancellationToken);
@@ -754,7 +820,11 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         finally
         {
             if (currentLoad is null || ReferenceEquals(currentLoad, _loadCancellation))
-                LoadingRing.IsActive = false;
+            {
+                SetResourceLoading(false);
+                BrowserContent.Opacity = 1;
+                BrowserContent.IsHitTestVisible = true;
+            }
         }
     }
 
@@ -979,7 +1049,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
 
         _activeVideoItem = list.SelectedItem as ResourceBrowserItemViewModel;
         ShowActiveVideoDetails();
-        if (_animeLibrary) UpdateAnimeIllustrations();
+        UpdateVideoIllustrations();
         UpdateResourceSelection(list.SelectedItems.OfType<ResourceBrowserItemViewModel>());
     }
 
@@ -1006,6 +1076,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         VideoDetailModified.Visibility = _animeLibrary ? Visibility.Collapsed : Visibility.Visible;
         VideoDetailPath.Visibility = _animeLibrary ? Visibility.Collapsed : Visibility.Visible;
         VideoDetailPoster.Source = item?.Poster ?? _detailFolderItem?.Poster;
+        UpdateAnimePosterLayout();
         VideoDetailTitle.Text = _detailFolderItem?.Name ?? (_locations.Count > 0 ? _locations[^1].Title : string.Empty);
         UpdateDetailTitleAction();
         UpdateAnimeMetadata();
@@ -1035,10 +1106,10 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
 
     private void UpdateAnimeMetadata()
     {
-        AnimeDetailMetadata.Visibility = _animeLibrary ? Visibility.Visible : Visibility.Collapsed;
+        AnimeDetailMetadata.Visibility = Visibility.Visible;
         VideoDetailLayout.DataContext = _detailFolderItem;
         AnimeDetailMetadata.DataContext = _detailFolderItem;
-        if (!_animeLibrary || _detailFolderItem is null) return;
+        if (_detailFolderItem is null) return;
         var details = _workspace.GetVideoDetails(AnimeMetadataPath!);
         AnimeSynopsis.Text = string.IsNullOrWhiteSpace(details.Synopsis) ? Strings.AnimeLibraryNoSynopsis.GetLocalizedResource() : details.Synopsis;
         AnimeAirDate.Text = details.AirDate?.ToString("Y", CultureInfo.CurrentCulture) ?? "—";
@@ -1144,6 +1215,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         SetAnimeEditing(false);
 
         UpdateAnimeMetadata();
+        ApplyBrowserSorting();
     }
 
     private void AnimeMetadataCancel_Click(object sender, RoutedEventArgs e)
@@ -1275,14 +1347,18 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
     private void UpdateAnimePosterLayout()
     {
         VideoInfoColumn.Width = _animeLibrary ? new GridLength(0.65, GridUnitType.Star) : new GridLength(0);
-        Grid.SetColumn(VideoFileInfoPanel, _animeLibrary ? 2 : 1);
-        Grid.SetRow(VideoFileInfoPanel, _animeLibrary ? 0 : 1);
-        VideoFileInfoPanel.Margin = _animeLibrary ? new Thickness(0) : new Thickness(0, 20, 0, 0);
-        AnimeDetailEditButton.Visibility = _animeLibrary ? Visibility.Visible : Visibility.Collapsed;
+        VideoFileInfoPanel.Visibility = _animeLibrary ? Visibility.Visible : Visibility.Collapsed;
+        Grid.SetColumn(VideoFileInfoPanel, 2);
+        Grid.SetRow(VideoFileInfoPanel, 0);
+        VideoFileInfoPanel.Margin = new Thickness(0);
+        AnimeDetailEditButton.Visibility = Visibility.Visible;
+        VideoPosterFrame.Background = null;
         VideoDetailPoster.Stretch = _animeLibrary ? Stretch.UniformToFill : Stretch.Uniform;
-        VideoDetailInfoPanel.Height = _animeLibrary ? (VideoDetailLayout.ActualWidth is > 0 and < 700 ? 280 : 380) : double.NaN;
-        if (!_animeLibrary) return;
-        var width = VideoDetailInfoPanel.Height * 2 / 3;
+        VideoDetailInfoPanel.Height = VideoDetailLayout.ActualWidth is > 0 and < 700 ? 280 : 380;
+        var ratio = _animeLibrary ? 2d / 3 : VideoDetailPoster.Source is BitmapImage { PixelWidth: > 0, PixelHeight: > 0 } poster
+            ? (double)poster.PixelWidth / poster.PixelHeight : 1.5;
+        var width = VideoDetailInfoPanel.Height * ratio;
+        if (!_animeLibrary && VideoDetailLayout.ActualWidth > 0) width = Math.Min(width, VideoDetailLayout.ActualWidth * 0.55);
         VideoPosterColumn.Width = GridLength.Auto;
         VideoDetailLayout.ColumnDefinitions[1].Width = new GridLength(1, GridUnitType.Star);
         VideoPosterFrame.Width = width;
@@ -1377,7 +1453,10 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var path in Directory.EnumerateFiles(folderPath)
-                .Where(path => extensions.Contains(Path.GetExtension(path).TrimStart('.')) && !posterPaths.Contains(path)).OrderBy(path => path, StringComparer.CurrentCultureIgnoreCase))
+                .Where(path => extensions.Contains(Path.GetExtension(path).TrimStart('.'))
+                    && (_animeLibrary
+                        ? !MediaImageSourceService.IsPosterFile(path) && (!posterPaths.Contains(path) || AnimeLibraryService.IsPreviewImage(path))
+                        : !posterPaths.Contains(path))).OrderBy(path => path, StringComparer.CurrentCultureIgnoreCase))
             {
                 token.ThrowIfCancellationRequested();
                 if (await LoadPosterAsync(path, token) is { } image)
@@ -1387,26 +1466,22 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         catch (OperationCanceledException) { throw; }
         catch (Exception ex) { App.Logger.LogWarning(ex, "Unable to load video illustrations from {Folder}", folderPath); }
         token.ThrowIfCancellationRequested();
-        if (_animeLibrary)
-        {
-            _animeIllustrationCache.Clear();
-            foreach (var pair in imagePaths) _animeIllustrationCache[pair.Key] = pair.Value;
-            UpdateAnimeIllustrations();
-            return;
-        }
+        _animeIllustrationCache.Clear();
         _illustrationPaths.Clear();
-        foreach (var pair in imagePaths) _illustrationPaths[pair.Key] = pair.Value;
-        _illustrationImages = images;
-        VideoIllustrations.ItemsSource = images;
-        VideoIllustrationsEmpty.Visibility = images.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var pair in imagePaths)
+        {
+            _animeIllustrationCache[pair.Key] = pair.Value;
+            _illustrationPaths[pair.Key] = pair.Value;
+        }
+        UpdateVideoIllustrations();
     }
 
-    private void UpdateAnimeIllustrations()
+    private void UpdateVideoIllustrations()
     {
-        var orderedVideos = BrowserItems.OrderBy(item => item.EpisodeIndex).Select(item => item.Path).ToArray();
-        var number = _activeVideoItem is null ? null : AnimeLibraryService.GetIllustrationNumber(_activeVideoItem.Path, orderedVideos);
+        var orderedVideos = _locations.Count == 0 ? [] : MediaRecognitionModule.GetTargets(_locations[^1].Path, _workspace.Settings, _animeLibrary);
+        var number = _activeVideoItem is null ? null : MediaRecognitionModule.GetImageNumber(_activeVideoItem.Path, orderedVideos, _animeLibrary);
         var matching = _activeVideoItem is null ? [] : _animeIllustrationCache.Where(pair => AnimeLibraryService.IsEpisodeIllustration(pair.Value, _activeVideoItem.Path, number)).ToArray();
-        var images = matching.Length > 0 ? matching : _animeIllustrationCache.Where(pair => AnimeLibraryService.GetIllustrationGroup(pair.Value) is null && AnimeLibraryService.GetIllustrationEpisodeNumber(pair.Value) is null).ToArray();
+        var images = !_animeLibrary ? _animeIllustrationCache.ToArray() : matching.Length > 0 ? matching : _animeIllustrationCache.Where(pair => AnimeLibraryService.GetIllustrationGroup(pair.Value) is null && AnimeLibraryService.GetIllustrationEpisodeNumber(pair.Value) is null).ToArray();
         _illustrationPaths.Clear();
         foreach (var pair in images) _illustrationPaths[pair.Key] = pair.Value;
         _illustrationImages = images.Select(pair => pair.Key).ToList();
@@ -1433,7 +1508,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
             {
                 if (PathEquals(Path.GetDirectoryName(file.Path) ?? string.Empty, folder))
                     continue;
-                var number = _animeLibrary && _activeVideoItem is not null ? AnimeLibraryService.GetIllustrationNumber(_activeVideoItem.Path, BrowserItems.OrderBy(item => item.EpisodeIndex).Select(item => item.Path).ToArray()) : null;
+                var number = _activeVideoItem is not null ? MediaRecognitionModule.GetImageNumber(_activeVideoItem.Path, MediaRecognitionModule.GetTargets(folder, _workspace.Settings, _animeLibrary), _animeLibrary) : null;
                 var index = 1;
                 var stem = number is null ? $"illustration-{Guid.NewGuid():N}" : $"{int.Parse(number):00}\u63D2\u56FE";
                 var destination = Path.Combine(folder, $"{stem} ({index}){Path.GetExtension(file.Name)}");
@@ -1452,10 +1527,11 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
 
     private void SetNativeSelection(List<ListedItem>? items)
     {
-        if (_contentPageContext.ShellPage is ModernShellPage modernShellPage)
-            modernShellPage.UpdateResourceLibrarySelection(items ?? []);
-        if (_contentPageContext.ShellPage is { } shellPage)
+        if (_loadingShell is { } shellPage && ReferenceEquals(shellPage.CurrentResourceLibraryPage, this))
+        {
+            shellPage.UpdateResourceLibrarySelection(items ?? []);
             shellPage.ToolbarViewModel.SelectedItems = items;
+        }
     }
 
     private ListedItem CreateListedItem(ResourceBrowserItemViewModel item)
@@ -1801,6 +1877,11 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
             : fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
     }
 
+    public SectionType CurrentNavigationSection => _animeLibrary ? SectionType.AnimeLibrary : SectionType.ResourceManager;
+    public string CurrentNavigationPath => _locations.Count > 1 ? _locations[^1].Path : _animeLibrary ? "AnimeLibrary" : "ResourceManager";
+    public string CurrentPageTitle => _locations.Count > 1 ? _locations[^1].Title
+        : (_animeLibrary ? Strings.LibraryAnimeGroup : Strings.LibraryDramaGroup).GetLocalizedResource();
+
     private void NavigateToLocation(IReadOnlyList<ResourceBrowserLocation> locations)
     {
         RememberBrowserPosition();
@@ -1881,7 +1962,6 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         var dialog = ResourceDialogPresentation.Create(XamlRoot, toolsDialog);
         toolsDialog.RequestClose += (_, _) => dialog.Hide();
         dialog.Closing += (_, args) => args.Cancel = toolsDialog.IsBusy;
-        toolsDialog.StartFormatOptimizationPreview();
         await dialog.ShowAsync();
         if (toolsDialog.HasChanges && _locations.Count > 0)
             await LoadLocationAsync(_locations[^1]);
@@ -1889,17 +1969,17 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
 
     private async void AutoRecognizeIllustrations_Click(object sender, RoutedEventArgs e)
     {
-        if (!_animeLibrary || _locations.Count == 0 || _locations[^1].Kind != ResourceBrowserLocationKind.VideoFolder) return;
+        if (_locations.Count == 0 || _locations[^1].Kind != ResourceBrowserLocationKind.VideoFolder) return;
         var item = _activeVideoItem ?? _detailFolderItem;
-        if (item is not null) await ImportAnimeImagesAsync(item);
+        if (item is not null) await ImportPreviewMediaAsync(item);
     }
 
-    private async Task ImportAnimeImagesAsync(ResourceBrowserItemViewModel item)
+    private async Task ImportPreviewMediaAsync(ResourceBrowserItemViewModel item)
     {
         try
         {
             var folder = item.Kind == ResourceBrowserItemKind.VideoFile ? Path.GetDirectoryName(item.Path)! : item.Path;
-            var content = new AnimeImageImportDialog(folder, _workspace, item.Kind == ResourceBrowserItemKind.VideoFile ? item.Path : null);
+            var content = MediaRecognitionModule.CreateDialog(folder, _workspace, item.Kind == ResourceBrowserItemKind.VideoFile ? item.Path : null, _animeLibrary);
             var dialog = ResourceDialogPresentation.Create(XamlRoot, content, 860, 600);
             dialog.Opened += async (_, _) => await content.InitializeSourceAsync();
             content.RequestClose += (_, _) => dialog.Hide();
@@ -1967,7 +2047,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
 
         if (item.Kind != ResourceBrowserItemKind.ActorFolder)
         {
-            var editResourceTags = new MenuFlyoutItem { Text = "编辑资源管理标签" };
+            var editResourceTags = new MenuFlyoutItem { Text = Strings.LibraryEditTags.GetLocalizedResource() };
             editResourceTags.Click += async (_, _) => await EditResourceTagsAsync(item);
             flyout.Items.Add(editResourceTags);
         }
@@ -2159,7 +2239,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         BrowserGrid.SelectedItems.Clear();
         BrowserItems.Clear();
         EmptyText.Visibility = Visibility.Collapsed;
-        LoadingRing.IsActive = true;
+        SetResourceLoading(true);
         try
         {
             await DisplayResourceItemsAsync(_actorVideoGroups[index].Items, cancellationToken);
@@ -2171,7 +2251,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         finally
         {
             if (ReferenceEquals(currentLoad, _loadCancellation))
-                LoadingRing.IsActive = false;
+                SetResourceLoading(false);
         }
     }
 
@@ -2275,16 +2355,31 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
     private async Task EditResourceTagsAsync(ResourceBrowserItemViewModel item)
     {
         var selectedTagIds = ReadTagIds(item.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        ContentDialog? dialog = null;
-        var tagEditor = CreateTagEditor(selectedTagIds, () =>
+        HashSet<string> selectedGlobalTagIds;
+        try { selectedGlobalTagIds = FileTagsHelper.ReadFileTag(item.Path).ToHashSet(StringComparer.OrdinalIgnoreCase); }
+        catch { selectedGlobalTagIds = new(StringComparer.OrdinalIgnoreCase); }
+        var originalGlobalTagIds = selectedGlobalTagIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var tagEditor = CreateTagEditor(selectedTagIds).Panel;
+        var globalTags = Ioc.Default.GetRequiredService<IFileTagsSettingsService>().FileTagList;
+        if (globalTags.Count > 0)
         {
-            dialog?.Hide();
-            _ = ManageResourceTagsAsync();
-        }).Panel;
+            var globalPanel = new StackPanel { Spacing = 4 };
+            globalPanel.Children.Add(new TextBlock { Text = Strings.LibraryGlobalTags.GetLocalizedResource() });
+            var globalChoices = new CommunityToolkit.WinUI.Controls.WrapPanel { HorizontalSpacing = 8, VerticalSpacing = 8 };
+            foreach (var tag in globalTags)
+            {
+                var choice = new ToggleButton { Content = tag.Name, IsChecked = selectedGlobalTagIds.Contains(tag.Uid) };
+                choice.Checked += (_, _) => selectedGlobalTagIds.Add(tag.Uid);
+                choice.Unchecked += (_, _) => selectedGlobalTagIds.Remove(tag.Uid);
+                globalChoices.Children.Add(choice);
+            }
+            globalPanel.Children.Add(globalChoices);
+            tagEditor.Children.Insert(0, globalPanel);
+        }
 
-        dialog = new ContentDialog
+        var dialog = new ContentDialog
         {
-            Title = $"编辑资源管理标签：{item.Name}",
+            Title = $"{Strings.LibraryEditTags.GetLocalizedResource()}：{item.Name}",
             Content = new ScrollViewer { Content = tagEditor, MaxHeight = 520, MaxWidth = 620 },
             PrimaryButtonText = "保存",
             CloseButtonText = "取消",
@@ -2295,9 +2390,15 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         if (await dialog.ShowAsync() != ContentDialogResult.Primary)
             return;
 
+        if (!originalGlobalTagIds.SetEquals(selectedGlobalTagIds)
+            && !await FileTagsHelper.WriteFileTagAsync(item.Path, selectedGlobalTagIds.ToArray()))
+        {
+            SetResourceStatusMessage(Strings.LibraryGlobalTagSaveFailed.GetLocalizedResource());
+            return;
+        }
         await SaveTagsAsync(item.Path, selectedTagIds);
         await RefreshAsync();
-        SetResourceStatusMessage($"已保存“{item.Name}”的资源管理标签。");
+        SetResourceStatusMessage(string.Format(Strings.LibraryTagSaved.GetLocalizedResource(), item.Name));
     }
 
     [DynamicWindowsRuntimeCast(typeof(Microsoft.UI.Xaml.Media.Brush))]
@@ -2308,6 +2409,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
 
         var nameBox = new TextBox { Header = "姓名", Text = string.IsNullOrWhiteSpace(details.Name) ? item.Model.Name : details.Name };
         var aliasesBox = new TextBox { Header = "别名", Text = details.Aliases, PlaceholderText = "可填写多个别名" };
+        var informationUrlBox = new TextBox { Header = Strings.ActorInformationUrl.GetLocalizedResource(), Text = ResourceActorDetails.GetInformationUrlDisplay(details.InformationUrl) };
         var biographyBox = new TextBox
         {
             Header = "简介",
@@ -2444,6 +2546,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         fields.Children.Add(validationText);
 
         content.Children.Add(nameGrid);
+        content.Children.Add(informationUrlBox);
         content.Children.Add(biographyBox);
         content.Children.Add(fields);
 
@@ -2458,6 +2561,14 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         };
         actorDialog.PrimaryButtonClick += (sender, args) =>
         {
+            if (!string.IsNullOrWhiteSpace(informationUrlBox.Text) && !ResourceActorDetails.TryGetInformationUri(informationUrlBox.Text, out _))
+            {
+                args.Cancel = true;
+                informationUrlBox.Focus(FocusState.Programmatic);
+                validationText.Text = Strings.ActorInformationUrlInvalid.GetLocalizedResource();
+                validationText.Visibility = Visibility.Visible;
+                return;
+            }
             if (!string.IsNullOrWhiteSpace(birthDateBox.Text) &&
                 !TryParseRetirementDate(birthDateBox.Text, out _))
             {
@@ -2530,6 +2641,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
             Name = nameBox.Text.Trim(),
             Aliases = aliasesBox.Text.Trim(),
             Biography = biographyBox.Text.Trim(),
+            InformationUrl = ResourceActorDetails.TryGetInformationUri(informationUrlBox.Text, out var informationUri) ? informationUri!.AbsoluteUri : string.Empty,
             HeightCm = heightBox.Text.Trim(),
             WeightKg = weightBox.Text.Trim(),
             Bust = bustBox.Text,
@@ -2555,16 +2667,17 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         SetResourceStatusMessage($"已保存“{nameBox.Text.Trim()}”的演员信息。");
     }
 
-    private (StackPanel Panel, HashSet<string> TagIds) CreateTagEditor(HashSet<string> selectedTagIds, Action manageResourceTags)
+    private (StackPanel Panel, HashSet<string> TagIds) CreateTagEditor(HashSet<string> selectedTagIds)
     {
-        var panel = new StackPanel { Spacing = 4 };
-        var tagList = new StackPanel { Spacing = 4 };
+        var panel = new StackPanel { Spacing = 12 };
+        panel.Children.Add(new TextBlock { Text = (_animeLibrary ? Strings.LibraryAnimeTags : Strings.LibraryResourceTags).GetLocalizedResource() });
+        var tagList = new CommunityToolkit.WinUI.Controls.WrapPanel { HorizontalSpacing = 8, VerticalSpacing = 8 };
         void RebuildTagChoices()
         {
             tagList.Children.Clear();
             foreach (var tag in _workspace.ResourceTags)
             {
-                var checkBox = new CheckBox { Content = tag.Name, Tag = tag.Uid, IsChecked = selectedTagIds.Contains(tag.Uid) };
+                var checkBox = new ToggleButton { Content = tag.Name, Tag = tag.Uid, IsChecked = selectedTagIds.Contains(tag.Uid) };
                 checkBox.Checked += (_, _) => selectedTagIds.Add(tag.Uid);
                 checkBox.Unchecked += (_, _) => selectedTagIds.Remove(tag.Uid);
                 tagList.Children.Add(checkBox);
@@ -2573,10 +2686,11 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
 
         RebuildTagChoices();
         panel.Children.Add(tagList);
-        var newTagName = new TextBox { PlaceholderText = "输入资源标签，例如：中文字幕", MaxLength = 64 };
-        var tagActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 4, 0, 0) };
-        var addTag = new Button { Content = "新建资源标签并添加" };
-        var manageTags = new Button { Content = "管理资源标签" };
+        var newTagName = new TextBox { MaxLength = 64, MinWidth = 220 };
+        var tagActions = new Grid { ColumnSpacing = 8 };
+        tagActions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        tagActions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var addTag = new Button { Content = Strings.LibraryAddTag.GetLocalizedResource() };
         addTag.Click += (_, _) =>
         {
             var name = newTagName.Text.Trim();
@@ -2598,10 +2712,9 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
             newTagName.Text = string.Empty;
             RebuildTagChoices();
         };
-        manageTags.Click += (_, _) => manageResourceTags();
+        Grid.SetColumn(addTag, 1);
+        tagActions.Children.Add(newTagName);
         tagActions.Children.Add(addTag);
-        tagActions.Children.Add(manageTags);
-        panel.Children.Add(newTagName);
         panel.Children.Add(tagActions);
         return (panel, selectedTagIds);
     }
@@ -2810,39 +2923,8 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         SetNativeSelection(selectedItems.Count == 0 ? null : selectedItems);
     }
 
-    private async Task<int> CountActorVideosAsync(string actorFolderPath, CancellationToken cancellationToken = default)
-    {
-        var videoExtensions = _workspace.Settings.VideoExtensions.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return await Task.Run(() =>
-        {
-            try
-            {
-                var options = new EnumerationOptions
-                {
-                    RecurseSubdirectories = true,
-                    IgnoreInaccessible = true,
-                    AttributesToSkip = System.IO.FileAttributes.ReparsePoint,
-                };
-                var count = 0;
-                foreach (var path in Directory.EnumerateFiles(actorFolderPath, "*", options))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (videoExtensions.Contains(Path.GetExtension(path).TrimStart('.')))
-                        count++;
-                }
-
-                return count;
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch
-            {
-                return 0;
-            }
-        }, cancellationToken);
-    }
+    private Task<int> CountActorVideosAsync(string actorFolderPath, CancellationToken cancellationToken = default)
+        => ResourceBrowserService.CountActorVideosAsync(actorFolderPath, _workspace.Settings, cancellationToken);
 
     private static bool TryParseRetirementDate(string value, out DateTime date)
     {
@@ -2896,7 +2978,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
 
     public Task ImportActorsAsync()
         => ResourceActorImportWorkflow.ImportAsync(_libraryPath, _workspace, XamlRoot, SetResourceStatusMessage,
-            RefreshAsync, busy => LoadingRing.IsActive = busy);
+            RefreshAsync, SetResourceLoading);
 
     private async Task ChoosePosterAsync(ResourceBrowserItemViewModel item)
     {

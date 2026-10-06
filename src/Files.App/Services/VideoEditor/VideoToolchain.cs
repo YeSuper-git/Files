@@ -27,7 +27,8 @@ public sealed class VideoToolchain
 		var localCandidates = new[]
 		{
 			Path.Combine(AppContext.BaseDirectory, "Tools", name),
-			Path.Combine(AppContext.BaseDirectory, name)
+			Path.Combine(AppContext.BaseDirectory, name),
+			Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "WinGet", "Links", name)
 		};
 
 		foreach (var candidate in localCandidates)

@@ -45,8 +45,8 @@ namespace Files.App.ViewModels.Settings
 			NavigationItems.Add(CreateNavigationItem(SettingsPageKind.TagsPage, "SettingsItemTags", Strings.FileTags.GetLocalizedResource(), "App.ThemedIcons.Settings.Tags"));
 			NavigationItems.Add(CreateNavigationItem(SettingsPageKind.VideoEditorPage, "SettingsItemVideoEditor", Strings.VideoEditorSettingsTitle.GetLocalizedResource(), "App.ThemedIcons.Settings.FilesFolders"));
 			#if FILES_RESOURCE_MANAGER
-			NavigationItems.Add(CreateNavigationItem(SettingsPageKind.AnimeLibraryPage, "SettingsItemAnimeLibrary", Strings.AnimeLibraryTitle.GetLocalizedResource(), "App.ThemedIcons.Settings.FilesFolders"));
-			NavigationItems.Add(CreateNavigationItem(SettingsPageKind.ResourceManagerPage, "SettingsItemResourceManager", Strings.SettingsItemResourceManager.GetLocalizedResource(), "App.ThemedIcons.Settings.FilesFolders"));
+			NavigationItems.Add(CreateNavigationItem(SettingsPageKind.AnimeLibraryPage, "SettingsItemAnimeLibrary", Strings.LibraryAnimeGroup.GetLocalizedResource(), "App.ThemedIcons.Settings.FilesFolders"));
+			NavigationItems.Add(CreateNavigationItem(SettingsPageKind.ResourceManagerPage, "SettingsItemResourceManager", Strings.LibraryDramaGroup.GetLocalizedResource(), "App.ThemedIcons.Settings.FilesFolders"));
 			#endif
 			NavigationItems.Add(CreateNavigationItem(SettingsPageKind.DevToolsPage, "SettingsItemDevTools", Strings.DevTools.GetLocalizedResource(), "App.ThemedIcons.Settings.DevTools"));
 			NavigationItems.Add(CreateNavigationItem(SettingsPageKind.AdvancedPage, "SettingsItemAdvanced", Strings.Advanced.GetLocalizedResource(), "App.ThemedIcons.Settings.Advanced"));
@@ -65,8 +65,11 @@ namespace Files.App.ViewModels.Settings
 			foreach (var item in NavigationItems)
 			{
 				var isSelected = item.PageKind == pageKind;
-				item.IconElement.IsFilled = isSelected;
-				item.IconElement.IconType = ThemedIconTypes.Outline;
+				if (item.IconElement is ThemedIcon themedIcon)
+				{
+					themedIcon.IsFilled = isSelected;
+					themedIcon.IconType = ThemedIconTypes.Outline;
+				}
 			}
 		}
 
@@ -109,6 +112,17 @@ namespace Files.App.ViewModels.Settings
 				Style = iconStyle,
 			};
 
+            #if FILES_RESOURCE_MANAGER
+            var glyph = pageKind switch
+            {
+                SettingsPageKind.AnimeLibraryPage => "\uE7F4",
+                SettingsPageKind.ResourceManagerPage => "\uE8B7",
+                SettingsPageKind.VideoEditorPage => "\uE714",
+                _ => null
+            };
+            if (glyph is not null)
+                return new SettingsNavigationItem(pageKind, automationId, text, new Microsoft.UI.Xaml.Controls.FontIcon { Width = 16, Height = 16, FontSize = 16, Glyph = glyph });
+            #endif
 			return new SettingsNavigationItem(pageKind, automationId, text, iconElement);
 		}
 	}
@@ -118,7 +132,7 @@ namespace Files.App.ViewModels.Settings
 		public SettingsPageKind PageKind { get; }
 		public string AutomationId { get; }
 		public string Text { get; }
-		public ThemedIcon IconElement { get; }
+		public FrameworkElement IconElement { get; }
 
 		// ISidebarItemModel
 		public object? Children => null;
@@ -131,7 +145,7 @@ namespace Files.App.ViewModels.Settings
 		FrameworkElement ISidebarItemPresentationModel.IconElement => IconElement;
 		FrameworkElement? ISidebarItemPresentationModel.ItemDecorator => null;
 
-		public SettingsNavigationItem(SettingsPageKind pageKind, string automationId, string text, ThemedIcon iconElement)
+		public SettingsNavigationItem(SettingsPageKind pageKind, string automationId, string text, FrameworkElement iconElement)
 		{
 			PageKind = pageKind;
 			AutomationId = automationId;

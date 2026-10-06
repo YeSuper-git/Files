@@ -64,6 +64,16 @@ public sealed partial class ResourceBrowserItemViewModel : ObservableObject
     }
     public int EpisodeIndex { get; set; }
     public string EpisodeLabel => string.Format(System.Globalization.CultureInfo.CurrentCulture, Strings.AnimeLibraryEpisodeNumber.GetLocalizedResource(), AnimeLibraryService.GetEpisodeNumber(Model.Name) ?? EpisodeIndex.ToString());
+    public string FileSizeText
+    {
+        get
+        {
+            if (Kind != ResourceBrowserItemKind.VideoFile || Model.IsPosterOnly) return string.Empty;
+            try { return new FileInfo(Model.Path).Length.ToSizeString(); }
+            catch (IOException) { return Strings.Unknown.GetLocalizedResource(); }
+            catch (UnauthorizedAccessException) { return Strings.Unknown.GetLocalizedResource(); }
+        }
+    }
     public string Path => Model.Path;
     public ResourceBrowserItemKind Kind => Model.Kind;
     public string DescriptionText

@@ -100,22 +100,18 @@
 				</wctcontrols:SettingsExpander.Items>
 			</wctcontrols:SettingsExpander>
 
-			<wctcontrols:SettingsExpander Header="{helpers:ResourceString Name=SortingMenuItems}" Description="{helpers:ResourceString Name=SortingMenuItemsDescription}">
-				<wctcontrols:SettingsExpander.Items>
-					<ItemsControl ItemsSource="{x:Bind ViewModel.SortingMenuItems}">
-						<ItemsControl.ItemTemplate>
-							<DataTemplate x:DataType="vm:SortingMenuItemViewModel">
-								<wctcontrols:SettingsCard Header="{x:Bind Label}">
-									<ComboBox Width="180" AutomationProperties.Name="{x:Bind Label}" SelectedIndex="{x:Bind VisibilityMode, Mode=TwoWay}">
-										<ComboBoxItem Content="{helpers:ResourceString Name=SortingMenuAvailableOnly}" />
-										<ComboBoxItem Content="{helpers:ResourceString Name=SortingMenuAlwaysShow}" />
-										<ComboBoxItem Content="{helpers:ResourceString Name=SortingMenuHide}" />
-									</ComboBox>
-								</wctcontrols:SettingsCard>
-							</DataTemplate>
-						</ItemsControl.ItemTemplate>
-					</ItemsControl>
-				</wctcontrols:SettingsExpander.Items>
+			<wctcontrols:SettingsExpander Header="{helpers:ResourceString Name=SortingMenuItems}" Description="{helpers:ResourceString Name=SortingMenuItemsDescription}" ItemsSource="{x:Bind ViewModel.SortingMenuItems}">
+				<wctcontrols:SettingsExpander.ItemTemplate>
+					<DataTemplate x:DataType="vm:SortingMenuItemViewModel">
+						<wctcontrols:SettingsCard Header="{x:Bind Label}">
+							<ComboBox Width="180" AutomationProperties.Name="{x:Bind Label}" SelectedIndex="{x:Bind VisibilityMode, Mode=TwoWay}">
+								<ComboBoxItem Content="{helpers:ResourceString Name=SortingMenuAvailableOnly}" />
+								<ComboBoxItem Content="{helpers:ResourceString Name=SortingMenuAlwaysShow}" />
+								<ComboBoxItem Content="{helpers:ResourceString Name=SortingMenuHide}" />
+							</ComboBox>
+						</wctcontrols:SettingsCard>
+					</DataTemplate>
+				</wctcontrols:SettingsExpander.ItemTemplate>
 			</wctcontrols:SettingsExpander>
 
 			<!--  Default grouping options  -->

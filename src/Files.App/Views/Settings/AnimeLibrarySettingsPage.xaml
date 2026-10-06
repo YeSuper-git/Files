@@ -4,6 +4,6 @@
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  xmlns:helpers="using:Files.App.Helpers">
  <StackPanel x:Name="SettingsContent" Spacing="8">
-  <TextBlock Padding="0,0,0,12" Style="{StaticResource App.Theme.SubtitleTextBlockStyle}" Text="{helpers:ResourceString Name=AnimeLibraryTitle}" />
+  <TextBlock Padding="0,0,0,12" Style="{StaticResource App.Theme.SubtitleTextBlockStyle}" Text="{helpers:ResourceString Name=LibraryAnimeGroup}" />
  </StackPanel>
 </Page>

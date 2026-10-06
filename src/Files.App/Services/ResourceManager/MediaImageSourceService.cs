@@ -12,9 +12,10 @@ namespace Files.App.Services.ResourceManager;
 public sealed record AnimeSourceImage(string Kind, Uri OriginalUrl, string? Episode, string Label);
 public sealed record AnimeSourceWork(string Title, IReadOnlyList<string> Aliases, IReadOnlyList<AnimeSourceImage> Images);
 
-public sealed class AnimeImageSourceService
+public sealed class MediaImageSourceService
 {
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(30) };
+    private Uri? _pageOrigin;
     private const int MaximumManifestBytes = 4 * 1024 * 1024;
     private const int MaximumImageBytes = 32 * 1024 * 1024;
 
@@ -29,15 +30,15 @@ public sealed class AnimeImageSourceService
         return combined.AbsoluteUri;
     }
 
-    public sealed record PageImage(Uri Url, string Label, string Evidence, string? SuggestedName = null);
+    public sealed record PageImage(Uri Url, string Label, string Evidence, string? SuggestedName = null, uint PixelWidth = 0, uint PixelHeight = 0);
 
     public static string GetImageFileName(PageImage image)
         => image.SuggestedName ?? Uri.UnescapeDataString(Path.GetFileName(image.Url.AbsolutePath));
 
-    public static IReadOnlyList<PageImage> FilterImages(IEnumerable<PageImage> images, IEnumerable<string> includedNames, bool matchAll = false)
+    public static IReadOnlyList<PageImage> FilterImages(IEnumerable<PageImage> images, IEnumerable<string> includedNames)
     {
         var keywords = includedNames.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim()).ToArray();
-        return images.Where(image => keywords.Length == 0 || (matchAll ? keywords.All(keyword => GetImageFileName(image).Contains(keyword, StringComparison.OrdinalIgnoreCase)) : keywords.Any(keyword => GetImageFileName(image).Contains(keyword, StringComparison.OrdinalIgnoreCase)))).ToArray();
+        return images.Where(image => keywords.Any(keyword => GetImageFileName(image).Contains(keyword, StringComparison.OrdinalIgnoreCase))).ToArray();
     }
 
     public async Task<IReadOnlyList<PageImage>> FilterDimensionsAsync(IEnumerable<PageImage> images, int minimumWidth, int minimumHeight, CancellationToken token)
@@ -49,11 +50,11 @@ public sealed class AnimeImageSourceService
             token.ThrowIfCancellationRequested();
             try
             {
-                var bytes = await ReadRemoteAsync(image.Url, MaximumImageBytes, token);
+                var bytes = await ReadRemoteAsync(image.Url, MaximumImageBytes, token, _pageOrigin);
                 using var stream = new MemoryStream(bytes);
                 using var randomAccess = stream.AsRandomAccessStream();
                 var decoder = await BitmapDecoder.CreateAsync(randomAccess).AsTask(token);
-                if (decoder.PixelWidth >= minimumWidth && decoder.PixelHeight >= minimumHeight) result.Add(image);
+                if (decoder.PixelWidth >= minimumWidth && decoder.PixelHeight >= minimumHeight) result.Add(image with { PixelWidth = decoder.PixelWidth, PixelHeight = decoder.PixelHeight });
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex) when (ex is HttpRequestException or IOException or System.Runtime.InteropServices.COMException or TaskCanceledException) { }
@@ -61,14 +62,59 @@ public sealed class AnimeImageSourceService
         return result;
     }
 
-    public static IReadOnlyList<IReadOnlyList<PageImage>> GroupImages(IEnumerable<PageImage> images, bool groupByPrefix)
-        => images.GroupBy(image => groupByPrefix ? GetImageSetKey(image) : image.Url.AbsoluteUri, StringComparer.Ordinal)
+    public async Task<PageImage?> SelectLargestPosterAsync(IEnumerable<PageImage> images, CancellationToken token)
+    {
+        var measured = new List<PageImage>();
+        foreach (var image in images)
+        {
+            token.ThrowIfCancellationRequested();
+            var candidate = image;
+            if (candidate.PixelWidth == 0 || candidate.PixelHeight == 0)
+            {
+                try
+                {
+                    var bytes = await ReadPreviewAsync(candidate.Url, token);
+                    using var stream = new MemoryStream(bytes);
+                    using var randomAccess = stream.AsRandomAccessStream();
+                    var decoder = await BitmapDecoder.CreateAsync(randomAccess).AsTask(token);
+                    candidate = candidate with { PixelWidth = decoder.PixelWidth, PixelHeight = decoder.PixelHeight };
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex) when (ex is HttpRequestException or IOException or System.Runtime.InteropServices.COMException or TaskCanceledException) { }
+            }
+            measured.Add(candidate);
+        }
+        return measured.OrderByDescending(image => (ulong)image.PixelWidth * image.PixelHeight)
+            .ThenByDescending(image => image.PixelWidth).FirstOrDefault();
+    }
+
+    public static bool IsPosterImage(PageImage image)
+        => IsPosterFile(image.Url.AbsolutePath) || IsPosterFile(GetImageFileName(image));
+
+    public static bool IsPosterFile(string path)
+        => Path.GetFileNameWithoutExtension(path).Contains("_pl", StringComparison.OrdinalIgnoreCase)
+            || Path.GetFileNameWithoutExtension(path).Contains("_pm", StringComparison.OrdinalIgnoreCase);
+
+    public static IReadOnlyList<IReadOnlyList<PageImage>> GroupImages(IEnumerable<PageImage> images)
+        => images.GroupBy(image => GetSequenceSetKey(image) ?? image.Url.AbsoluteUri, StringComparer.OrdinalIgnoreCase)
             .Select(group => (IReadOnlyList<PageImage>)group.ToArray()).ToArray();
+
+    private static string? GetSequenceSetKey(PageImage image)
+    {
+        var name = Path.GetFileNameWithoutExtension(GetImageFileName(image));
+        var stem = Regex.Replace(name, @"(?:[-_ ]\d+|[（(]\d+[）)])$", "", RegexOptions.IgnoreCase);
+        stem = Regex.Replace(stem, @"(?:[-_ ]?(?:jp|sample|preview|thumb))(?:[-_ ]?\d+)?$", "", RegexOptions.IgnoreCase);
+        var key = new string(stem.Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
+        return key.Length > 0 ? key : null;
+    }
+
+    public async Task<byte[]> ReadPreviewAsync(Uri url, CancellationToken token)
+        => await ReadRemoteAsync(url, MaximumImageBytes, token, _pageOrigin);
 
     public static string GetImageSetKey(PageImage image)
     {
         var name = Path.GetFileNameWithoutExtension(GetImageFileName(image));
-        return name.Length >= 8 ? name[..8] : image.Url.AbsoluteUri;
+        return GetSequenceSetKey(image) ?? name;
     }
 
     public async Task<IReadOnlyList<PageImage>> InspectPageAsync(string address, CancellationToken token)
@@ -78,6 +124,7 @@ public sealed class AnimeImageSourceService
         using var response = await Client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token);
         response.EnsureSuccessStatusCode();
         var origin = response.RequestMessage?.RequestUri ?? url;
+        _pageOrigin = origin;
         if (origin.Scheme != "https") throw new InvalidDataException("HTTPS is required.");
         if (response.Content.Headers.ContentType?.MediaType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) == true)
             return [new(origin, Path.GetFileName(origin.AbsolutePath), "direct")];
@@ -95,16 +142,19 @@ public sealed class AnimeImageSourceService
     {
         var result = new Dictionary<string, PageImage>(StringComparer.Ordinal);
         var timeout = TimeSpan.FromSeconds(2);
+        IReadOnlyList<PageImage> galleryImages = [];
         if (origin.Host.Equals("www.lune-soft.jp", StringComparison.OrdinalIgnoreCase) || origin.Host.Equals("lune-soft.jp", StringComparison.OrdinalIgnoreCase))
         {
             var gallery = Regex.Match(html, @"<section\b[^>]*\bid\s*=\s*[""']gallery[""'][^>]*>(.*?)</section\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline, timeout);
             var product = Regex.Match(html, @"<th\b[^>]*>\s*品番\s*</th>\s*<td\b[^>]*>\s*([A-Z]+\d+)\s*</td>", RegexOptions.IgnoreCase | RegexOptions.Singleline, timeout);
             if (gallery.Success)
             {
-                var galleryImages = ParsePage(gallery.Groups[1].Value, origin);
-                if (!product.Success) return galleryImages;
-                var code = product.Groups[1].Value.ToUpperInvariant();
-                return galleryImages.Select((image, index) => image with { SuggestedName = $"{code}_{index + 1:00}{Path.GetExtension(image.Url.AbsolutePath)}" }).ToArray();
+                galleryImages = ParsePage(gallery.Groups[1].Value, origin);
+                if (product.Success)
+                {
+                    var code = product.Groups[1].Value.ToUpperInvariant();
+                    galleryImages = galleryImages.Select((image, index) => IsPosterImage(image) ? image : image with { SuggestedName = $"{code}_{index + 1:00}{Path.GetExtension(image.Url.AbsolutePath)}" }).ToArray();
+                }
             }
         }
         html = Regex.Replace(html, @"<!--.*?-->|<(script|style)\b[^>]*>.*?</\1\s*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline, timeout);
@@ -120,12 +170,14 @@ public sealed class AnimeImageSourceService
         void Add(string address, string label, string evidence)
         {
             if (result.Count >= 300 || string.IsNullOrWhiteSpace(address) || !Uri.TryCreate(origin, address.Trim(), out var url) || url.Scheme != "https") return;
+            if (Regex.IsMatch(url.AbsolutePath, @"\.(?:mp4|mkv|avi|mov|wmv|flv|m4v|ts|webm|mpg|mpeg)(?:$|/)", RegexOptions.IgnoreCase)) return;
             var key = url.GetLeftPart(UriPartial.Path) + url.Query;
             if (!result.TryGetValue(key, out var previous) || previous.Evidence == "unknown") result[key] = new(url, label, evidence);
         }
         foreach (Match tag in Regex.Matches(html, @"<(?:img|source|a|meta)\b[^>]*>", RegexOptions.IgnoreCase, timeout))
         {
             var attributes = Attributes(tag.Value);
+            if (attributes.GetValueOrDefault("type", "").StartsWith("video/", StringComparison.OrdinalIgnoreCase)) continue;
             var label = attributes.GetValueOrDefault("alt", attributes.GetValueOrDefault("title", string.Empty));
             if (tag.Value.StartsWith("<a", StringComparison.OrdinalIgnoreCase))
             {
@@ -150,6 +202,7 @@ public sealed class AnimeImageSourceService
                 }
             }
         }
+        foreach (var image in galleryImages) result[image.Url.GetLeftPart(UriPartial.Path) + image.Url.Query] = image;
         return result.Values.ToArray();
     }
 
@@ -208,9 +261,12 @@ public sealed class AnimeImageSourceService
     private static string Text(JsonElement element, string property)
         => element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? string.Empty : string.Empty;
 
-    private static async Task<byte[]> ReadRemoteAsync(Uri url, int limit, CancellationToken token)
+    private static async Task<byte[]> ReadRemoteAsync(Uri url, int limit, CancellationToken token, Uri? referer = null)
     {
-        using var response = await Client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token);
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Referrer = referer;
+        request.Headers.UserAgent.ParseAdd("Mozilla/5.0");
+        using var response = await Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
         response.EnsureSuccessStatusCode();
         if (response.RequestMessage?.RequestUri?.Scheme != "https") throw new InvalidDataException("HTTPS is required.");
         return await ReadLimitedAsync(response, limit, token);
@@ -241,10 +297,23 @@ public sealed class AnimeImageSourceService
         for (var directory = new DirectoryInfo(folder); directory is not null && directory.FullName.StartsWith(root, StringComparison.OrdinalIgnoreCase); directory = directory.Parent)
             if (directory.Attributes.HasFlag(FileAttributes.ReparsePoint)) throw new InvalidDataException("Linked target folders are not supported.");
         if (!int.TryParse(episodeNumber, out var episode) || episode < 1) throw new InvalidDataException("Invalid episode number.");
-        if (sourceNumber is not null && !Regex.IsMatch(sourceNumber, @"^[0-9]{5}$")) throw new InvalidDataException("Invalid image source number.");
+        sourceNumber = sourceNumber is null ? null : SanitizeSourceIdentifier(sourceNumber);
         var stem = $"{episode:00}插图" + (sourceNumber is null ? string.Empty : "_" + sourceNumber);
-        var bytes = await ReadRemoteAsync(image.OriginalUrl, MaximumImageBytes, token);
+        var bytes = await ReadRemoteAsync(image.OriginalUrl, MaximumImageBytes, token, _pageOrigin);
         var extension = DetectExtension(bytes);
+        if (image.Kind == "poster")
+        {
+            var posterPath = Path.Combine(folder, Path.GetFileNameWithoutExtension(video) + extension);
+            var posterTemporary = Path.Combine(folder, $".files-poster-{Guid.NewGuid():N}.tmp");
+            try
+            {
+                await File.WriteAllBytesAsync(posterTemporary, bytes, token);
+                token.ThrowIfCancellationRequested();
+                File.Move(posterTemporary, posterPath, true);
+                return posterPath;
+            }
+            finally { if (File.Exists(posterTemporary)) File.Delete(posterTemporary); }
+        }
         var hash = SHA256.HashData(bytes);
         foreach (var existing in Directory.EnumerateFiles(folder).Where(path => Path.GetFileNameWithoutExtension(path).StartsWith(stem, StringComparison.OrdinalIgnoreCase)))
         {
@@ -270,6 +339,9 @@ public sealed class AnimeImageSourceService
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
+
+    public static string SanitizeSourceIdentifier(string suffix)
+        => new string(suffix.Trim().Select(character => char.IsControl(character) || Path.GetInvalidFileNameChars().Contains(character) ? '_' : character).ToArray()).TrimEnd(' ', '.');
 
     public static string DetectExtension(byte[] data)
     {

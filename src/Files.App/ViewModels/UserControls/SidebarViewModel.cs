@@ -3,8 +3,13 @@
 
 using Files.App.Controls;
 using Files.App.Helpers;
+#if FILES_RESOURCE_MANAGER
+using Files.App.Services.ResourceManager;
+using Files.App.Data.Models.ResourceManager;
+#endif
 using Files.App.Helpers.ContextFlyouts;
 using Microsoft.UI.Input;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -29,6 +34,13 @@ namespace Files.App.ViewModels.UserControls
 		private ICommandManager Commands { get; } = Ioc.Default.GetRequiredService<ICommandManager>();
 		private readonly DrivesViewModel drivesViewModel = Ioc.Default.GetRequiredService<DrivesViewModel>();
 		private readonly IFileTagsService fileTagsService;
+#if FILES_RESOURCE_MANAGER
+		private readonly IResourceWorkspaceService resourceWorkspace = Ioc.Default.GetRequiredService<IResourceWorkspaceService>();
+		private readonly AnimeLibraryService animeLibrary = Ioc.Default.GetRequiredService<AnimeLibraryService>();
+		private int resourceNavigationVersion;
+		private CancellationTokenSource? resourceNavigationCancellation;
+		private int animeNavigationVersion;
+#endif
 
 		private IShellPanesPage? paneHolder;
 		public IShellPanesPage? PaneHolder
@@ -112,6 +124,19 @@ namespace Files.App.ViewModels.UserControls
 		public void UpdateSidebarSelectedItemFromArgs(string? arg)
 		{
 			var value = arg;
+#if FILES_RESOURCE_MANAGER
+			if (PaneHolder?.ActivePaneOrColumn is ModernShellPage { CurrentResourceLibraryPage: { } library })
+			{
+				value = library.CurrentNavigationPath;
+				CurrentPath = value;
+				var section = sidebarItems.FirstOrDefault(item => item.Section == library.CurrentNavigationSection);
+				INavigationControlItem? selected = null;
+				if (section?.IsExpanded == true && GetChildren(section) is { } children)
+					FindDeepestVisibleAncestorRecursive(children, value, ref selected);
+				SidebarSelectedItem = selected ?? section;
+				return;
+			}
+#endif
 			CurrentPath = value;
 
 			if (string.IsNullOrEmpty(value))
@@ -322,6 +347,8 @@ namespace Files.App.ViewModels.UserControls
 			Manager_DataChanged(SectionType.WSL, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
 			Manager_DataChanged(SectionType.FileTag, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
 #if FILES_RESOURCE_MANAGER
+			resourceWorkspace.NavigationChanged += ResourceNavigationChanged;
+			animeLibrary.Workspace.NavigationChanged += AnimeNavigationChanged;
 			Manager_DataChanged(SectionType.ResourceManager, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
 			Manager_DataChanged(SectionType.VideoEditor, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
 			Manager_DataChanged(SectionType.AnimeLibrary, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
@@ -386,10 +413,12 @@ namespace Files.App.ViewModels.UserControls
 					return;
 
 #if FILES_RESOURCE_MANAGER
-				// Resource Manager is a standalone navigation item, so it has no
-				// child collection to synchronize like the filesystem sections do.
-				if (sectionType is SectionType.ResourceManager or SectionType.VideoEditor or SectionType.AnimeLibrary)
+				if (sectionType is SectionType.ResourceManager or SectionType.AnimeLibrary)
+				{
+					await RefreshLibrarySectionAsync(section);
 					return;
+				}
+				if (sectionType == SectionType.VideoEditor) return;
 #endif
 
 				Func<IReadOnlyList<INavigationControlItem>> getElements = () => sectionType switch
@@ -633,28 +662,25 @@ namespace Files.App.ViewModels.UserControls
 
 #if FILES_RESOURCE_MANAGER
 				case SectionType.ResourceManager:
-					section = BuildSection(Strings.SettingsItemResourceManager.GetLocalizedResource(), sectionType, new ContextMenuOptions { IsLocationItem = true }, true);
-					// This is a navigable application page, not a collapsible sidebar group.
-					// BuildSection creates an empty child collection for normal sections;
-					// keeping it here makes SidebarView classify this row as a group header
-					// and suppress its ItemInvoked event.
-					section.ChildItems = null;
-					section.Path = "ResourceManager";
+					section = BuildSection(Strings.LibraryDramaGroup.GetLocalizedResource(), sectionType, new ContextMenuOptions(), false);
+					section.Path = null;
 					section.IsHeader = true;
+					section.IsExpanded = false;
 					break;
 
 				case SectionType.AnimeLibrary:
-					section = BuildSection(Strings.AnimeLibraryTitle.GetLocalizedResource(), sectionType, new ContextMenuOptions { IsLocationItem = true }, true);
-					section.ChildItems = null;
-					section.Path = "AnimeLibrary";
+					section = BuildSection(Strings.LibraryAnimeGroup.GetLocalizedResource(), sectionType, new ContextMenuOptions(), false);
+					section.Path = null;
 					section.IsHeader = true;
+					section.IsExpanded = false;
 					break;
 
 				case SectionType.VideoEditor:
-					section = BuildSection(Strings.VideoEditorNavigationTitle.GetLocalizedResource(), sectionType, new ContextMenuOptions { IsLocationItem = true }, true);
-					section.ChildItems = null;
-					section.Path = "VideoEditor";
+					section = BuildSection(Strings.LibraryToolsGroup.GetLocalizedResource(), sectionType, new ContextMenuOptions(), false);
+					section.Path = "Tools";
 					section.IsHeader = true;
+					section.IsExpanded = false;
+					section.ChildItems!.Add(CreateLibraryNavigationItem(Strings.VideoEditorNavigationTitle.GetLocalizedResource(), "VideoEditor", sectionType));
 					break;
 #endif
 			}
@@ -670,6 +696,93 @@ namespace Files.App.ViewModels.UserControls
 
 			return Task.FromResult(section);
 		}
+
+#if FILES_RESOURCE_MANAGER
+		private void ResourceNavigationChanged(object? sender, EventArgs e)
+			=> Manager_DataChanged(SectionType.ResourceManager, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+
+		private void AnimeNavigationChanged(object? sender, EventArgs e)
+			=> Manager_DataChanged(SectionType.AnimeLibrary, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+
+		private static LocationItem CreateLibraryNavigationItem(string title, string path, SectionType section)
+			=> new()
+			{
+				Text = title,
+				Path = path,
+				Section = section,
+				ChildItems = null,
+				SelectsOnInvoked = true,
+				MenuOptions = new ContextMenuOptions(),
+				Icon = new BitmapImage(new Uri(SidebarSectionIcons.For(section)!)),
+			};
+
+		private async Task RefreshLibrarySectionAsync(LocationItem section)
+		{
+			var anime = section.Section == SectionType.AnimeLibrary;
+			var version = anime ? ++animeNavigationVersion : ++resourceNavigationVersion;
+			var workspace = anime ? animeLibrary.Workspace : resourceWorkspace;
+			var browser = anime ? animeLibrary.Browser : Ioc.Default.GetRequiredService<IResourceBrowserService>();
+			var root = workspace.LibraryPath;
+			CancellationToken token = default;
+			if (!anime)
+			{
+				resourceNavigationCancellation?.Cancel();
+				resourceNavigationCancellation?.Dispose();
+				resourceNavigationCancellation = new CancellationTokenSource();
+				token = resourceNavigationCancellation.Token;
+			}
+			try
+			{
+				var folders = string.IsNullOrWhiteSpace(root) ? []
+					: await browser.GetChildrenAsync(root, ResourceBrowserLocationKind.LibraryRoot, workspace.Settings, token);
+				if (!anime)
+				{
+					var settings = workspace.Settings.Clone();
+					using var limit = new SemaphoreSlim(3);
+					var counts = await Task.WhenAll(folders.Select(async folder =>
+					{
+						await limit.WaitAsync(token);
+						try { return (Folder: folder, Count: await ResourceBrowserService.CountActorVideosAsync(folder.Path, settings, token)); }
+						finally { limit.Release(); }
+					}));
+					folders = counts.OrderByDescending(item => item.Count)
+						.ThenBy(item => item.Folder.Name, StringComparer.CurrentCultureIgnoreCase).Select(item => item.Folder).ToArray();
+				}
+				if (dispatcherQueue is null || version != (anime ? animeNavigationVersion : resourceNavigationVersion)) return;
+				var items = new List<LocationItem>();
+				if (!anime)
+					items.Add(CreateLibraryNavigationItem(Strings.LibraryAll.GetLocalizedResource(), "ResourceManager", section.Section));
+				foreach (var folder in folders)
+				{
+					var title = anime ? folder.Name : workspace.GetActorDetails(folder.Path).Name;
+					items.Add(CreateLibraryNavigationItem(string.IsNullOrWhiteSpace(title) ? folder.Name : title, folder.Path, section.Section));
+				}
+				var children = section.ChildItems!;
+				for (var index = 0; index < items.Count; index++)
+				{
+					var existing = children.OfType<LocationItem>().FirstOrDefault(child => string.Equals(child.Path, items[index].Path, StringComparison.OrdinalIgnoreCase));
+					if (existing is null) children.Insert(index, items[index]);
+					else
+					{
+						existing.Text = items[index].Text;
+						var oldIndex = children.IndexOf(existing);
+						if (oldIndex != index)
+						{
+							children.RemoveAt(oldIndex);
+							children.Insert(index, existing);
+						}
+					}
+				}
+				while (children.Count > items.Count) children.RemoveAt(children.Count - 1);
+				UpdateSidebarSelectedItemFromArgs(CurrentPath);
+			}
+			catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+			catch (Exception ex)
+			{
+				App.Logger.LogWarning(ex, "Unable to update library navigation for {Root}", root);
+			}
+		}
+#endif
 
 		private LocationItem BuildSection(string sectionName, SectionType sectionType, ContextMenuOptions options, bool selectsOnInvoked)
 		{
@@ -800,6 +913,12 @@ namespace Files.App.ViewModels.UserControls
 
 		public void Dispose()
 		{
+#if FILES_RESOURCE_MANAGER
+			resourceNavigationCancellation?.Cancel();
+			resourceNavigationCancellation?.Dispose();
+			resourceWorkspace.NavigationChanged -= ResourceNavigationChanged;
+			animeLibrary.Workspace.NavigationChanged -= AnimeNavigationChanged;
+#endif
 			UserSettingsService.OnSettingChangedEvent -= UserSettingsService_OnSettingChangedEvent;
 
 			App.QuickAccessManager.Model.DataChanged -= Manager_DataChanged;
@@ -886,6 +1005,24 @@ namespace Files.App.ViewModels.UserControls
 			var middleClickPressed = pointerUpdateKind == PointerUpdateKind.MiddleButtonReleased;
 
 #if FILES_RESOURCE_MANAGER
+			if (navigationControlItem.Section is SectionType.AnimeLibrary or SectionType.ResourceManager
+				&& navigationPath is not null && Path.IsPathFullyQualified(navigationPath))
+			{
+				var anime = navigationControlItem.Section == SectionType.AnimeLibrary;
+				var workspace = anime ? animeLibrary.Workspace : resourceWorkspace;
+				if (PaneHolder?.ActivePane is IShellPage libraryShell)
+					libraryShell.NavigateToResourceLibraryLocation(new NavigationArguments
+					{
+						NavPathParam = anime ? "AnimeLibrary" : "ResourceManager",
+						IsResourceLibraryPage = true,
+						ResourceLibraryPath = workspace.LibraryPath,
+						ResourceLocationPaths = [workspace.LibraryPath, navigationPath],
+						ResourceLocationTitles = [workspace.LibraryPath, navigationControlItem.Text ?? Path.GetFileName(navigationPath)],
+						ResourceLocationKinds = [ResourceBrowserLocationKind.LibraryRoot, ResourceBrowserLocationKind.ActorFolder],
+					});
+				return;
+			}
+
 			// Resource Manager is an application page, not a filesystem path. Route it directly
 			// so the normal sidebar navigation pipeline does not treat "ResourceManager" as a folder.
 			if (string.Equals(navigationPath, "ResourceManager", StringComparison.OrdinalIgnoreCase))

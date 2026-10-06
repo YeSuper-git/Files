@@ -14,7 +14,7 @@
 		<TextBlock
 			Padding="0,0,0,12"
 			Style="{StaticResource App.Theme.SubtitleTextBlockStyle}"
-			Text="{helpers:ResourceString Name=ResourceManagerTranslationSettingsTitle}" />
+			Text="{helpers:ResourceString Name=LibraryDramaGroup}" />
 
         <wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ResourceSettingsLibraryPath}">
             <wctcontrols:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8B7;" /></wctcontrols:SettingsCard.HeaderIcon>
@@ -23,14 +23,10 @@
                 <Button Content="{helpers:ResourceString Name=ResourceSettingsChangePath}" Click="ChangeLibraryPath_Click" />
             </StackPanel>
         </wctcontrols:SettingsCard>
-        <wctcontrols:SettingsExpander Header="{helpers:ResourceString Name=ResourceSettingsImport}" IsExpanded="False">
-            <wctcontrols:SettingsExpander.HeaderIcon><FontIcon Glyph="&#xE8B5;" /></wctcontrols:SettingsExpander.HeaderIcon>
-            <wctcontrols:SettingsExpander.ItemsHeader>
-                <wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ResourceSettingsImportActors}">
-                    <Button x:Name="ImportActorsButton" Content="{helpers:ResourceString Name=ResourceSettingsImportActors}" Click="ImportActors_Click" />
-                </wctcontrols:SettingsCard>
-            </wctcontrols:SettingsExpander.ItemsHeader>
-        </wctcontrols:SettingsExpander>
+        <wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ResourceSettingsImportActors}">
+            <wctcontrols:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8B5;" /></wctcontrols:SettingsCard.HeaderIcon>
+            <Button x:Name="ImportActorsButton" Content="{helpers:ResourceString Name=ResourceSettingsImportActors}" Click="ImportActors_Click" />
+        </wctcontrols:SettingsCard>
 		<wctcontrols:SettingsExpander
 			Header="{helpers:ResourceString Name=ResourceManagerTranslationProvider}"
 			IsExpanded="False">
@@ -196,6 +192,7 @@
 			</wctcontrols:SettingsExpander.ItemsHeader>
 		</wctcontrols:SettingsExpander>
 
+        <StackPanel x:Name="RecognitionSettings" Spacing="8" />
 		<TextBlock x:Name="StatusTextBlock" Margin="0,8,0,0" TextWrapping="Wrap" />
 	</StackPanel>
 </Page>

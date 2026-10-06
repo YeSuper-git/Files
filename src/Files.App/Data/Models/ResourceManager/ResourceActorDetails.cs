@@ -11,6 +11,7 @@ public sealed class ResourceActorDetails
 {
     public string Name { get; set; } = string.Empty;
     public string Aliases { get; set; } = string.Empty;
+    public string InformationUrl { get; set; } = string.Empty;
     public string Biography { get; set; } = string.Empty;
     public string HeightCm { get; set; } = string.Empty;
     public string WeightKg { get; set; } = string.Empty;
@@ -24,11 +25,31 @@ public sealed class ResourceActorDetails
     public List<string> PosterPaths { get; set; } = [];
     public List<string> ExcludedPosterPaths { get; set; } = [];
 
+    public static bool TryGetInformationUri(string? value, out Uri? uri)
+    {
+        uri = null;
+        var text = value?.Trim();
+        if (string.IsNullOrEmpty(text)) return false;
+        if (!Uri.TryCreate(text, UriKind.Absolute, out var candidate))
+        {
+            if (text.Contains("://", StringComparison.Ordinal)) return false;
+            Uri.TryCreate("https://" + text, UriKind.Absolute, out candidate);
+        }
+        if (candidate is null || candidate.Scheme is not ("http" or "https") || string.IsNullOrEmpty(candidate.Host)) return false;
+        uri = candidate;
+        return true;
+    }
+
+    public static string GetInformationUrlDisplay(string? value)
+        => TryGetInformationUri(value, out var uri)
+            ? uri!.GetComponents(UriComponents.AbsoluteUri, UriFormat.SafeUnescaped) : value ?? string.Empty;
+
     public ResourceActorDetails Clone() => new()
     {
         Name = Name,
         Aliases = Aliases,
         Biography = Biography,
+        InformationUrl = InformationUrl,
         HeightCm = HeightCm,
         WeightKg = WeightKg,
         Bust = Bust,

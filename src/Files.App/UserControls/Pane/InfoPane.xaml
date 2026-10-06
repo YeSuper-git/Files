@@ -405,6 +405,13 @@
 					</ItemsControl.ItemTemplate>
 				</ItemsControl>
 
+                <StackPanel Margin="12,12,12,0" Spacing="4" Visibility="{x:Bind ViewModel.ActorInformationUrlVisibility, Mode=OneWay}">
+                    <TextBlock Style="{StaticResource Local.FileDetailsHeaderTextBlockStyle}" Text="{x:Bind ViewModel.ActorInformationUrlLabel}" />
+                    <TextBlock Text="{x:Bind ViewModel.SelectedActorInformationUrl, Mode=OneWay}" TextWrapping="Wrap" TextDecorations="Underline"
+                        Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" DoubleTapped="ActorInformationUrl_DoubleTapped"
+                        ToolTipService.ToolTip="{x:Bind ViewModel.ActorInformationUrlHint}" AutomationProperties.Name="{x:Bind ViewModel.ActorInformationUrlHint}" />
+                </StackPanel>
+
 				<StackPanel
 					Margin="12,12,12,0"
 					Spacing="4"

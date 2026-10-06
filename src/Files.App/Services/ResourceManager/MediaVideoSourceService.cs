@@ -8,11 +8,11 @@ using System.Text.RegularExpressions;
 
 namespace Files.App.Services.ResourceManager;
 
-public sealed class AnimeVideoSourceService(VideoProbeService probe)
+public sealed class MediaVideoSourceService(VideoProbeService probe)
 {
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromMinutes(30) };
     private static readonly string[] Extensions = [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".m4v", ".ts", ".webm", ".mpg", ".mpeg"];
-    public sealed record PageVideo(Uri Url, string Name, double? DurationSeconds = null);
+    public sealed record PageVideo(Uri Url, string Name, double? DurationSeconds = null, string? DurationError = null);
     public sealed record ScanResult(IReadOnlyList<PageVideo> Videos, int TooShort, int UnknownDuration);
 
     public static IReadOnlyList<PageVideo> ParsePage(string html, Uri origin)
@@ -96,14 +96,15 @@ public sealed class AnimeVideoSourceService(VideoProbeService probe)
         {
             token.ThrowIfCancellationRequested();
             double? duration = null;
+            string? durationError = null;
             using var probeDeadline = CancellationTokenSource.CreateLinkedTokenSource(token);
             probeDeadline.CancelAfter(TimeSpan.FromSeconds(15));
             try { duration = (await probe.ProbeAsync(candidate.Url.AbsoluteUri, probeDeadline.Token, origin)).DurationSeconds; }
-            catch (OperationCanceledException) when (!token.IsCancellationRequested) { }
-            catch (Exception) when (!token.IsCancellationRequested) { }
-            if (MeetsMinimumDuration(duration, minimumSeconds)) videos.Add(candidate with { DurationSeconds = duration });
-            else if (duration is null) unknown++;
-            else tooShort++;
+            catch (OperationCanceledException) when (!token.IsCancellationRequested) { durationError = Strings.AnimeVideosUnknownDuration.GetLocalizedResource(); }
+            catch (Exception ex) when (!token.IsCancellationRequested) { durationError = ex.Message; }
+            if (duration is null) unknown++;
+            if (MeetsMinimumDuration(duration, minimumSeconds)) videos.Add(candidate with { DurationSeconds = duration, DurationError = durationError });
+            else if (duration is not null) tooShort++;
         }
         return new(videos, tooShort, unknown);
     }

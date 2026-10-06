@@ -27,6 +27,32 @@ namespace Files.App.Views
 		public SettingsPage()
 		{
 			InitializeComponent();
+			GotFocus += SettingsInput_GotFocus;
+		}
+
+		private void SettingsInput_GotFocus(object sender, RoutedEventArgs e)
+		{
+			var current = e.OriginalSource as DependencyObject;
+			while (current is not null && current is not TextBox)
+				current = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(current);
+			if (current is TextBox box)
+				DispatcherQueue.TryEnqueue(() => HideInputClearButtons(box));
+		}
+
+		private void HideInputClearButtons(DependencyObject root)
+		{
+			for (var index = 0; index < Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(root); index++)
+			{
+				var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(root, index);
+				if (child is FrameworkElement button && button.Name is "DeleteButton" or "ClearButton")
+				{
+					button.Visibility = Visibility.Collapsed;
+					button.IsHitTestVisible = false;
+					button.MinWidth = button.Width = button.MaxWidth = 0;
+					button.Clip = new Microsoft.UI.Xaml.Media.RectangleGeometry { Rect = new Windows.Foundation.Rect(0, 0, 0, 0) };
+				}
+				else HideInputClearButtons(child);
+			}
 		}
 
 		private void SettingsPage_Loaded(object sender, RoutedEventArgs e)

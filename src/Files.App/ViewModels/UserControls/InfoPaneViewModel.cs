@@ -3,6 +3,7 @@
 
 using Files.App.UserControls.FilePreviews;
 using Files.App.Data.Items.ResourceManager;
+using Files.App.Data.Models.ResourceManager;
 using Files.App.ViewModels.Properties;
 using Files.App.ViewModels.Previews;
 using Files.Shared.Helpers;
@@ -209,6 +210,12 @@ namespace Files.App.ViewModels.UserControls
 				? actor.ActorDetails.Aliases
 				: "暂无";
 
+        public string ActorInformationUrlLabel => Strings.ActorInformationUrl.GetLocalizedResource();
+        public string ActorInformationUrlHint => Strings.ActorInformationUrlOpen.GetLocalizedResource();
+        public string SelectedActorInformationUrl => SelectedItem is ResourceActorListedItem actor ? ResourceActorDetails.GetInformationUrlDisplay(actor.ActorDetails.InformationUrl) : string.Empty;
+        public Visibility ActorInformationUrlVisibility => SelectedItem is ResourceActorListedItem && !string.IsNullOrWhiteSpace(SelectedActorInformationUrl)
+            ? Visibility.Visible : Visibility.Collapsed;
+
 		public string SelectedActorBiography
 			=> SelectedItem is ResourceActorListedItem actor && !string.IsNullOrWhiteSpace(actor.ActorDetails.Biography)
 				? actor.ActorDetails.Biography
@@ -243,6 +250,8 @@ namespace Files.App.ViewModels.UserControls
 			OnPropertyChanged(nameof(ResourceVideoFolderTitleActionText));
 			OnPropertyChanged(nameof(SelectedActorAliases));
 			OnPropertyChanged(nameof(SelectedActorBiography));
+            OnPropertyChanged(nameof(SelectedActorInformationUrl));
+            OnPropertyChanged(nameof(ActorInformationUrlVisibility));
 			OnPropertyChanged(nameof(SelectedActorAliasesVisibility));
 			OnPropertyChanged(nameof(ResourceActorDetailsVisibility));
 
