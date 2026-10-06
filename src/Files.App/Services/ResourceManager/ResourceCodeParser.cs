@@ -27,6 +27,22 @@ public sealed partial class ResourceCodeParser : IResourceCodeParser
         return new ResourceCodeInfo { Normalized = $"{prefix}-{numberStr}", NoZero = $"{prefix}{number}", Raw = match.Value };
     }
 
+    public static bool HasSubtitleMarkerBeforeTitle(string name, ResourceCodeInfo? code)
+    {
+        if (code is null) return false;
+        var start = name.IndexOf(code.Raw, StringComparison.OrdinalIgnoreCase);
+        if (start < 0) return false;
+        var end = start + code.Raw.Length;
+        var title = name.IndexOfAny(['[', '［'], end);
+        return title >= end && string.Equals(name[end..title].Trim(), "-C", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static string AddSubtitleMarker(string name, ResourceCodeInfo code)
+    {
+        var start = name.IndexOf(code.Raw, StringComparison.OrdinalIgnoreCase);
+        return start < 0 || HasSubtitleMarkerBeforeTitle(name, code) ? name : name.Insert(start + code.Raw.Length, "-C");
+    }
+
     public bool HasChineseSubtitle(string name) => HasChineseSubtitle(name, DefaultSubKeywords);
 
     public bool HasChineseSubtitle(string name, IReadOnlyList<string> keywords)

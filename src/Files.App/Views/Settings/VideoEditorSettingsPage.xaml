@@ -7,7 +7,6 @@
 	xmlns:wctcontrols="using:CommunityToolkit.WinUI.Controls">
 	<StackPanel Spacing="8">
 		<TextBlock Padding="0,0,0,12" Style="{StaticResource App.Theme.SubtitleTextBlockStyle}" Text="{video:VideoEditorText Name=VideoEditorSettingsTitle}" />
-		<TextBlock Margin="0,8,0,0" FontSize="16" FontWeight="Medium" Text="{video:VideoEditorText Name=VideoEditorExportGroup}" />
 		<wctcontrols:SettingsCard x:Name="SourceLocationCard" Header="{video:VideoEditorText Name=VideoEditorExportLocation}" Description="{video:VideoEditorText Name=VideoEditorExportLocationHint}">
 			<wctcontrols:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8B7;" /></wctcontrols:SettingsCard.HeaderIcon>
 			<ComboBox x:Name="SourceFolderModeComboBox" Width="240" SelectionChanged="FolderModeComboBox_SelectionChanged">

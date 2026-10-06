@@ -34,6 +34,13 @@ namespace Files.App.Views.Shells
 		private readonly SelectedItemsPropertiesViewModel _resourceLibrarySelectionPropertiesViewModel = new();
 		public StatusBarViewModel ResourceLibraryStatusBarViewModel => _resourceLibraryStatusBarViewModel ??= new StatusBarViewModel();
 		public ResourceManager.ResourceLibraryPage? CurrentResourceLibraryPage => ItemDisplayFrame?.Content as ResourceManager.ResourceLibraryPage;
+		public void UpdateResourceLibraryLoading(ResourceManager.ResourceLibraryPage page, bool loading)
+		{
+			if (!ReferenceEquals(CurrentResourceLibraryPage, page)) return;
+			ToolbarViewModel.CanRefresh = !loading;
+			SetLoadingIndicatorForTabs(loading);
+		}
+
 		public void UpdateResourceLibrarySelection(IReadOnlyList<ListedItem> items)
 		{
 			var selection = _resourceLibrarySelectionPropertiesViewModel;

@@ -705,6 +705,13 @@ namespace Files.App.Views.Shells
 
 		protected void FilesystemViewModel_ItemLoadStatusChanged(object? sender, ItemLoadStatusChangedEventArgs e)
 		{
+#if FILES_RESOURCE_MANAGER
+			if (this is ModernShellPage { CurrentResourceLibraryPage: { } libraryPage } shell)
+			{
+				shell.UpdateResourceLibraryLoading(libraryPage, libraryPage.IsLoading);
+				return;
+			}
+#endif
 			switch (e.Status)
 			{
 				case ItemLoadStatusChangedEventArgs.ItemLoadStatus.Starting:

@@ -41,6 +41,7 @@ namespace Files.App.Views
 		private WindowMessageMonitor? _titleBarMessageMonitor;
 
 		private readonly Dictionary<TabBarItem, double> _sidebarScrollByTab = new();
+        private readonly Dictionary<TabBarItem, (string? Path, SectionType Section)> _sidebarSelectionByTab = new();
 		private TabBarItem? _previousSidebarTab;
 
 		[DynamicWindowsRuntimeCast(typeof(MenuFlyout))]
@@ -258,6 +259,10 @@ namespace Files.App.Views
 		private async Task OnPreviewKeyDownAsync(KeyRoutedEventArgs e)
 		{
 			base.OnPreviewKeyDown(e);
+
+            var videoEditor = (e.OriginalSource as DependencyObject)?.FindAscendantOrSelf<Files.App.Views.VideoEditor.VideoEditorPage>();
+            videoEditor?.HandleShortcut(e);
+            if (e.Handled) return;
 
 			switch (e.Key)
 			{
@@ -505,7 +510,11 @@ namespace Files.App.Views
 		private void HandleSidebarTabChange()
 		{
 			if (_previousSidebarTab is not null)
-				_sidebarScrollByTab[_previousSidebarTab] = SidebarControl.VerticalScrollOffset;
+            {
+                _sidebarScrollByTab[_previousSidebarTab] = SidebarControl.VerticalScrollOffset;
+                if (SidebarAdaptiveViewModel.SidebarSelectedItem is { } selected)
+                    _sidebarSelectionByTab[_previousSidebarTab] = (selected.Path, selected.Section);
+            }
 
 			var newTab = ViewModel.SelectedTabItem;
 			_previousSidebarTab = newTab;
@@ -515,7 +524,21 @@ namespace Files.App.Views
 
 			var savedOffset = _sidebarScrollByTab.GetValueOrDefault(newTab);
 			// Defer to after the flat-tree's tab-state restoration dispatcher work so the content extent has caught up before scrolling.
-			DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => SidebarControl.ScrollToVerticalOffset(savedOffset));
+			DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+            {
+                if (!ReferenceEquals(ViewModel.SelectedTabItem, newTab)) return;
+                if (_sidebarSelectionByTab.TryGetValue(newTab, out var saved))
+                {
+                    var selected = SidebarAdaptiveViewModel.FlatSidebarItems.Select(row => row.Item).OfType<INavigationControlItem>()
+                        .FirstOrDefault(item => item.Section == saved.Section && string.Equals(item.Path, saved.Path, StringComparison.OrdinalIgnoreCase));
+                    if (selected is not null) SidebarAdaptiveViewModel.SidebarSelectedItem = selected;
+                }
+#if FILES_RESOURCE_MANAGER
+                if (SidebarAdaptiveViewModel.PaneHolder?.ActivePaneOrColumn is ModernShellPage { CurrentResourceLibraryPage: not null })
+                    SidebarAdaptiveViewModel.UpdateSidebarSelectedItemFromArgs(null);
+#endif
+                SidebarControl.ScrollToVerticalOffset(savedOffset);
+            });
 		}
 
 		internal void DetachTabContent(TabBarItem tabItem)
@@ -524,12 +547,14 @@ namespace Files.App.Views
 				PageContent.Content = null;
 
 			_sidebarScrollByTab.Remove(tabItem);
+            _sidebarSelectionByTab.Remove(tabItem);
 			if (ReferenceEquals(_previousSidebarTab, tabItem))
 				_previousSidebarTab = null;
 		}
 
 		private void RootGrid_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
 		{
+            if (e.Handled) return;
 			switch (e.Key)
 			{
 				case VirtualKey.Menu:

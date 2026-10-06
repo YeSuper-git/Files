@@ -25,7 +25,7 @@ public sealed class VideoProbeService(VideoToolchain toolchain)
 		foreach (var argument in new[]
 		{
 			"-v", "error",
-			"-show_entries", "format=duration:stream=codec_type,codec_name,width,height,avg_frame_rate,duration",
+			"-show_entries", "format=duration,bit_rate:stream=codec_type,codec_name,width,height,avg_frame_rate,duration,bit_rate",
 			"-show_format", "-show_streams",
 			"-of", "json",
 			path
@@ -59,7 +59,32 @@ public sealed class VideoProbeService(VideoToolchain toolchain)
 		var frameRate = ParseRate(ReadString(videoStream, "avg_frame_rate"));
 
 		var audioCount = streams.EnumerateArray().Count(stream => stream.TryGetProperty("codec_type", out var type) && type.GetString() == "audio");
-		return new VideoMetadata(duration, codec, width, height, frameRate, audioCount);
+		var audioBitRates = streams.EnumerateArray().Where(stream => stream.TryGetProperty("codec_type", out var type) && type.GetString() == "audio")
+            .Select(stream => (long)Math.Max(0, ReadNumber(stream, "bit_rate"))).ToArray();
+        return new VideoMetadata(duration, codec, width, height, frameRate, audioCount,
+            (long)Math.Max(0, ReadNumber(videoStream, "bit_rate")), (long)Math.Max(0, ReadNumber(root, "format", "bit_rate")), audioBitRates);
+	}
+
+	public async Task<double?> FindNearbyKeyframeAsync(string path, double seconds, CancellationToken cancellationToken)
+	{
+		if (_toolchain.FfprobePath is null) return null;
+		var info = CreateStartInfo(_toolchain.FfprobePath);
+		var start = Math.Max(0, seconds - 2).ToString("0.#########", CultureInfo.InvariantCulture);
+		var end = (seconds + 2.001).ToString("0.#########", CultureInfo.InvariantCulture);
+		foreach (var argument in new[] { "-v", "error", "-select_streams", "v:0", "-read_intervals", start + "%" + end,
+			"-show_packets", "-show_entries", "packet=pts_time,flags", "-of", "csv=p=0", path }) info.ArgumentList.Add(argument);
+		var (exitCode, output, _) = await RunCapturedAsync(info, cancellationToken).ConfigureAwait(false);
+		if (exitCode != 0) return null;
+		var candidates = new List<double>();
+		foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+		{
+			var fields = line.Trim().Split(',');
+			if (fields.Length >= 2 && fields[1].Contains('K') &&
+				double.TryParse(fields[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var position) &&
+				double.IsFinite(position) && position >= 0 && Math.Abs(position - seconds) <= 2)
+				candidates.Add(position);
+		}
+		return candidates.OrderBy(position => Math.Abs(position - seconds)).ThenBy(position => position).Select(position => (double?)position).FirstOrDefault();
 	}
 
 	public async Task<IReadOnlyList<double>> ReadKeyframesAsync(string path, CancellationToken cancellationToken = default)

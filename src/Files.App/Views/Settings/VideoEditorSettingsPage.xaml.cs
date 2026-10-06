@@ -60,7 +60,9 @@ public sealed partial class VideoEditorSettingsPage : Page
             };
             disable.Click += (_, _) => { var items = VideoEditorShortcuts.Load(_settings.VideoEditorShortcuts); items[items.FindIndex(item => item.Action == binding.Action)] = binding with { Key = (VirtualKey)0, Modifiers = VirtualKeyModifiers.None }; _settings.VideoEditorShortcuts = VideoEditorShortcuts.Save(items); field.Text = Strings.VideoEditorShortcutDisabled.GetLocalizedResource(); };
             Grid.SetColumn(field, 1); Grid.SetColumn(edit, 2); Grid.SetColumn(disable, 3);
-            row.Children.Add(label); row.Children.Add(field); row.Children.Add(edit); row.Children.Add(disable); ShortcutRows.Children.Add(row);
+            var name = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, VerticalAlignment = VerticalAlignment.Center };
+            name.Children.Add(new FontIcon { Glyph = "\uE765", FontSize = 16 }); name.Children.Add(label);
+            row.Children.Add(name); row.Children.Add(field); row.Children.Add(edit); row.Children.Add(disable); ShortcutRows.Children.Add(row);
         }
     }
     private void RestoreShortcuts_Click(object sender, RoutedEventArgs e)

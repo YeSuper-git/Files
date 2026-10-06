@@ -92,7 +92,11 @@ public sealed class ResourceOperationsService : IResourceOperationsService
         var ops = new List<ResourceFileOperation>();
         var plannedTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var entry in files)
+        var orderedFiles = files.Where(entry => IsVideoFile(entry.File, extensions))
+            .GroupBy(entry => entry.File.DirectoryName, StringComparer.OrdinalIgnoreCase)
+            .SelectMany(group => group.OrderBy(entry => entry.File.Name, new EpisodeNameComparer())
+                .Select((entry, index) => (entry.File, entry.Code, Index: index + 1, Count: group.Count())));
+        foreach (var entry in orderedFiles)
         {
             ct.ThrowIfCancellationRequested();
             var file = entry.File;
@@ -116,7 +120,8 @@ public sealed class ResourceOperationsService : IResourceOperationsService
             }
 
             var ext = file.Extension.TrimStart('.');
-            var target = Path.Combine(parent.FullName, $"{entry.Code}.{ext}");
+            var targetName = entry.Count > 1 ? $"{entry.Code}-{entry.Index:00}" : entry.Code;
+            var target = Path.Combine(parent.FullName, $"{targetName}.{ext}");
             var samePath = PathsEqual(file.FullName, target);
             var targetAlreadyPlanned = !samePath && !plannedTargets.Add(target);
             var status = samePath
@@ -288,7 +293,6 @@ public sealed class ResourceOperationsService : IResourceOperationsService
         return await Task.Run(() =>
         {
             var results = new List<ResourceFileOperation>(ops.Count);
-            var directoryPathMappings = new List<(string SourcePath, string TargetPath)>();
             foreach (var op in ops)
             {
                 ct.ThrowIfCancellationRequested();
@@ -354,7 +358,7 @@ public sealed class ResourceOperationsService : IResourceOperationsService
                         }
 
                         Directory.Move(op.Source, op.Target);
-                        directoryPathMappings.Add((op.Source, op.Target));
+                        _workspace.RemapItemPaths(op.Source, op.Target);
                         results.Add(DoneOperation(op));
                         continue;
                     }
@@ -384,6 +388,7 @@ public sealed class ResourceOperationsService : IResourceOperationsService
                         throw;
                     }
 
+                    _workspace.RemapItemPaths(op.Source, op.Target);
                     results.Add(DoneOperation(op, backup));
                 }
                 catch (Exception ex)
@@ -393,8 +398,6 @@ public sealed class ResourceOperationsService : IResourceOperationsService
                 }
             }
 
-            if (directoryPathMappings.Count > 0)
-                _workspace.RemapItemPaths(directoryPathMappings);
 
             var done = results.Where(r => r.Status == "done").ToList();
             if (done.Count > 0)
@@ -408,7 +411,6 @@ public sealed class ResourceOperationsService : IResourceOperationsService
         return await Task.Run(() =>
         {
             var results = new List<ResourceFileOperation>(ops.Count);
-            var directoryPathMappings = new List<(string SourcePath, string TargetPath)>();
             foreach (var op in ops.AsEnumerable().Reverse())
             {
                 ct.ThrowIfCancellationRequested();
@@ -498,10 +500,13 @@ public sealed class ResourceOperationsService : IResourceOperationsService
                     if (Directory.Exists(op.Target))
                     {
                         Directory.Move(op.Target, op.Source);
-                        directoryPathMappings.Add((op.Target, op.Source));
+                        _workspace.RemapItemPaths(op.Target, op.Source);
                     }
                     else
+                    {
                         File.Move(op.Target, op.Source);
+                        _workspace.RemapItemPaths(op.Target, op.Source);
+                    }
 
                     if (backupExists)
                     {
@@ -524,8 +529,6 @@ public sealed class ResourceOperationsService : IResourceOperationsService
                 results.Add(restored);
             }
 
-            if (directoryPathMappings.Count > 0)
-                _workspace.RemapItemPaths(directoryPathMappings);
             return results;
         }, ct);
     }
@@ -561,7 +564,6 @@ public sealed class ResourceOperationsService : IResourceOperationsService
 
             var batch = history[^1];
             var reversed = new List<ResourceFileOperation>();
-            var directoryPathMappings = new List<(string SourcePath, string TargetPath)>();
             foreach (var op in batch.Operations.AsEnumerable().Reverse().ToList())
             {
                 ct.ThrowIfCancellationRequested();
@@ -609,10 +611,13 @@ public sealed class ResourceOperationsService : IResourceOperationsService
                     if (Directory.Exists(undo.Source))
                     {
                         Directory.Move(undo.Source, undo.Target);
-                        directoryPathMappings.Add((undo.Source, undo.Target));
+                        _workspace.RemapItemPaths(undo.Source, undo.Target);
                     }
                     else
+                    {
                         File.Move(undo.Source, undo.Target);
+                        _workspace.RemapItemPaths(undo.Source, undo.Target);
+                    }
 
                     if (!string.IsNullOrWhiteSpace(op.Backup))
                     {
@@ -632,8 +637,6 @@ public sealed class ResourceOperationsService : IResourceOperationsService
                 reversed.Add(undo);
             }
 
-            if (directoryPathMappings.Count > 0)
-                _workspace.RemapItemPaths(directoryPathMappings);
 
             history.RemoveAll(x => x.Operations.Count == 0);
             if (batch.Operations.Count > 0 && !history.Contains(batch))

@@ -9,4 +9,7 @@ public sealed record VideoMetadata(
 	int Width,
 	int Height,
 	double FrameRate,
-	int AudioStreamCount = 0);
+	int AudioStreamCount = 0,
+    long VideoBitRate = 0,
+    long TotalBitRate = 0,
+    IReadOnlyList<long>? AudioBitRates = null);

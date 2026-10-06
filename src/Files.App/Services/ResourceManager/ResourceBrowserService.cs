@@ -42,6 +42,40 @@ public sealed class ResourceBrowserService : IResourceBrowserService
         }, cancellationToken);
     }
 
+    public static async Task<int> CountActorVideosAsync(string actorFolderPath, ResourceSettings settings, CancellationToken cancellationToken = default)
+    {
+        var videoExtensions = settings.VideoExtensions.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return await Task.Run(() =>
+        {
+            try
+            {
+                var options = new EnumerationOptions
+                {
+                    RecurseSubdirectories = true,
+                    IgnoreInaccessible = true,
+                    AttributesToSkip = System.IO.FileAttributes.ReparsePoint,
+                };
+                var count = 0;
+                foreach (var path in Directory.EnumerateFiles(actorFolderPath, "*", options))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (videoExtensions.Contains(Path.GetExtension(path).TrimStart('.')))
+                        count++;
+                }
+
+                return count;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                return 0;
+            }
+        }, cancellationToken);
+    }
+
     private IReadOnlyList<ResourceBrowserItem> GetFolders(
         DirectoryInfo directory,
         ResourceBrowserLocationKind locationKind,
@@ -203,14 +237,18 @@ public sealed class ResourceBrowserService : IResourceBrowserService
             }
             var candidates = directory.EnumerateFiles()
                 .Where(file => IsImageFile(file.FullName, settings.ImageExtensions))
-                .Where(file => !_animeLibrary || !AnimeLibraryService.IsPreviewImage(file.FullName))
+                .Where(file => _animeLibrary ? !AnimeLibraryService.IsPreviewImage(file.FullName) : !IsResourceIllustration(file.FullName))
                 .Where(file => !excludedPosterPaths.Contains(file.FullName, StringComparer.OrdinalIgnoreCase))
                 .Select(file => new
                 {
                     File = file,
-                    Score = SimilarityScore(Path.GetFileNameWithoutExtension(file.Name), targetName),
+                    Score = SimilarityScore(_animeLibrary ? Path.GetFileNameWithoutExtension(file.Name)
+                        : System.Text.RegularExpressions.Regex.Replace(Path.GetFileNameWithoutExtension(file.Name), @"pl$|(?:^|[-_])pl(?=[-_]|$)", string.Empty, System.Text.RegularExpressions.RegexOptions.IgnoreCase), targetName),
+                    IsPoster = !_animeLibrary && HasPlPosterMarker(file.FullName),
                 })
-                .OrderBy(x => x.Score)
+                .OrderBy(x => !_animeLibrary && x.Score <= 2 ? 0 : x.Score)
+                .ThenByDescending(x => x.IsPoster)
+                .ThenBy(x => x.Score)
                 .ThenByDescending(x => x.File.Length)
                 .Select(x => x.File.FullName)
                 .ToList();
@@ -223,6 +261,18 @@ public sealed class ResourceBrowserService : IResourceBrowserService
             return null;
         }
     }
+
+    private static bool HasPlPosterMarker(string path)
+    {
+        var name = Path.GetFileNameWithoutExtension(path);
+        return name.EndsWith("pl", StringComparison.OrdinalIgnoreCase)
+            || System.Text.RegularExpressions.Regex.IsMatch(name, @"(?:^|[-_])pl(?:[-_]|$)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    }
+
+    internal static bool IsResourceIllustration(string path)
+        => AnimeLibraryService.IsPreviewImage(path)
+            || (!HasPlPosterMarker(path) && System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileNameWithoutExtension(path),
+                @"jp(?:[-_]\d+)?$|(?:^|[-_])(?:sample|screenshot|preview)(?:[-_]|$)", System.Text.RegularExpressions.RegexOptions.IgnoreCase));
 
     private static int SimilarityScore(string candidateName, string targetName)
     {

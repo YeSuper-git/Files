@@ -4866,7 +4866,7 @@
   <data name="VideoEditorChangeVideo" xml:space="preserve"><value>更换视频</value></data>
   <data name="VideoEditorTaskCenter" xml:space="preserve"><value>剪切任务</value></data>
   <data name="VideoEditorQueueHint" xml:space="preserve"><value>处理中和等待中的任务会按队列顺序保存并替换原视频。</value></data>
-  <data name="VideoEditorStatusWaiting" xml:space="preserve"><value>等待队列执行</value></data>
+  <data name="VideoEditorStatusWaiting" xml:space="preserve"><value>排队中</value></data>
   <data name="VideoEditorStatusProcessing" xml:space="preserve"><value>正在快速剪切</value></data>
   <data name="VideoEditorStatusReplacing" xml:space="preserve"><value>校验通过，正在替换原视频</value></data>
   <data name="VideoEditorStatusCompleted" xml:space="preserve"><value>输出完成</value></data>
@@ -4903,7 +4903,7 @@
   <data name="VideoEditorDurationUnavailable" xml:space="preserve"><value>无法读取视频时长。</value></data>
   <data name="VideoEditorFfprobeStartFailed" xml:space="preserve"><value>无法启动 FFprobe。</value></data>
   <data name="VideoEditorKeyframesFailed" xml:space="preserve"><value>无法读取视频关键帧。</value></data>
-  <data name="VideoEditorQueueEmpty" xml:space="preserve"><value>队列为空。选择视频并设置裁切点后，可加入队列批量输出。</value></data>
+  <data name="VideoEditorQueueEmpty" xml:space="preserve"><value>暂无内容</value></data>
   <data name="VideoEditorCompletedEmpty" xml:space="preserve"><value>暂无已完成的视频。</value></data>
   <data name="VideoEditorMenuFile" xml:space="preserve"><value>文件</value></data>
   <data name="VideoEditorMenuEdit" xml:space="preserve"><value>编辑</value></data>
@@ -5016,7 +5016,7 @@
   <data name="ResourceOptimizationConfirm" xml:space="preserve"><value>确定优化</value></data>
   <data name="ResourceOptimizationSelectAll" xml:space="preserve"><value>全选</value></data>
   <data name="ResourceOptimizationSelectNone" xml:space="preserve"><value>取消全选</value></data>
-  <data name="ResourceOptimizationViewDetails" xml:space="preserve"><value>点击查看详情</value></data>
+  <data name="ResourceOptimizationViewDetails" xml:space="preserve"><value>详情</value></data>
   <data name="ResourceOptimizationAddTagSummary" xml:space="preserve"><value>{0} 共有 {1} 部作品缺少中文字幕标记</value></data>
   <data name="ResourceOptimizationRemoveTagSummary" xml:space="preserve"><value>{0} 共有 {1} 部作品的中文字幕标记不匹配</value></data>
   <data name="ResourceOptimizationMoveSummary" xml:space="preserve"><value>{0} 共有 {1} 部作品需要归入无中文字幕分类</value></data>
@@ -5068,7 +5068,7 @@
   <data name="AnimeImagesPreview" xml:space="preserve"><value>预览</value></data>
   <data name="AnimeImagesNoVideos" xml:space="preserve"><value>此文件夹没有可关联的视频，请进入包含视频的文件夹。</value></data>
   <data name="AnimeImagesEmpty" xml:space="preserve"><value>网页中未找到可识别的插图链接。</value></data>
-  <data name="AnimeImagesFound" xml:space="preserve"><value>找到 {0} 张候选图片，请勾选并指定对应视频。</value></data>
+  <data name="AnimeImagesFound" xml:space="preserve"><value>图片 {0} 张</value></data>
   <data name="AnimeImagesCancelled" xml:space="preserve"><value>已取消，已下载的图片保留。</value></data>
   <data name="AnimeImagesFailed" xml:space="preserve"><value>图片获取失败：</value></data>
   <data name="AnimeImagesResult" xml:space="preserve"><value>已完成：下载 {0} 张，跳过 {1} 张，失败 {2} 张。</value></data>
@@ -5077,7 +5077,7 @@
   <data name="AnimeImagesPrefix" xml:space="preserve"><value>网址前缀预设</value></data>
   <data name="AnimeImagesPrefixHelp" xml:space="preserve"><value>例如 https://example.org/anime/；查找图片时只能输入后缀，前缀在此设置。</value></data>
   <data name="AnimeImagesIncludedNames" xml:space="preserve"><value>保留图片名称关键词</value></data>
-  <data name="AnimeImagesIncludedNamesHelp" xml:space="preserve"><value>可添加多条图片名称条件，选择满足任一或全部条件；忽略大小写，留空不过滤。</value></data>
+  <data name="AnimeImagesIncludedNamesHelp" xml:space="preserve"><value>开启关键词识别后，满足任一关键词即可，忽略大小写；可添加多条条件。</value></data>
   <data name="AnimeImagesMinimumWidth" xml:space="preserve"><value>图片最小宽度（像素，0 为不限）</value></data>
   <data name="AnimeImagesMinimumHeight" xml:space="preserve"><value>图片最小高度（像素，0 为不限）</value></data>
   <data name="AnimeImagesGroupByPrefix" xml:space="preserve"><value>按文件名前 8 个字符合并为一套图</value></data>
@@ -5118,13 +5118,70 @@
   <data name="AnimeImagesMatchMode" xml:space="preserve"><value>条件匹配方式</value></data>
   <data name="ResourceVideoNoResource" xml:space="preserve"><value>暂无资源</value></data>
   <data name="AnimeVideosFiles" xml:space="preserve"><value>视频文件</value></data>
-  <data name="AnimeVideosMinimumSeconds" xml:space="preserve"><value>最短视频时长（秒，0 不过滤）</value></data>
+  <data name="AnimeVideosMinimumSeconds" xml:space="preserve"><value>视频长度限制</value></data>
   <data name="AnimeVideosLoading" xml:space="preserve"><value>正在识别视频并读取时长…</value></data>
   <data name="AnimeVideosDuration" xml:space="preserve"><value>{0:0.##} 秒</value></data>
   <data name="AnimeVideosUnknownDuration" xml:space="preserve"><value>时长未知</value></data>
-  <data name="AnimeVideosFound" xml:space="preserve"><value>找到 {0} 个视频，过滤 {1} 个过短视频、{2} 个时长无法确认的视频。</value></data>
+  <data name="AnimeVideosFound" xml:space="preserve"><value>视频 {0} 个 · 过短 {1} 个 · 时长未知 {2} 个</value></data>
   <data name="AnimeVideosDownloading" xml:space="preserve"><value>正在下载 {0}：{1:0.0} MiB</value></data>
   <data name="AnimeVideosResult" xml:space="preserve"><value>下载成功 {0} 个，失败 {1} 个。</value></data>
   <data name="AnimeVideosTooShort" xml:space="preserve"><value>视频时长低于设置的最短时长。</value></data>
   <data name="AnimeVideosAllDownloaded" xml:space="preserve"><value>已全部下载成功</value></data>
+  <data name="LibraryEditTags" xml:space="preserve"><value>编辑标签</value></data>
+  <data name="LibraryGlobalTags" xml:space="preserve"><value>全局标签</value></data>
+  <data name="LibraryResourceTags" xml:space="preserve"><value>特殊标签（追剧）</value></data>
+  <data name="LibraryAnimeTags" xml:space="preserve"><value>特殊标签（追番）</value></data>
+  <data name="LibraryAddTag" xml:space="preserve"><value>新增</value></data>
+  <data name="LibraryTagSaved" xml:space="preserve"><value>已保存“{0}”的标签。</value></data>
+  <data name="LibraryGlobalTagSaveFailed" xml:space="preserve"><value>全局标签保存失败，请重试。</value></data>
+  <data name="LibraryAnimeGroup" xml:space="preserve"><value>追番</value></data>
+  <data name="LibraryDramaGroup" xml:space="preserve"><value>追剧</value></data>
+  <data name="LibraryToolsGroup" xml:space="preserve"><value>工具</value></data>
+  <data name="LibraryAll" xml:space="preserve"><value>全部</value></data>
+  <data name="ResourceSubtitleTagsAutomatic" xml:space="preserve"><value>将自动为 {0} 部符合的作品添加“中文字幕”标签。</value></data>
+  <data name="ResourceOptimizeNames" xml:space="preserve"><value>视频命名优化</value></data>
+  <data name="ResourceOptimizeClassification" xml:space="preserve"><value>海报命名优化</value></data>
+  <data name="ResourceOptimizeSubtitleTags" xml:space="preserve"><value>分类优化</value></data>
+  <data name="ResourceOptimizationChooseFunctions" xml:space="preserve"><value>请选择要执行的优化功能。</value></data>
+  <data name="MediaWebsitePrefixes" xml:space="preserve"><value>识别网址</value></data>
+  <data name="MediaAddPrefix" xml:space="preserve"><value>新增前缀</value></data>
+  <data name="MediaInvalidPrefix" xml:space="preserve"><value>请输入有效的 http 或 https 网站前缀。</value></data>
+  <data name="MediaChoosePrefix" xml:space="preserve"><value>请在设置中添加前缀</value></data>
+  <data name="MediaTranslationSection" xml:space="preserve"><value>标题翻译</value></data>
+  <data name="MediaRecoverySection" xml:space="preserve"><value>回退与恢复</value></data>
+  <data name="MediaKeywordRecognition" xml:space="preserve"><value>关键词筛选</value></data>
+  <data name="MediaKeywordConditions" xml:space="preserve"><value>关键词条件</value></data>
+  <data name="MediaKeywordRecognitionHelp" xml:space="preserve"><value>开启后，图片先按最小宽高过滤，再匹配关键词；必须满足任意关键词，其余图片过滤。未设置关键词时不会识别出图片。</value></data>
+  <data name="MediaImageMinimumDimensions" xml:space="preserve"><value>识图尺寸限制</value></data>
+  <data name="MediaImageMinimumDimensionsHelp" xml:space="preserve"><value>宽 × 高（像素），0 表示不限制对应维度。图片必须同时满足宽度和高度要求。</value></data>
+  <data name="MediaImageDimensionsValue" xml:space="preserve"><value>宽 × 高（像素）</value></data>
+  <data name="MediaVideoMinimumSecondsValue" xml:space="preserve"><value>最短时长（秒）</value></data>
+  <data name="MediaSecondsUnit" xml:space="preserve"><value>秒</value></data>
+  <data name="MediaPosterImage" xml:space="preserve"><value>海报图</value></data>
+  <data name="VideoEditorElapsed" xml:space="preserve"><value>耗时 {0}</value></data>
+  <data name="VideoEditorDownloading" xml:space="preserve"><value>下载中</value></data>
+  <data name="VideoEditorDownload" xml:space="preserve"><value>下载</value></data>
+  <data name="VideoEditorDeleteOutput" xml:space="preserve"><value>同时删除生成的视频文件</value></data>
+  <data name="VideoEditorDeleteConfirmation" xml:space="preserve"><value>确认删除任务“{0}”？</value></data>
+  <data name="VideoEditorEncoder" xml:space="preserve"><value>编码器：{0}</value></data>
+  <data name="VideoEditorShortcutBackward" xml:space="preserve"><value>后退5秒</value></data>
+  <data name="VideoEditorShortcutForward" xml:space="preserve"><value>前进5秒</value></data>
+  <data name="ResourceOptimizeNamesDescription" xml:space="preserve"><value>将视频重命名为番号名称</value></data>
+  <data name="ResourceOptimizeClassificationDescription" xml:space="preserve"><value>将海报名重命名为视频文件名称</value></data>
+  <data name="ResourceOptimizeSubtitleTagsDescription" xml:space="preserve"><value>检查中文字幕标签和视频位置摆放</value></data>
+  <data name="VideoEditorCurrentlyEditing" xml:space="preserve"><value>当前编辑中</value></data>
+  <data name="VideoEditorPendingStatus" xml:space="preserve"><value>待处理</value></data>
+  <data name="ResourceOptimizationMovedNoSubtitle" xml:space="preserve"><value>移动到“无中文字幕”分类中</value></data>
+  <data name="ResourceOptimizationTagAdded" xml:space="preserve"><value>补充标签</value></data>
+  <data name="ResourceOptimizationTagRemoved" xml:space="preserve"><value>移除标签</value></data>
+  <data name="ResourceOptimizationTargetConflict" xml:space="preserve"><value>目标名称已存在，请处理后重试</value></data>
+  <data name="ResourceOptimizationMovedFromNoSubtitle" xml:space="preserve"><value>从“无中文字幕”分类移出</value></data>
+  <data name="ActorInformationUrl" xml:space="preserve"><value>资讯网址</value></data>
+  <data name="ActorInformationUrlOpen" xml:space="preserve"><value>双击使用默认浏览器打开</value></data>
+  <data name="ActorInformationUrlInvalid" xml:space="preserve"><value>请输入有效的 http 或 https 网址。</value></data>
+  <data name="VideoEditorRemainingSeconds" xml:space="preserve"><value>预计剩余 {0} 秒</value></data>
+  <data name="VideoEditorEstimatingRemaining" xml:space="preserve"><value>正在估算剩余时间</value></data>
+  <data name="ResourceOptimizationSelectedCount" xml:space="preserve"><value>已选 {0} / {1} 项</value></data>
+  <data name="VideoEditorRemainingMinutesSeconds" xml:space="preserve"><value>预计剩余 {0} 分 {1} 秒</value></data>
+  <data name="VideoEditorFastCutAdjusted" xml:space="preserve"><value>已按关键帧快速裁剪，实际起点 {0}，与所选位置相差 {1} 秒。</value></data>
 </root>

@@ -26,6 +26,7 @@ public sealed partial class ResourceManagerSettingsPage : Page
     public ResourceManagerSettingsPage()
     {
         InitializeComponent();
+        Files.App.UserControls.ResourceManager.MediaRecognitionSettings.Build(RecognitionSettings, _workspace);
         _isInitializing = true;
         var selectedProvider = _appSettings.ResourceManagerTranslationProvider;
         TranslationProviderComboBox.SelectedItem = TranslationProviderComboBox.Items

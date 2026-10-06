@@ -167,6 +167,11 @@ namespace Files.App.Helpers
 				result = await GetSelectedTabInfoAsync(pathArgs);
 			}
 
+			#if FILES_RESOURCE_MANAGER
+			if (tabItem.TabItemContent is IShellPanesPage panes &&
+				panes.ActivePaneOrColumn is ModernShellPage { CurrentResourceLibraryPage: { } library })
+				result = (library.CurrentPageTitle, result.Icon, library.CurrentPageTitle);
+#endif
 			// Don't update tabItem if the contents of the tab have already changed
 			if (result.Item1 is not null)
 			{
@@ -303,13 +308,13 @@ namespace Files.App.Helpers
 #if FILES_RESOURCE_MANAGER
 			else if (currentPath.Equals("ResourceManager", StringComparison.OrdinalIgnoreCase))
 			{
-				tabLocationHeader = "资源管理";
+				tabLocationHeader = Strings.LibraryDramaGroup.GetLocalizedResource();
 				((ImageIconSource)iconSource).ImageSource = new BitmapImage(new Uri(SidebarSectionIcons.For(SectionType.ResourceManager)!));
 				toolTipText = tabLocationHeader;
 			}
 			else if (currentPath.Equals("AnimeLibrary", StringComparison.OrdinalIgnoreCase))
 			{
-				tabLocationHeader = Strings.AnimeLibraryTitle.GetLocalizedResource();
+				tabLocationHeader = Strings.LibraryAnimeGroup.GetLocalizedResource();
 				((ImageIconSource)iconSource).ImageSource = new BitmapImage(new Uri(SidebarSectionIcons.For(SectionType.AnimeLibrary)!));
 			}
 			else if (currentPath.Equals("VideoEditor", StringComparison.OrdinalIgnoreCase))
@@ -409,6 +414,11 @@ namespace Files.App.Helpers
 				else if (navigationArg is string pathArgs)
 					(windowTitle, _, _) = await GetSelectedTabInfoAsync(pathArgs);
 
+				#if FILES_RESOURCE_MANAGER
+				if (MainPageViewModel.SelectedTabItem?.TabItemContent is IShellPanesPage panes &&
+					panes.ActivePaneOrColumn is ModernShellPage { CurrentResourceLibraryPage: { } library })
+					windowTitle = library.CurrentPageTitle;
+#endif
 				if (navigationArg == MainPageViewModel.SelectedTabItem?.NavigationParameter?.NavigationParameter)
 					MainWindow.Instance.AppWindow.Title = $"{windowTitle} - Files";
 			});
