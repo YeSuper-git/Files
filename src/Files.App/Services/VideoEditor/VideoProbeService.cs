@@ -8,9 +8,39 @@ using System.Text.Json;
 
 namespace Files.App.Services.VideoEditor;
 
+public sealed record MediaStreamInfo(string Kind, string Codec, string Title, string Language, bool IsDefault, int Width, int Height, int Channels);
+public sealed record MediaContainerInfo(string Format, long Size, double Duration, IReadOnlyList<MediaStreamInfo> Streams, int Chapters, bool HasMetadata);
+
 public sealed class VideoProbeService(VideoToolchain toolchain)
 {
 	private readonly VideoToolchain _toolchain = toolchain;
+
+	public async Task<MediaContainerInfo> ReadContainerAsync(string path, CancellationToken token = default)
+	{
+		if (_toolchain.FfprobePath is null) throw new InvalidOperationException(_toolchain.StatusMessage);
+		var info = CreateStartInfo(_toolchain.FfprobePath);
+		foreach (var argument in new[] { "-v", "error", "-show_streams", "-show_format", "-show_chapters", "-of", "json", path }) info.ArgumentList.Add(argument);
+		var (exitCode, output, error) = await RunCapturedAsync(info, token).ConfigureAwait(false);
+		if (exitCode != 0) throw new InvalidDataException(error);
+		using var json = JsonDocument.Parse(output);
+		var root = json.RootElement;
+		var streams = new List<MediaStreamInfo>();
+		if (root.TryGetProperty("streams", out var list))
+			foreach (var stream in list.EnumerateArray())
+			{
+				var tags = stream.TryGetProperty("tags", out var streamTags) ? streamTags : default;
+				streams.Add(new(ReadString(stream, "codec_type") ?? "data", ReadString(stream, "codec_name") ?? "",
+					tags.ValueKind == JsonValueKind.Object ? ReadString(tags, "title") ?? ReadString(tags, "filename") ?? "" : "",
+					tags.ValueKind == JsonValueKind.Object ? ReadString(tags, "language") ?? "und" : "und",
+					stream.TryGetProperty("disposition", out var disposition) && ReadInt(disposition, "default") == 1,
+					ReadInt(stream, "width"), ReadInt(stream, "height"), ReadInt(stream, "channels")));
+			}
+		var format = root.GetProperty("format");
+		return new(ReadString(format, "format_long_name") ?? ReadString(format, "format_name") ?? "",
+			new FileInfo(path).Length, ReadNumber(format, "duration"), streams,
+			root.TryGetProperty("chapters", out var chapters) ? chapters.GetArrayLength() : 0,
+			format.TryGetProperty("tags", out var metadata) && metadata.EnumerateObject().Any());
+	}
 
 	public async Task<VideoMetadata> ProbeAsync(string path, CancellationToken cancellationToken = default, Uri? referer = null)
 	{
@@ -60,9 +90,9 @@ public sealed class VideoProbeService(VideoToolchain toolchain)
 
 		var audioCount = streams.EnumerateArray().Count(stream => stream.TryGetProperty("codec_type", out var type) && type.GetString() == "audio");
 		var audioBitRates = streams.EnumerateArray().Where(stream => stream.TryGetProperty("codec_type", out var type) && type.GetString() == "audio")
-            .Select(stream => (long)Math.Max(0, ReadNumber(stream, "bit_rate"))).ToArray();
-        return new VideoMetadata(duration, codec, width, height, frameRate, audioCount,
-            (long)Math.Max(0, ReadNumber(videoStream, "bit_rate")), (long)Math.Max(0, ReadNumber(root, "format", "bit_rate")), audioBitRates);
+			.Select(stream => (long)Math.Max(0, ReadNumber(stream, "bit_rate"))).ToArray();
+		return new VideoMetadata(duration, codec, width, height, frameRate, audioCount,
+			(long)Math.Max(0, ReadNumber(videoStream, "bit_rate")), (long)Math.Max(0, ReadNumber(root, "format", "bit_rate")), audioBitRates);
 	}
 
 	public async Task<double?> FindNearbyKeyframeAsync(string path, double seconds, CancellationToken cancellationToken)

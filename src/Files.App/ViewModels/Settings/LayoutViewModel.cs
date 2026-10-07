@@ -20,6 +20,7 @@ namespace Files.App.ViewModels.Settings
 			SortingMenuItems.Add(new("SortByDateModified", commands.SortByDateModified.Label, UserSettingsService.AppearanceSettingsService));
 			SortingMenuItems.Add(new("SortByDateCreated", commands.SortByDateCreated.Label, UserSettingsService.AppearanceSettingsService));
 			SortingMenuItems.Add(new("SortByAnimeAirDate", commands.SortByAnimeAirDate.Label, UserSettingsService.AppearanceSettingsService));
+			SortingMenuItems.Add(new("SortByResourceWorkCount", commands.SortByResourceWorkCount.Label, UserSettingsService.AppearanceSettingsService));
 			SortingMenuItems.Add(new("SortBySize", commands.SortBySize.Label, UserSettingsService.AppearanceSettingsService));
 			SortingMenuItems.Add(new("SortByType", commands.SortByType.Label, UserSettingsService.AppearanceSettingsService));
 			SortingMenuItems.Add(new("SortBySyncStatus", commands.SortBySyncStatus.Label, UserSettingsService.AppearanceSettingsService));

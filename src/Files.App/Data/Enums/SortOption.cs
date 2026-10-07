@@ -67,6 +67,8 @@ namespace Files.App.Data.Enums
 		/// </remarks>
 		Path = 9,
 
-		AnimeAirDate = 10
+		AnimeAirDate = 10,
+
+		ResourceWorkCount = 11
 	}
 }

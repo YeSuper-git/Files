@@ -18,5 +18,6 @@ namespace Files.App.Data.Contexts
 		ReleaseNotes,
 		Settings,
 		VideoEditor,
+		MediaTool,
 	}
 }

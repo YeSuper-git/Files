@@ -1,6 +1,8 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using System.Globalization;
+
 namespace Files.App.Data.Models.ResourceManager;
 
 /// <summary>
@@ -20,8 +22,10 @@ public sealed class ResourceActorDetails
     public string Hip { get; set; } = string.Empty;
     public string CupSize { get; set; } = string.Empty;
     public DateTime? BirthDate { get; set; }
+    public bool BirthDateMonthOnly { get; set; }
     public bool? IsCurrentlyActive { get; set; }
     public DateTime? CareerRetirementDate { get; set; }
+    public bool CareerRetirementDateMonthOnly { get; set; }
     public List<string> PosterPaths { get; set; } = [];
     public List<string> ExcludedPosterPaths { get; set; } = [];
 
@@ -44,6 +48,19 @@ public sealed class ResourceActorDetails
         => TryGetInformationUri(value, out var uri)
             ? uri!.GetComponents(UriComponents.AbsoluteUri, UriFormat.SafeUnescaped) : value ?? string.Empty;
 
+    public static bool TryParseDate(string value, out DateTime date, out bool monthOnly)
+    {
+        value = value.Trim();
+        if (value.Length == 4 && value.All(char.IsAsciiDigit)) value = "20" + value;
+        monthOnly = DateTime.TryParseExact(value, new[] { "yyyy-MM", "yyyy-M", "yyyyMM", "yyyy/M", "yyyy年M月" },
+            CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
+        return monthOnly || DateTime.TryParseExact(value, new[] { "yyyy-MM-dd", "yyyy-M-d", "yyyyMMdd", "yyyy/M/d", "yyyy年M月d日" },
+            CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
+    }
+
+    public static string FormatDate(DateTime? date, bool monthOnly)
+        => date?.ToString(monthOnly ? "yyyy-MM" : "yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
+
     public ResourceActorDetails Clone() => new()
     {
         Name = Name,
@@ -57,8 +74,10 @@ public sealed class ResourceActorDetails
         Hip = Hip,
         CupSize = CupSize,
         BirthDate = BirthDate,
+        BirthDateMonthOnly = BirthDateMonthOnly,
         IsCurrentlyActive = IsCurrentlyActive,
         CareerRetirementDate = CareerRetirementDate,
+        CareerRetirementDateMonthOnly = CareerRetirementDateMonthOnly,
         PosterPaths = [.. (PosterPaths ?? [])],
         ExcludedPosterPaths = [.. (ExcludedPosterPaths ?? [])],
     };

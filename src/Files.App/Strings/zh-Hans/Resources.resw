@@ -4833,8 +4833,8 @@
   <data name="ResourceManagerVideoQualityOther" xml:space="preserve">
     <value>{0}P {1}级</value>
   </data>
-  <data name="VideoEditorTitle" xml:space="preserve"><value>视频编辑</value></data>
-  <data name="VideoEditorNavigationTitle" xml:space="preserve"><value>视频编辑</value></data>
+  <data name="VideoEditorTitle" xml:space="preserve"><value>视频剪辑</value></data>
+  <data name="VideoEditorNavigationTitle" xml:space="preserve"><value>视频剪辑</value></data>
   <data name="VideoEditorOpenVideo" xml:space="preserve"><value>选择视频</value></data>
   <data name="VideoEditorDropVideo" xml:space="preserve"><value>拖放视频到这里</value></data>
   <data name="VideoEditorDroppedFileUnsupported" xml:space="preserve"><value>请放入支持的视频文件。</value></data>
@@ -4911,7 +4911,7 @@
   <data name="VideoEditorMenuView" xml:space="preserve"><value>查看</value></data>
   <data name="VideoEditorMenuTools" xml:space="preserve"><value>工具</value></data>
   <data name="VideoEditorMenuHelp" xml:space="preserve"><value>帮助</value></data>
-  <data name="VideoEditorSettingsTitle" xml:space="preserve"><value>视频编辑</value></data>
+  <data name="VideoEditorSettingsTitle" xml:space="preserve"><value>视频剪辑</value></data>
   <data name="VideoEditorExportMode" xml:space="preserve"><value>导出方式</value></data>
   <data name="VideoEditorExportModeHint" xml:space="preserve"><value>选择替换原视频，或保留原视频并生成修改版。</value></data>
   <data name="VideoEditorReplaceOriginalOption" xml:space="preserve"><value>导出后替换原视频</value></data>
@@ -4988,12 +4988,12 @@
   <data name="ResourceNextIllustration" xml:space="preserve"><value>下一张</value></data>
   <data name="ResourceVideoNoFiles" xml:space="preserve"><value>暂无视频文件</value></data>
   <data name="VideoEditorShortcutSettings" xml:space="preserve"><value>快捷键</value></data>
-  <data name="VideoEditorShortcutHint" xml:space="preserve"><value>点击编辑后按下快捷键组合，Esc 取消。仅在视频编辑工作区生效，输入文字时不触发。</value></data>
+  <data name="VideoEditorShortcutHint" xml:space="preserve"><value>点击编辑后按下快捷键组合，Esc 取消。仅在视频剪辑工作区生效，输入文字时不触发。</value></data>
   <data name="VideoEditorShortcutDefaults" xml:space="preserve"><value>恢复默认快捷键</value></data>
   <data name="VideoEditorShortcutCapture" xml:space="preserve"><value>请按快捷键组合…</value></data>
   <data name="VideoEditorShortcutDisabled" xml:space="preserve"><value>已禁用</value></data>
   <data name="VideoEditorShortcutDisable" xml:space="preserve"><value>禁用</value></data>
-  <data name="VideoEditorShortcutConflict" xml:space="preserve"><value>该组合已被其他视频编辑操作使用，请重新设置。</value></data>
+  <data name="VideoEditorShortcutConflict" xml:space="preserve"><value>该组合已被其他视频剪辑操作使用，请重新设置。</value></data>
   <data name="VideoEditorShortcutReserved" xml:space="preserve"><value>该组合保留给系统或应用导航，请选择其他按键。</value></data>
   <data name="VideoEditorShortcutSaved" xml:space="preserve"><value>快捷键已保存，立即生效。</value></data>
   <data name="VideoEditorShortcutPlay" xml:space="preserve"><value>播放 / 暂停</value></data>
@@ -5039,9 +5039,9 @@
   <data name="AnimeLibraryImageExtensions" xml:space="preserve"><value>海报图片格式</value></data>
   <data name="AnimeLibraryInvalidMonth" xml:space="preserve"><value>请输入有效年月，例如 202205 或 2022-05</value></data>
   <data name="AnimeOptimizationTitle" xml:space="preserve"><value>番剧格式优化</value></data>
-  <data name="AnimeOptimizationFolders" xml:space="preserve"><value>批量优化文件夹名称</value></data>
-  <data name="AnimeOptimizationPosters" xml:space="preserve"><value>批量优化视频海报名称</value></data>
-  <data name="AnimeOptimizationIllustrations" xml:space="preserve"><value>批量识别并优化插图名称</value></data>
+  <data name="AnimeOptimizationFolders" xml:space="preserve"><value>文件夹命名优化</value></data>
+  <data name="AnimeOptimizationPosters" xml:space="preserve"><value>海报命名优化</value></data>
+  <data name="AnimeOptimizationIllustrations" xml:space="preserve"><value>预览画像命名优化</value></data>
   <data name="AnimeOptimizationScanning" xml:space="preserve"><value>正在生成改名预览…</value></data>
   <data name="AnimeOptimizationNoChanges" xml:space="preserve"><value>暂无需要优化的项目</value></data>
   <data name="AnimeOptimizationCount" xml:space="preserve"><value>可优化 {0} 项，跳过 {1} 项</value></data>
@@ -5184,4 +5184,172 @@
   <data name="ResourceOptimizationSelectedCount" xml:space="preserve"><value>已选 {0} / {1} 项</value></data>
   <data name="VideoEditorRemainingMinutesSeconds" xml:space="preserve"><value>预计剩余 {0} 分 {1} 秒</value></data>
   <data name="VideoEditorFastCutAdjusted" xml:space="preserve"><value>已按关键帧快速裁剪，实际起点 {0}，与所选位置相差 {1} 秒。</value></data>
+  <data name="ArchiveInboxTitle" xml:space="preserve">
+    <value>待归档</value>
+  </data>
+  <data name="SubtitleMuxTitle" xml:space="preserve">
+    <value>字幕封装</value>
+  </data>
+  <data name="ArchiveChooseFolder" xml:space="preserve">
+    <value>选择待归档路径</value>
+  </data>
+  <data name="ArchiveIncludeSubfolders" xml:space="preserve">
+    <value>包含子文件夹</value>
+  </data>
+  <data name="ArchiveFileCount" xml:space="preserve">
+    <value>{0} 个文件</value>
+  </data>
+  <data name="ArchiveMove" xml:space="preserve">
+    <value>移动</value>
+  </data>
+  <data name="ArchiveQueuedForEditing" xml:space="preserve">
+    <value>已将 {0} 加入视频剪辑的待编辑队列。</value>
+  </data>
+  <data name="ArchiveFileBusy" xml:space="preserve">
+    <value>该视频正在编辑或处理中，请先关闭编辑或结束处理。</value>
+  </data>
+  <data name="ArchiveTargetLibrary" xml:space="preserve">
+    <value>目标板块</value>
+  </data>
+  <data name="ArchiveDestinationPath" xml:space="preserve">
+    <value>目标目录</value>
+  </data>
+  <data name="ArchiveRecognizedPaths" xml:space="preserve">
+    <value>识别到的目录</value>
+  </data>
+  <data name="ArchiveChooseDestination" xml:space="preserve">
+    <value>手动选择目录</value>
+  </data>
+  <data name="ArchiveRecognizing" xml:space="preserve">
+    <value>正在识别目录…</value>
+  </data>
+  <data name="ArchiveRecognitionReady" xml:space="preserve">
+    <value>已按文件名称匹配目录，请确认或修改。</value>
+  </data>
+  <data name="ArchiveRecognitionEmpty" xml:space="preserve">
+    <value>未找到匹配目录，请手动选择。</value>
+  </data>
+  <data name="ArchiveSameFolder" xml:space="preserve">
+    <value>目标目录与当前目录相同。</value>
+  </data>
+  <data name="ArchiveMoved" xml:space="preserve">
+    <value>已将 {0} 移动到 {1}。</value>
+  </data>
+  <data name="ArchiveRecycleConfirmation" xml:space="preserve">
+    <value>将 {0} 放入回收站？</value>
+  </data>
+  <data name="ArchiveRecycled" xml:space="preserve">
+    <value>已将 {0} 放入回收站。</value>
+  </data>
+  <data name="MediaToolsMissingInput" xml:space="preserve">
+    <value>请确认视频和字幕文件均存在。</value>
+  </data>
+  <data name="MediaToolsOutputExists" xml:space="preserve">
+    <value>目标文件已存在，请更改输出名称。</value>
+  </data>
+  <data name="SubtitleMuxMkvRequired" xml:space="preserve">
+    <value>输出文件需使用 .mkv 扩展名。</value>
+  </data>
+  <data name="SubtitleMuxValidationFailed" xml:space="preserve">
+    <value>输出文件验证失败，未保存结果。</value>
+  </data>
+  <data name="SubtitleMuxDescription" xml:space="preserve">
+    <value>将外挂字幕加入视频，生成可切换字幕的 MKV。视频和音频不重新编码，源文件保留。</value>
+  </data>
+  <data name="SubtitleMuxChooseVideo" xml:space="preserve">
+    <value>选择视频</value>
+  </data>
+  <data name="SubtitleMuxTracks" xml:space="preserve">
+    <value>外挂字幕</value>
+  </data>
+  <data name="SubtitleMuxAddSubtitles" xml:space="preserve">
+    <value>添加字幕</value>
+  </data>
+  <data name="SubtitleMuxNoSubtitles" xml:space="preserve">
+    <value>支持 SRT、ASS、SSA、VTT 字幕。</value>
+  </data>
+  <data name="SubtitleMuxDefaultTrack" xml:space="preserve">
+    <value>默认字幕</value>
+  </data>
+  <data name="SubtitleMuxEncoding" xml:space="preserve">
+    <value>字幕编码</value>
+  </data>
+  <data name="SubtitleMuxOutputFolder" xml:space="preserve">
+    <value>输出目录</value>
+  </data>
+  <data name="SubtitleMuxOutputName" xml:space="preserve">
+    <value>输出文件名</value>
+  </data>
+  <data name="SubtitleMuxStart" xml:space="preserve">
+    <value>开始封装</value>
+  </data>
+  <data name="SubtitleMuxOutputSuffix" xml:space="preserve">
+    <value>-内嵌字幕</value>
+  </data>
+  <data name="SubtitleMuxRemoveTrack" xml:space="preserve">
+    <value>移除字幕</value>
+  </data>
+  <data name="SubtitleMuxTrackName" xml:space="preserve">
+    <value>轨道名称</value>
+  </data>
+  <data name="SubtitleMuxLanguage" xml:space="preserve">
+    <value>语言</value>
+  </data>
+  <data name="SubtitleMuxChinese" xml:space="preserve">
+    <value>中文</value>
+  </data>
+  <data name="SubtitleMuxEnglish" xml:space="preserve">
+    <value>英语</value>
+  </data>
+  <data name="SubtitleMuxJapanese" xml:space="preserve">
+    <value>日语</value>
+  </data>
+  <data name="SubtitleMuxUnknown" xml:space="preserve">
+    <value>未指定</value>
+  </data>
+  <data name="SubtitleMuxInvalidName" xml:space="preserve">
+    <value>请输入有效的输出文件名。</value>
+  </data>
+  <data name="SubtitleMuxWorking" xml:space="preserve">
+    <value>封装中</value>
+  </data>
+  <data name="SubtitleMuxComplete" xml:space="preserve">
+    <value>已完成：{0} · {1} · 耗时 {2} 秒</value>
+  </data>
+  <data name="SubtitleMuxCancelled" xml:space="preserve">
+    <value>已取消合并，源文件保留。</value>
+  </data>
+  <data name="ArchiveRecycleUnavailable" xml:space="preserve"><value>此路径不支持回收站，文件未删除。</value></data>
+  <data name="ArchiveRecycleFailed" xml:space="preserve"><value>文件未放入回收站，请查看操作结果。</value></data>
+  <data name="SubtitleMuxQueued" xml:space="preserve"><value>排队中</value></data>
+  <data name="SubtitleMuxJobComplete" xml:space="preserve"><value>已完成 · {0} · 耗时 {1} 秒</value></data>
+  <data name="SubtitleMuxSourceContent" xml:space="preserve"><value>原有内容</value></data>
+  <data name="SubtitleMuxOutputContent" xml:space="preserve"><value>封装后内容</value></data>
+  <data name="SubtitleMuxVideoTrack" xml:space="preserve"><value>视频</value></data>
+  <data name="SubtitleMuxAudioTrack" xml:space="preserve"><value>音频</value></data>
+  <data name="SubtitleMuxSubtitleTrack" xml:space="preserve"><value>字幕</value></data>
+  <data name="SubtitleMuxAttachment" xml:space="preserve"><value>附件</value></data>
+  <data name="SubtitleMuxChapter" xml:space="preserve"><value>章节</value></data>
+  <data name="SubtitleMuxMetadata" xml:space="preserve"><value>全局标签</value></data>
+  <data name="SubtitleMuxDefault" xml:space="preserve"><value>默认</value></data>
+  <data name="SubtitleMuxAdded" xml:space="preserve"><value>新增</value></data>
+  <data name="SubtitleMuxProcessingQueue" xml:space="preserve"><value>处理中</value></data>
+  <data name="SubtitleMuxDropHint" xml:space="preserve"><value>拖入视频或字幕文件</value></data>
+  <data name="SubtitleMuxPreparing" xml:space="preserve"><value>正在读取轨道…</value></data>
+  <data name="SubtitleMuxNewTrackHint" xml:space="preserve"><value>添加字幕后，可在右侧查看封装后的轨道。</value></data>
+  <data name="SubtitleMuxCancelJob" xml:space="preserve"><value>取消任务</value></data>
+  <data name="SubtitleMuxRemoveJob" xml:space="preserve"><value>移除记录</value></data>
+  <data name="SubtitleMuxSelectVideoFirst" xml:space="preserve"><value>请先添加一个视频，再添加字幕。</value></data>
+  <data name="SubtitleMuxMultipleVideos" xml:space="preserve"><value>每次工作区只放入一个视频，提交任务后可继续添加下一个。</value></data>
+  <data name="SubtitleMuxOutputSummary" xml:space="preserve"><value>MKV · 保留视频和音频 · 新增 {0} 条字幕</value></data>
+  <data name="SubtitleMuxReset" xml:space="preserve"><value>清空工作区</value></data>
+  <data name="AnimeOptimizationFoldersDescription" xml:space="preserve"><value>整理文件夹名称与集数范围</value></data>
+  <data name="AnimeOptimizationIllustrationsDescription" xml:space="preserve"><value>识别对应集数并整理预览画像名称</value></data>
+  <data name="ResourceSortWorkCount" xml:space="preserve"><value>作品数量</value></data>
+  <data name="ActorDateInputHint" xml:space="preserve"><value>yyyy-MM 或 yyyy-MM-dd</value></data>
+  <data name="ActorDateInputInvalid" xml:space="preserve"><value>请输入有效的年月或年月日，例如 1990-01 或 1990-01-23。</value></data>
+  <data name="ActorRetiredBadge" xml:space="preserve"><value>退役</value></data>
+  <data name="AnimeCategoryEpisodePosters" xml:space="preserve"><value>分集展示海报</value></data>
+  <data name="AnimeCategoryEpisodeCount" xml:space="preserve"><value>海报图集数统计</value></data>
+  <data name="AnimeCategoryEpisodeCountValue" xml:space="preserve"><value>{0}集</value></data>
 </root>

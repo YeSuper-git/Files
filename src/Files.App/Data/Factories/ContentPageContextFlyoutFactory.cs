@@ -174,6 +174,7 @@ namespace Files.App.Data.Factories
 							IsToggle = true
 						}.Build(),
 						new ContextMenuFlyoutItemViewModelBuilder(Commands.SortByAnimeAirDate) { IsToggle = true }.Build(),
+						new ContextMenuFlyoutItemViewModelBuilder(Commands.SortByResourceWorkCount) { IsToggle = true }.Build(),
 						new ContextMenuFlyoutItemViewModelBuilder(Commands.SortByType)
 						{
 							IsToggle = true

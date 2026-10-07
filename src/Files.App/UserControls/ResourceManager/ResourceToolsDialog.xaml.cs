@@ -160,7 +160,7 @@ public sealed partial class ResourceToolsDialog : UserControl
                 foreach (var video in children.Where(item => item.Kind == ResourceBrowserItemKind.VideoFile)
                     .OrderBy(item => item.Name, new EpisodeNameComparer()))
                 {
-                    var poster = _workspace.GetPosterOverride(folder.Path) ?? video.PosterPath;
+                    var poster = _workspace.GetPosterOverride(video.Path) ?? _workspace.GetPosterOverride(folder.Path) ?? video.PosterPath;
                     if (poster is not null && ResourceBrowserService.IsResourceIllustration(poster)) continue;
                     if (string.IsNullOrWhiteSpace(poster) || !File.Exists(poster) || _posterVideos.ContainsKey(poster)
                         || !string.Equals(Path.GetDirectoryName(poster), Path.GetDirectoryName(video.Path), StringComparison.OrdinalIgnoreCase)) continue;

@@ -15,6 +15,10 @@ namespace Files.App.Data.EventArguments
 
 		public IShellPage? AssociatedTabInstance { get; set; }
 
+		public bool IsArchiveInboxPage { get; set; }
+
+		public string? ArchiveInboxRoot { get; set; }
+
 		public bool IsSearchResultPage { get; set; } = false;
 
 		public string? SearchPathParam

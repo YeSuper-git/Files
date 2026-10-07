@@ -4,6 +4,8 @@ using Files.App.Services.ResourceManager;
 using Files.App.Helpers;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Documents;
 using Microsoft.Extensions.Logging;
 using System.IO;
 using System.Diagnostics;
@@ -21,7 +23,9 @@ public sealed partial class AnimeFormatOptimizationDialog : UserControl
     private readonly Dictionary<string, (Button Execute, TextBlock Result)> _folderActions = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<ComboBox> _groupSelectors = [];
     private bool _buildingAssignments;
-    private bool ManualMode => KindSelector.SelectedIndex == (int)AnimeOptimizationKind.Illustrations;
+    private int _selectedFunction = -1;
+    private readonly Dictionary<(int Function, string Folder), bool> _expandedGroups = [];
+    private bool ManualMode => _selectedFunction == (int)AnimeOptimizationKind.Illustrations;
     public List<(string SourcePath, string TargetPath)> AppliedMappings { get; } = [];
     public bool IsBusy { get; private set; }
     public bool HasChanges => AppliedMappings.Count > 0;
@@ -32,12 +36,72 @@ public sealed partial class AnimeFormatOptimizationDialog : UserControl
         _operations = new ResourceOperationsService(Ioc.Default.GetRequiredService<IResourceCodeParser>(), Ioc.Default.GetRequiredService<IResourceScanner>(), workspace, Ioc.Default.GetRequiredService<ILogger<ResourceOperationsService>>());
         var close = ResourceDialogPresentation.CreateIconButton("\uE8BB", Strings.Close.GetLocalizedResource());
         CloseButton.Content = new FontIcon { Glyph = "\uE8BB", FontSize = 16 }; CloseButton.Background = close.Background; CloseButton.Foreground = close.Foreground; CloseButton.CornerRadius = close.CornerRadius;
-        KindSelector.Items.Add(Strings.AnimeOptimizationFolders.GetLocalizedResource()); KindSelector.Items.Add(Strings.AnimeOptimizationPosters.GetLocalizedResource()); KindSelector.Items.Add(Strings.AnimeOptimizationIllustrations.GetLocalizedResource());
-        KindSelector.SelectedIndex = 0; KindSelector.SelectionChanged += async (_, _) => await PreviewAsync(); Loaded += async (_, _) => await PreviewAsync();
+        FolderFunction.Content = CreateFunctionLabel(Strings.AnimeOptimizationFolders, Strings.AnimeOptimizationFoldersDescription);
+        PosterFunction.Content = CreateFunctionLabel(Strings.AnimeOptimizationPosters, Strings.ResourceOptimizeClassificationDescription);
+        IllustrationFunction.Content = CreateFunctionLabel(Strings.AnimeOptimizationIllustrations, Strings.AnimeOptimizationIllustrationsDescription);
+    }
+    private static StackPanel CreateFunctionLabel(string title, string description)
+    {
+        var label = new StackPanel { Spacing = 4 };
+        label.Children.Add(new TextBlock { Text = title.GetLocalizedResource(), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+        label.Children.Add(new TextBlock { Text = description.GetLocalizedResource(), FontSize = 12, TextWrapping = TextWrapping.Wrap,
+            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"] });
+        return label;
+    }
+    private async void Function_Click(object sender, RoutedEventArgs e)
+    {
+        if (IsBusy || sender is not Button button) return;
+        _selectedFunction = int.Parse((string)button.Tag);
+        foreach (var option in new[] { FolderFunction, PosterFunction, IllustrationFunction })
+            option.BorderBrush = (Brush)Application.Current.Resources[ReferenceEquals(option, button) ? "AccentFillColorDefaultBrush" : "CardStrokeColorDefaultBrush"];
+        await PreviewAsync();
+    }
+    private async void Retry_Click(object sender, RoutedEventArgs e) => await PreviewAsync();
+    private string GetGroupPath(ResourceFileOperation operation)
+        => _selectedFunction == (int)AnimeOptimizationKind.Folders ? operation.Source : Path.GetDirectoryName(operation.Source)!;
+    private void AddFolderMenu(CheckBox check, string source)
+    {
+        var menu = new MenuFlyout();
+        var open = new MenuFlyoutItem { Text = Strings.AnimeOptimizationOpenFolder.GetLocalizedResource(), Icon = new SymbolIcon(Symbol.OpenFile) };
+        open.Click += async (_, _) =>
+        {
+            try
+            {
+                var path = source;
+                foreach (var mapping in AppliedMappings)
+                    if (string.Equals(path, mapping.SourcePath, StringComparison.OrdinalIgnoreCase) || path.StartsWith(mapping.SourcePath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                        path = mapping.TargetPath + path[mapping.SourcePath.Length..];
+                var folder = Directory.Exists(path) ? path : Path.GetDirectoryName(path)!;
+                await Windows.System.Launcher.LaunchFolderAsync(await Windows.Storage.StorageFolder.GetFolderFromPathAsync(folder));
+            }
+            catch (Exception ex) { StatusText.Text = ex.Message; }
+        };
+        menu.Items.Add(open); check.ContextFlyout = menu;
+    }
+    private Border CreateGroup(string folder, int count, StackPanel rows, bool defaultExpanded, FrameworkElement? extraHeader = null)
+    {
+        var key = (_selectedFunction, folder);
+        var expanded = _expandedGroups.GetValueOrDefault(key, defaultExpanded);
+        var header = new Grid { ColumnSpacing = 16 };
+        header.ColumnDefinitions.Add(new ColumnDefinition()); header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.Children.Add(new TextBlock { Text = Path.GetFileName(folder) + $" ({count})", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap });
+        var accent = (Brush)Application.Current.Resources["AccentTextFillColorPrimaryBrush"];
+        var detail = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        detail.Children.Add(new TextBlock { Text = Strings.ResourceOptimizationViewDetails.GetLocalizedResource(), Foreground = accent });
+        var arrow = new FontIcon { Glyph = expanded ? "\uE70E" : "\uE70D", FontSize = 12, Foreground = accent }; detail.Children.Add(arrow);
+        Grid.SetColumn(detail, 1); header.Children.Add(detail);
+        var toggle = new Button { Content = header, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Padding = new Thickness(16, 12, 16, 12), Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent), BorderThickness = new Thickness(0) };
+        if (extraHeader is not null) rows.Children.Insert(0, extraHeader);
+        rows.Padding = new Thickness(16, 4, 16, 12); rows.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+        toggle.Click += (_, _) => { var show = rows.Visibility != Visibility.Visible; _expandedGroups[key] = show;
+            rows.Visibility = show ? Visibility.Visible : Visibility.Collapsed; arrow.Glyph = show ? "\uE70E" : "\uE70D"; };
+        var card = new StackPanel(); card.Children.Add(toggle); card.Children.Add(rows);
+        return new Border { Child = card, CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1), BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"] };
     }
     private void SetBusy(bool busy)
     {
-        IsBusy = busy; KindSelector.IsEnabled = !busy; CloseButton.IsEnabled = !busy; SelectAllButton.IsEnabled = !busy; SelectNoneButton.IsEnabled = !busy;
+        IsBusy = busy; FunctionOptions.IsHitTestVisible = !busy; RetryButton.IsEnabled = !busy; CloseButton.IsEnabled = !busy; SelectAllButton.IsEnabled = !busy; SelectNoneButton.IsEnabled = !busy;
         foreach (var pair in _choices) pair.Key.IsEnabled = !busy && (ManualMode || pair.Value.Status == "ready");
         foreach (var row in _assignmentRows.Values) row.Video.IsEnabled = !busy;
         foreach (var selector in _groupSelectors) selector.IsEnabled = !busy;
@@ -47,6 +111,7 @@ public sealed partial class AnimeFormatOptimizationDialog : UserControl
     {
         var selected = _choices.Where(pair => pair.Key.IsChecked == true).Select(pair => pair.Value).ToArray();
         ExecuteButton.Visibility = ManualMode ? Visibility.Collapsed : Visibility.Visible;
+        if (!IsBusy && !ManualMode && _choices.Count > 0) StatusText.Text = string.Format(Strings.ResourceOptimizationSelectedCount.GetLocalizedResource(), selected.Length, _choices.Count);
         foreach (var folder in _folderActions)
         {
             var selectedFolder = _choices.Where(pair => pair.Key.IsChecked == true && string.Equals(Path.GetDirectoryName(pair.Value.Source), folder.Key, StringComparison.OrdinalIgnoreCase)).Select(pair => pair.Value).ToArray();
@@ -56,10 +121,10 @@ public sealed partial class AnimeFormatOptimizationDialog : UserControl
     }
     private async Task PreviewAsync()
     {
-        if (IsBusy) return; SetBusy(true); _choices.Clear(); _assignments.Clear(); _assignmentRows.Clear(); _folderActions.Clear(); _groupSelectors.Clear(); PreviewRows.Children.Clear(); StatusText.Text = Strings.AnimeOptimizationScanning.GetLocalizedResource();
+        if (IsBusy || _selectedFunction < 0) return; SetBusy(true); _choices.Clear(); _assignments.Clear(); _assignmentRows.Clear(); _folderActions.Clear(); _groupSelectors.Clear(); PreviewRows.Children.Clear(); StatusText.Text = Strings.AnimeOptimizationScanning.GetLocalizedResource();
         try
         {
-            var operations = await AnimeFormatOptimizationService.PreviewAsync(_scope, _workspace.Settings.Clone(), (AnimeOptimizationKind)KindSelector.SelectedIndex, _includeScope);
+            var operations = await AnimeFormatOptimizationService.PreviewAsync(_scope, _workspace.Settings.Clone(), (AnimeOptimizationKind)_selectedFunction, _includeScope, workspace: _workspace);
             if (ManualMode)
             {
                 BuildAssignmentRows(operations);
@@ -67,17 +132,30 @@ public sealed partial class AnimeFormatOptimizationDialog : UserControl
                 if (operations.Count == 0) StatusText.Text = Strings.AnimeOptimizationNoChanges.GetLocalizedResource();
                 return;
             }
-            foreach (var operation in operations)
+            var groups = operations.GroupBy(operation => GetGroupPath(operation)).ToArray();
+            foreach (var group in groups)
             {
-                var label = Path.GetRelativePath(_scope, operation.Source) + "  →  " + Path.GetFileName(operation.Target);
-                if (operation.Status != "ready") label += "  ·  " + operation.Reason;
-                var check = new CheckBox { Content = new TextBlock { Text = label, TextWrapping = TextWrapping.Wrap }, IsChecked = operation.Status == "ready", IsEnabled = operation.Status == "ready", HorizontalAlignment = HorizontalAlignment.Stretch };
-                check.Checked += (_, _) => UpdateExecute(); check.Unchecked += (_, _) => UpdateExecute(); _choices[check] = operation; PreviewRows.Children.Add(check);
+                var rows = new StackPanel { Spacing = 4 };
+                foreach (var operation in group)
+                {
+                    var details = new StackPanel { Spacing = 3 };
+                    details.Children.Add(new TextBlock { Text = Path.GetFileName(operation.Source), FontSize = 12,
+                        Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"], TextWrapping = TextWrapping.Wrap });
+                    var target = new TextBlock { FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+                    target.Inlines.Add(new Run { Text = Path.GetFileName(operation.Target) });
+                    target.Inlines.Add(new Run { Text = "  new", Foreground = (Brush)Application.Current.Resources["AccentTextFillColorPrimaryBrush"] });
+                    details.Children.Add(target);
+                    if (operation.Status != "ready") details.Children.Add(new TextBlock { Text = operation.Reason, FontSize = 12, TextWrapping = TextWrapping.Wrap });
+                    var check = new CheckBox { Content = details, IsChecked = operation.Status == "ready", IsEnabled = operation.Status == "ready", HorizontalAlignment = HorizontalAlignment.Stretch };
+                    AddFolderMenu(check, operation.Source);
+                    check.Checked += (_, _) => UpdateExecute(); check.Unchecked += (_, _) => UpdateExecute(); _choices[check] = operation; rows.Children.Add(check);
+                }
+                PreviewRows.Children.Add(CreateGroup(group.Key, group.Count(), rows, groups.Length == 1));
             }
             StatusText.Text = operations.Count == 0 ? Strings.AnimeOptimizationNoChanges.GetLocalizedResource() : string.Format(Strings.AnimeOptimizationCount.GetLocalizedResource(), operations.Count(operation => operation.Status == "ready"), operations.Count(operation => operation.Status != "ready"));
         }
         catch (Exception ex) { StatusText.Text = ex.Message; }
-        finally { SetBusy(false); }
+        finally { SetBusy(false); RetryButton.Visibility = Visibility.Visible; SelectionButtons.Visibility = _choices.Count > 0 ? Visibility.Visible : Visibility.Collapsed; }
     }
     private void BuildAssignmentRows(List<ResourceFileOperation> operations)
     {
@@ -117,6 +195,7 @@ public sealed partial class AnimeFormatOptimizationDialog : UserControl
                     {
                     var source = operation.Source;
                     var check = new CheckBox { Content = Path.GetFileName(source), IsChecked = true };
+                    AddFolderMenu(check, source);
                     var video = new ComboBox { MinWidth = 240, HorizontalAlignment = HorizontalAlignment.Stretch };
                     video.Items.Add(new ComboBoxItem { Content = Strings.AnimeOptimizationAssignVideo.GetLocalizedResource() });
                     foreach (var file in videos) video.Items.Add(new ComboBoxItem { Content = Path.GetFileName(file), Tag = file });
@@ -156,7 +235,7 @@ public sealed partial class AnimeFormatOptimizationDialog : UserControl
                     if (groupHeader is not null) rows.Children.Add(new Expander { Header = groupHeader, Content = imageRows, IsExpanded = false, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch });
                     else rows.Children.Add(imageRows);
                 }
-                PreviewRows.Children.Add(new Expander { Header = header, Content = rows, IsExpanded = true, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch });
+                PreviewRows.Children.Add(CreateGroup(group.Key, group.Count(), rows, operations.Select(GetGroupPath).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1, header));
             }
         }
         finally { _buildingAssignments = false; }
@@ -225,7 +304,7 @@ public sealed partial class AnimeFormatOptimizationDialog : UserControl
             foreach (var result in results)
                 CompletionRows.Children.Add(new TextBlock { Text = Path.GetRelativePath(_root, result.Source) + " → " + Path.GetFileName(result.Target) + (result.Status == "done" || result.Status == "ok" ? string.Empty : " · " + result.Reason), TextWrapping = TextWrapping.Wrap });
             CompletionSummary.Text = string.Format(Strings.AnimeOptimizationResult.GetLocalizedResource(), results.Count(result => result.Status == "done"), results.Count(result => result.Status != "done" && result.Status != "ok"));
-            KindSelector.Visibility = PreviewScroll.Visibility = PreviewFooter.Visibility = Visibility.Collapsed;
+            FunctionOptions.Visibility = PreviewScroll.Visibility = PreviewFooter.Visibility = Visibility.Collapsed;
             CompletionView.Visibility = Visibility.Visible;
         }
         catch (Exception ex) { StatusText.Text = ex.Message; }
@@ -234,7 +313,7 @@ public sealed partial class AnimeFormatOptimizationDialog : UserControl
     private async void Continue_Click(object sender, RoutedEventArgs e)
     {
         CompletionView.Visibility = Visibility.Collapsed;
-        KindSelector.Visibility = PreviewScroll.Visibility = PreviewFooter.Visibility = Visibility.Visible;
+        FunctionOptions.Visibility = PreviewScroll.Visibility = PreviewFooter.Visibility = Visibility.Visible;
         await PreviewAsync();
     }
     private void Close_Click(object sender, RoutedEventArgs e) { if (!IsBusy) RequestClose?.Invoke(this, EventArgs.Empty); }

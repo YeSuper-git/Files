@@ -29,9 +29,22 @@ public sealed class ResourceSettings
     public string AnimeImageSource { get; set; } = string.Empty;
     public bool AnimeFlattenSeasons { get; set; } = true;
     public int AnimePosterWidth { get; set; } = 160;
-    public int AnimePosterEpisodeLimit { get; set; } = 8;
+    public Dictionary<string, AnimeCategoryDisplaySettings> AnimeCategoryDisplay { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public int PosterQualityKb { get; set; } = 30;
     public List<string> SubtitleKeywords { get; set; } = ["中文字幕", "中字", "中文", "chinese", "chs", "cht", "sub"];
+
+    public AnimeCategoryDisplaySettings GetAnimeCategoryDisplay(string libraryRoot, string path)
+    {
+        try
+        {
+            var relative = System.IO.Path.GetRelativePath(libraryRoot, path);
+            var category = relative.Split(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar)[0];
+            if (category is "." or ".." || System.IO.Path.IsPathRooted(relative)) return new();
+            var key = System.IO.Path.Combine(libraryRoot, category);
+            return AnimeCategoryDisplay.TryGetValue(key, out var value) ? value : new();
+        }
+        catch (ArgumentException) { return new(); }
+    }
 
     public ResourceSettings Clone() => new()
     {
@@ -54,7 +67,7 @@ public sealed class ResourceSettings
         AnimeImageMinimumHeight = AnimeImageMinimumHeight,
         AnimeFlattenSeasons = AnimeFlattenSeasons,
         AnimePosterWidth = AnimePosterWidth,
-        AnimePosterEpisodeLimit = AnimePosterEpisodeLimit,
+        AnimeCategoryDisplay = (AnimeCategoryDisplay ?? []).ToDictionary(pair => pair.Key, pair => pair.Value.Clone(), StringComparer.OrdinalIgnoreCase),
         SubtitleKeywords = [.. (SubtitleKeywords ?? [])],
     };
 
@@ -84,7 +97,8 @@ public sealed class ResourceSettings
         AnimeImageMinimumWidth = Math.Clamp(AnimeImageMinimumWidth, 0, 65535);
         AnimeImageMinimumHeight = Math.Clamp(AnimeImageMinimumHeight, 0, 65535);
         AnimePosterWidth = Math.Clamp(AnimePosterWidth, 100, 240);
-        AnimePosterEpisodeLimit = Math.Clamp(AnimePosterEpisodeLimit, 0, 30);
+        AnimeCategoryDisplay = (AnimeCategoryDisplay ?? []).Where(pair => !string.IsNullOrWhiteSpace(pair.Key) && pair.Value is not null)
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
         PosterQualityKb = Math.Clamp(PosterQualityKb, 1, 1024 * 1024);
     }
 

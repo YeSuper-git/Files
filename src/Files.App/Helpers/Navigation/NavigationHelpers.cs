@@ -317,6 +317,12 @@ namespace Files.App.Helpers
 				tabLocationHeader = Strings.LibraryAnimeGroup.GetLocalizedResource();
 				((ImageIconSource)iconSource).ImageSource = new BitmapImage(new Uri(SidebarSectionIcons.For(SectionType.AnimeLibrary)!));
 			}
+			else if (currentPath is "ArchiveInbox" or "SubtitleMux")
+            {
+                tabLocationHeader = Files.App.Views.VideoEditor.MediaToolsPage.GetTitle(currentPath);
+                ((ImageIconSource)iconSource).ImageSource = new BitmapImage(new Uri(SidebarSectionIcons.ForMediaTool(currentPath)));
+                toolTipText = tabLocationHeader;
+            }
 			else if (currentPath.Equals("VideoEditor", StringComparison.OrdinalIgnoreCase))
 			{
 				tabLocationHeader = Strings.VideoEditorTitle.GetLocalizedResource();

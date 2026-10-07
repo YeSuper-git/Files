@@ -54,6 +54,21 @@ namespace Files.App.Data.Models
 			}
 		}
 
+		private bool isPageTypeMediaTool;
+        public bool IsPageTypeMediaTool
+        {
+            get => isPageTypeMediaTool;
+            set
+            {
+                if (SetProperty(ref isPageTypeMediaTool, value))
+                {
+                    OnPropertyChanged(nameof(CanCreateFileInPage));
+                    OnPropertyChanged(nameof(CanCopyPathInPage));
+                    OnPropertyChanged(nameof(CanTagFilesInPage));
+                }
+            }
+        }
+
 		private bool isPageTypeVideoEditor;
 		public bool IsPageTypeVideoEditor
 		{
@@ -192,17 +207,17 @@ namespace Files.App.Data.Models
 
 		public bool CanCopyPathInPage
 		{
-			get => !isPageTypeMtpDevice && !isPageTypeRecycleBin && isPageTypeNotHome && !isPageTypeSearchResults && !IsPageTypeReleaseNotes && !IsPageTypeSettings && !IsPageTypeVideoEditor;
+			get => !isPageTypeMtpDevice && !isPageTypeRecycleBin && isPageTypeNotHome && !isPageTypeSearchResults && !IsPageTypeReleaseNotes && !IsPageTypeSettings && !IsPageTypeVideoEditor && !IsPageTypeMediaTool;
 		}
 
 		public bool CanCreateFileInPage
 		{
-			get => !isPageTypeMtpDevice && !isPageTypeRecycleBin && isPageTypeNotHome && !isPageTypeSearchResults && !isPageTypeFtp && !isPageTypeZipFolder && !IsPageTypeReleaseNotes && !IsPageTypeSettings && !IsPageTypeVideoEditor;
+			get => !isPageTypeMtpDevice && !isPageTypeRecycleBin && isPageTypeNotHome && !isPageTypeSearchResults && !isPageTypeFtp && !isPageTypeZipFolder && !IsPageTypeReleaseNotes && !IsPageTypeSettings && !IsPageTypeVideoEditor && !IsPageTypeMediaTool;
 		}
 
 		public bool CanTagFilesInPage
 		{
-			get => !isPageTypeRecycleBin && !isPageTypeFtp && !isPageTypeZipFolder && !IsPageTypeVideoEditor;
+			get => !isPageTypeRecycleBin && !isPageTypeFtp && !isPageTypeZipFolder && !IsPageTypeVideoEditor && !IsPageTypeMediaTool;
 		}
 
 		private bool isGitRepository;

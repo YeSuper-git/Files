@@ -681,6 +681,8 @@ namespace Files.App.ViewModels.UserControls
 					section.IsHeader = true;
 					section.IsExpanded = false;
 					section.ChildItems!.Add(CreateLibraryNavigationItem(Strings.VideoEditorNavigationTitle.GetLocalizedResource(), "VideoEditor", sectionType));
+                    section.ChildItems.Add(CreateLibraryNavigationItem(Strings.ArchiveInboxTitle.GetLocalizedResource(), "ArchiveInbox", sectionType));
+                    section.ChildItems.Add(CreateLibraryNavigationItem(Strings.SubtitleMuxTitle.GetLocalizedResource(), "SubtitleMux", sectionType));
 					break;
 #endif
 			}
@@ -713,7 +715,7 @@ namespace Files.App.ViewModels.UserControls
 				ChildItems = null,
 				SelectsOnInvoked = true,
 				MenuOptions = new ContextMenuOptions(),
-				Icon = new BitmapImage(new Uri(SidebarSectionIcons.For(section)!)),
+				Icon = new BitmapImage(new Uri(path is "ArchiveInbox" or "SubtitleMux" ? SidebarSectionIcons.ForMediaTool(path) : SidebarSectionIcons.For(section)!)),
 			};
 
 		private async Task RefreshLibrarySectionAsync(LocationItem section)
@@ -1044,6 +1046,13 @@ namespace Files.App.ViewModels.UserControls
 				else if (PaneHolder?.ActivePane is IShellPage animeShell) NavigationHelpers.OpenAnimeLibrary(animeShell);
 				return;
 			}
+
+			if (navigationPath is "ArchiveInbox" or "SubtitleMux")
+            {
+                if (ctrlPressed || middleClickPressed) await NavigationHelpers.OpenPathInNewTab(navigationPath);
+                else if (PaneHolder?.ActivePane is IShellPage toolShell) toolShell.NavigateToMediaTool(navigationPath);
+                return;
+            }
 
 			if (string.Equals(navigationPath, "VideoEditor", StringComparison.OrdinalIgnoreCase))
 			{

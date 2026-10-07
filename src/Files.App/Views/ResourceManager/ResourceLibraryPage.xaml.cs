@@ -42,6 +42,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
     public SettingsPageKind SettingsPage => _animeLibrary ? SettingsPageKind.AnimeLibraryPage : SettingsPageKind.ResourceManagerPage;
     private Dictionary<string, ResourceBrowserViewState> _viewStates = new(StringComparer.OrdinalIgnoreCase);
     private string? _loadedLocationKey;
+    private ScrollViewer? _trackedBrowserScroller;
     private string? _currentAnimeSeasonPath;
     private bool _restoringPosition;
     private bool _restoringSorting;
@@ -84,6 +85,8 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
     private ResourceBrowserItemViewModel? _activeVideoItem;
 
     public System.Collections.ObjectModel.ObservableCollection<ResourceBrowserItemViewModel> BrowserItems { get; } = [];
+    private ListedItem? _actorContextPreview;
+    public ListedItem? ActorContextPreview => !_animeLibrary && _locations.LastOrDefault()?.Kind == ResourceBrowserLocationKind.ActorFolder ? _actorContextPreview : null;
     public bool IsAnimeLibrary => _animeLibrary;
     public string CurrentPath => _locations.Count > 0 ? _locations[^1].Path : _libraryPath;
 
@@ -104,6 +107,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         {
             _displayContext.PropertyChanged -= OnSortingChanged;
             _displayContext.PropertyChanged += OnSortingChanged;
+            TrackBrowserPosition();
             RestoreBrowserSorting();
             SetNativeSelection(_selectedResourceItems.Values.Select(selected => selected.Item).ToList());
             UpdateNativeResourceStatus();
@@ -199,7 +203,14 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
             _loadingShell = args?.AssociatedTabInstance as ModernShellPage ?? _contentPageContext.ShellPage as ModernShellPage;
             _viewStates = args?.ResourceViewStates ?? new(StringComparer.OrdinalIgnoreCase);
             if (args is not null) args.ResourceViewStates = _viewStates;
-            _animeLibrary = args?.NavPathParam == "AnimeLibrary";
+            var animeLibrary = args?.NavPathParam == "AnimeLibrary";
+            if (_animeLibrary != animeLibrary) _tabSortSettings = null;
+            _animeLibrary = animeLibrary;
+            if (!_animeLibrary)
+            {
+                _workspace = Ioc.Default.GetRequiredService<IResourceWorkspaceService>();
+                _browser = Ioc.Default.GetRequiredService<IResourceBrowserService>();
+            }
             _pendingAnimeEditPath = _animeLibrary ? args?.AnimeEditPath : null;
             if (args is not null) args.AnimeEditPath = null;
             if (_animeLibrary)
@@ -289,6 +300,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
     protected override void OnNavigatedFrom(NavigationEventArgs e)
     {
         RememberBrowserPosition();
+        _loadedLocationKey = null;
         _loadCancellation?.Cancel();
         _displayContext.PropertyChanged -= OnSortingChanged;
         base.OnNavigatedFrom(e);
@@ -296,7 +308,9 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
 
     private void OnPageUnloaded(object sender, RoutedEventArgs e)
     {
-        RememberBrowserPosition();
+        if (_trackedBrowserScroller is not null) _trackedBrowserScroller.ViewChanged -= OnBrowserViewChanged;
+        _trackedBrowserScroller = null;
+        VideoDetailView.ViewChanged -= OnBrowserViewChanged;
         _displayContext.PropertyChanged -= OnSortingChanged;
     }
 
@@ -322,12 +336,11 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
     public void ApplyRequestedSorting()
     {
         if (_contentPageContext.ShellPage is not ModernShellPage shell || !ReferenceEquals(shell.CurrentResourceLibraryPage, this)) return;
-        var preferences = shell.InstanceViewModel.FolderSettings;
         var settings = _workspace.Settings.Clone();
-        settings.BrowserSortOption = (int)preferences.DirectorySortOption;
-        settings.BrowserSortDirection = (int)preferences.DirectorySortDirection;
-        settings.BrowserSortFilesFirst = preferences.SortFilesFirst;
-        settings.BrowserSortDirectoriesAlongsideFiles = preferences.SortDirectoriesAlongsideFiles;
+        settings.BrowserSortOption = (int)_displayContext.SortOption;
+        settings.BrowserSortDirection = (int)_displayContext.SortDirection;
+        settings.BrowserSortFilesFirst = _displayContext.SortFilesFirst;
+        settings.BrowserSortDirectoriesAlongsideFiles = _displayContext.SortDirectoriesAlongsideFiles;
         _workspace.UpdateSettings(settings);
         if (_loadedLocationKey is not null) ApplyBrowserSorting();
     }
@@ -335,6 +348,13 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
     private void RestoreBrowserSorting()
     {
         var settings = _tabSortSettings ?? _workspace.Settings;
+        if (settings.BrowserSortOption is null)
+        {
+            settings = settings.Clone();
+            settings.BrowserSortOption = (int)SortOption.Name;
+            settings.BrowserSortDirection = (int)SortDirection.Ascending;
+            _workspace.UpdateSettings(settings);
+        }
         _restoringSorting = true;
         try
         {
@@ -364,6 +384,20 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
             for (var index = 0; index < episodes.Length; index++)
             {
                 var oldIndex = BrowserItems.IndexOf(episodes[index]);
+                if (oldIndex != index) BrowserItems.Move(oldIndex, index);
+            }
+            return;
+        }
+        if (!_animeLibrary && sortOption == SortOption.ResourceWorkCount)
+        {
+            var counts = current.OrderBy(item => item.ActorWorkCount is null);
+            var ranked = (sortDirection == SortDirection.Ascending
+                ? counts.ThenBy(item => item.ActorWorkCount)
+                : counts.ThenByDescending(item => item.ActorWorkCount))
+                .ThenBy(item => item.Name, new EpisodeNameComparer()).ToArray();
+            for (var index = 0; index < ranked.Length; index++)
+            {
+                var oldIndex = BrowserItems.IndexOf(ranked[index]);
                 if (oldIndex != index) BrowserItems.Move(oldIndex, index);
             }
             return;
@@ -444,9 +478,29 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
     private ScrollViewer? BrowserScroller => VideoDetailView.Visibility == Visibility.Visible
         ? VideoDetailView : DependencyObjectHelpers.FindChild<ScrollViewer>(BrowserGrid);
 
+    private void TrackBrowserPosition()
+    {
+        BrowserGrid.ApplyTemplate();
+        var scroller = DependencyObjectHelpers.FindChild<ScrollViewer>(BrowserGrid);
+        if (!ReferenceEquals(_trackedBrowserScroller, scroller))
+        {
+            if (_trackedBrowserScroller is not null) _trackedBrowserScroller.ViewChanged -= OnBrowserViewChanged;
+            _trackedBrowserScroller = scroller;
+            if (scroller is not null) scroller.ViewChanged += OnBrowserViewChanged;
+        }
+        VideoDetailView.ViewChanged -= OnBrowserViewChanged;
+        VideoDetailView.ViewChanged += OnBrowserViewChanged;
+    }
+
+    private void OnBrowserViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
+    {
+        if (IsLoaded && !LoadingRing.IsActive && BrowserContent.IsHitTestVisible)
+            RememberBrowserPosition();
+    }
+
     private void RememberBrowserPosition()
     {
-        if (_restoringPosition || _loadedLocationKey is null || BrowserScroller is not { } scroller) return;
+        if (!IsLoaded || LoadingRing.IsActive || _restoringPosition || _loadedLocationKey is null || BrowserScroller is not { } scroller) return;
         string? anchor = null;
         double anchorTop = 0;
         if (BrowserGrid.Visibility == Visibility.Visible)
@@ -524,11 +578,13 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         _loadingShell?.UpdateResourceLibraryLoading(this, loading);
     }
 
-    public async Task RefreshAsync()
+    public Task RefreshAsync() => RefreshAsync(restorePosition: true);
+
+    public async Task RefreshAsync(bool restorePosition)
     {
         if (_locations.Count > 0)
         {
-            await LoadLocationAsync(_locations[^1]);
+            await LoadLocationAsync(_locations[^1], restorePosition);
             if (_locations[^1].Kind != ResourceBrowserLocationKind.LibraryRoot) _workspace.NotifyNavigationChanged();
         }
     }
@@ -678,10 +734,17 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
             NavigateToLocation(_locations.Take(_locations.Count - 1).ToArray());
     }
 
-    private async Task LoadLocationAsync(ResourceBrowserLocation location)
+    private async Task LoadLocationAsync(ResourceBrowserLocation location, bool restorePosition = true)
     {
-        RememberBrowserPosition();
+        if (restorePosition)
+            RememberBrowserPosition();
+        else
+        {
+            _viewStates.Remove(GetLocationKey(location));
+            _sortItems.Clear();
+        }
         _loadedLocationKey = null;
+        _actorContextPreview = null;
         var preferredActorGroupName = location.Kind == ResourceBrowserLocationKind.ActorFolder &&
             _selectedActorGroupActorPath is not null && PathEquals(_selectedActorGroupActorPath, location.Path)
             ? _selectedActorGroupName
@@ -694,7 +757,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
             _loadCancellation?.Dispose();
             currentLoad = _loadCancellation = new CancellationTokenSource();
             cancellationToken = currentLoad.Token;
-            BrowserContent.Opacity = _viewStates.ContainsKey(GetLocationKey(location)) ? 0 : 1;
+            BrowserContent.Opacity = !restorePosition || _viewStates.ContainsKey(GetLocationKey(location)) ? 0 : 1;
             BrowserContent.IsHitTestVisible = false;
 
             ClearSelectedResourceItems();
@@ -797,13 +860,35 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
             SetResourceStatusMessage(string.Empty);
             UpdateActorGridLayout();
             UpdateNativeResourceStatus();
+            if (!_animeLibrary && location.Kind == ResourceBrowserLocationKind.ActorFolder)
+            {
+                var actorModel = await _browser.GetActorItemAsync(location.Path, _workspace.Settings, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                _actorContextPreview = CreateListedItem(new ResourceBrowserItemViewModel(actorModel, _workspace, false));
+                if (BrowserGrid.SelectedItems.Count == 0) SetNativeSelection(null);
+            }
+            if (_animeLibrary && location.Kind != ResourceBrowserLocationKind.VideoFolder)
+                _ = LoadAnimeEpisodeCountsAsync(BrowserItems.ToArray(), cancellationToken);
+            TrackBrowserPosition();
             _loadedLocationKey = GetLocationKey(location);
             if (location.Kind == ResourceBrowserLocationKind.LibraryRoot) _workspace.NotifyNavigationChanged();
-            await RestoreBrowserPositionAsync(cancellationToken);
-            if (_viewStates.ContainsKey(_loadedLocationKey))
+            if (!_animeLibrary && location.Kind == ResourceBrowserLocationKind.LibraryRoot && _workspace.Settings.BrowserSortOption == (int)SortOption.ResourceWorkCount)
+                await LoadActorWorkCountsAsync(BrowserItems.ToArray(), cancellationToken);
+            if (restorePosition)
+            {
+                await RestoreBrowserPositionAsync(cancellationToken);
+                if (_viewStates.ContainsKey(_loadedLocationKey))
+                    await WaitForBrowserRenderAsync(cancellationToken);
+            }
+            else
+            {
+                UpdateLayout();
+                BrowserScroller?.ChangeView(null, 0, null, true);
                 await WaitForBrowserRenderAsync(cancellationToken);
+            }
 
-            if (!_animeLibrary && location.Kind == ResourceBrowserLocationKind.LibraryRoot && BrowserItems.Count > 0)
+            if (!_animeLibrary && location.Kind == ResourceBrowserLocationKind.LibraryRoot && BrowserItems.Count > 0
+                && _workspace.Settings.BrowserSortOption != (int)SortOption.ResourceWorkCount)
                 _ = LoadActorWorkCountsAsync(BrowserItems.ToArray(), cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -1319,8 +1404,8 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
             token.ThrowIfCancellationRequested();
             ClearSelectedResourceItems(); SetNativeSelection(null);
             BrowserItems.Clear();
-            AnimeEpisodeCards.Visibility = episodes.Count > 0 && episodes.Count <= _workspace.Settings.AnimePosterEpisodeLimit ? Visibility.Visible : Visibility.Collapsed;
-            AnimeEpisodeButtons.Visibility = episodes.Count > _workspace.Settings.AnimePosterEpisodeLimit ? Visibility.Visible : Visibility.Collapsed;
+            AnimeEpisodeCards.Visibility = episodes.Count > 0 && _workspace.Settings.GetAnimeCategoryDisplay(_libraryPath, location.Path).ShowEpisodePosters ? Visibility.Visible : Visibility.Collapsed;
+            AnimeEpisodeButtons.Visibility = episodes.Count > 0 && !_workspace.Settings.GetAnimeCategoryDisplay(_libraryPath, location.Path).ShowEpisodePosters ? Visibility.Visible : Visibility.Collapsed;
             VideoFileList.Visibility = Visibility.Collapsed;
             foreach (var model in models) BrowserItems.Add(model);
             ApplyBrowserSorting();
@@ -1531,6 +1616,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         {
             shellPage.UpdateResourceLibrarySelection(items ?? []);
             shellPage.ToolbarViewModel.SelectedItems = items;
+            if (items is null or { Count: 0 }) Ioc.Default.GetRequiredService<InfoPaneViewModel>().RefreshLibrarySelection();
         }
     }
 
@@ -2496,8 +2582,8 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         var birthDateBox = new TextBox
         {
             Header = "出生日期",
-            Text = details.BirthDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty,
-            PlaceholderText = "yyyy-MM-dd",
+            Text = ResourceActorDetails.FormatDate(details.BirthDate, details.BirthDateMonthOnly),
+            PlaceholderText = Strings.ActorDateInputHint.GetLocalizedResource(),
         };
 
         var careerStatusBox = new ComboBox { Header = "生涯", PlaceholderText = "选择现役或退役" };
@@ -2508,10 +2594,12 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
             : details.IsCurrentlyActive == true ? 0 : -1;
         var retirementBox = new TextBox
         {
-            Text = details.CareerRetirementDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty,
-            PlaceholderText = "退役日期（yyyy-MM-dd）",
+            Text = ResourceActorDetails.FormatDate(details.CareerRetirementDate, details.CareerRetirementDateMonthOnly),
+            PlaceholderText = Strings.ActorDateInputHint.GetLocalizedResource(),
             Visibility = careerStatusBox.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed,
         };
+        ConfigureActorDateInput(birthDateBox);
+        ConfigureActorDateInput(retirementBox);
         careerStatusBox.SelectionChanged += (_, _) =>
         {
             retirementBox.Visibility = careerStatusBox.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
@@ -2574,7 +2662,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
             {
                 args.Cancel = true;
                 birthDateBox.Focus(FocusState.Programmatic);
-                validationText.Text = "出生日期请输入有效日期，例如 1990-01-01。";
+                validationText.Text = Strings.ActorDateInputInvalid.GetLocalizedResource();
                 validationText.Visibility = Visibility.Visible;
             }
 			else if (!string.IsNullOrWhiteSpace(retirementBox.Text) &&
@@ -2583,7 +2671,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
 			{
 				args.Cancel = true;
 				retirementBox.Focus(FocusState.Programmatic);
-				validationText.Text = "退役日期请输入有效日期，例如 2020-01-01；留空则只显示退役。";
+				validationText.Text = Strings.ActorDateInputInvalid.GetLocalizedResource();
                 validationText.Visibility = Visibility.Visible;
             }
             else if (string.IsNullOrWhiteSpace(nameBox.Text))
@@ -2649,6 +2737,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
             Hip = hipBox.Text,
             CupSize = cupBox.Text,
             BirthDate = birthDate,
+            BirthDateMonthOnly = birthDate is not null && ResourceActorDetails.TryParseDate(birthDateBox.Text, out _, out var birthMonthOnly) && birthMonthOnly,
             IsCurrentlyActive = careerStatusBox.SelectedIndex switch
             {
                 0 => true,
@@ -2656,6 +2745,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
                 _ => null,
             },
             CareerRetirementDate = retirementDate,
+            CareerRetirementDateMonthOnly = retirementDate is not null && ResourceActorDetails.TryParseDate(retirementBox.Text, out _, out var retirementMonthOnly) && retirementMonthOnly,
             PosterPaths = details.PosterPaths,
             ExcludedPosterPaths = details.ExcludedPosterPaths,
         });
@@ -2884,6 +2974,28 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         return field;
     }
 
+    private async Task LoadAnimeEpisodeCountsAsync(IReadOnlyList<ResourceBrowserItemViewModel> items, CancellationToken token)
+    {
+        using var concurrency = new SemaphoreSlim(3);
+        await Task.WhenAll(items.Where(item => item.Kind == ResourceBrowserItemKind.VideoFolder
+            && _workspace.Settings.GetAnimeCategoryDisplay(_libraryPath, item.Path).ShowEpisodeCount).Select(async item =>
+        {
+            try
+            {
+                await concurrency.WaitAsync(token);
+                try
+                {
+                    var seasons = await AnimeLibraryService.GetSeasonsAsync(item.Path, _workspace.Settings, token);
+                    var count = await Task.Run(() => seasons.Sum(path => { token.ThrowIfCancellationRequested(); return AnimeLibraryService.GetEpisodeTargets(path, _workspace.Settings).Count; }), token);
+                    await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() => { if (!token.IsCancellationRequested) item.AnimeEpisodeCount = count; });
+                }
+                finally { concurrency.Release(); }
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+            catch (Exception ex) { App.Logger.LogDebug(ex, "Unable to count anime episodes for {Path}", item.Path); }
+        }));
+    }
+
     private async Task LoadActorWorkCountsAsync(IReadOnlyList<ResourceBrowserItemViewModel> actors, CancellationToken cancellationToken)
     {
         using var concurrencyLimit = new SemaphoreSlim(3);
@@ -2910,6 +3022,8 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         });
 
         await Task.WhenAll(tasks);
+        if (!cancellationToken.IsCancellationRequested && _workspace.Settings.BrowserSortOption == (int)SortOption.ResourceWorkCount)
+            await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() => { if (!cancellationToken.IsCancellationRequested) ApplyBrowserSorting(); });
         if (!cancellationToken.IsCancellationRequested)
             await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(RefreshNativeSelectionAvailability);
     }
@@ -2927,9 +3041,27 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         => ResourceBrowserService.CountActorVideosAsync(actorFolderPath, _workspace.Settings, cancellationToken);
 
     private static bool TryParseRetirementDate(string value, out DateTime date)
+        => ResourceActorDetails.TryParseDate(value, out date, out _);
+
+    private static void ConfigureActorDateInput(TextBox input)
     {
-        var formats = new[] { "yyyy-MM-dd", "yyyy/M/d", "yyyy/M/dd", "yyyy年M月d日" };
-        return DateTime.TryParseExact(value.Trim(), formats, CultureInfo.CurrentCulture, DateTimeStyles.None, out date);
+        void Normalize()
+        {
+            if (ResourceActorDetails.TryParseDate(input.Text, out var date, out var monthOnly))
+                input.Text = ResourceActorDetails.FormatDate(date, monthOnly);
+        }
+        input.LostFocus += (_, _) => Normalize();
+        input.TextChanged += (_, _) =>
+        {
+            var text = input.Text.Trim();
+            if ((text.Length is 6 or 8 && text.All(char.IsAsciiDigit))
+                || System.Text.RegularExpressions.Regex.IsMatch(text, @"^\d{4}-\d{4}$"))
+            {
+                if (text.Length == 9) input.Text = text.Insert(7, "-");
+                Normalize();
+                input.SelectionStart = input.Text.Length;
+            }
+        };
     }
 
     private Task SaveTagsAsync(string path, IEnumerable<string> selectedTagIds)

@@ -474,7 +474,8 @@ namespace Files.App.Views
 				var isHomePage = !(SidebarAdaptiveViewModel.PaneHolder?.ActivePane?.InstanceViewModel?.IsPageTypeNotHome ?? false);
 				var isReleaseNotesPage = SidebarAdaptiveViewModel.PaneHolder?.ActivePane?.InstanceViewModel?.IsPageTypeReleaseNotes ?? false;
 				var isSettingsPage = SidebarAdaptiveViewModel.PaneHolder?.ActivePane?.InstanceViewModel?.IsPageTypeSettings ?? false;
-				var isVideoEditorPage = SidebarAdaptiveViewModel.PaneHolder?.ActivePane?.InstanceViewModel?.IsPageTypeVideoEditor ?? false;
+				var instance = SidebarAdaptiveViewModel.PaneHolder?.ActivePane?.InstanceViewModel;
+				var isVideoEditorPage = instance?.IsPageTypeVideoEditor == true || instance?.IsPageTypeMediaTool == true;
 				var isMultiPane = SidebarAdaptiveViewModel.PaneHolder?.IsMultiPaneActive ?? false;
 				var isBigEnough = !App.AppModel.IsMainWindowClosed &&
 					(MainWindow.Instance.Bounds.Width > 450 && MainWindow.Instance.Bounds.Height > 450 || RootGrid.ActualWidth > 700 && MainWindow.Instance.Bounds.Height > 360);

@@ -75,6 +75,7 @@ namespace Files.App.Data.Contracts
 		public void NavigateToResourceManagerTools();
 		public void NavigateToResourceLibraryLocation(NavigationArguments arguments);
 		public void NavigateToVideoEditor();
+		public void NavigateToMediaTool(string path);
 #endif
 
 		/// <summary>

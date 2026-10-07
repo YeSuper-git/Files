@@ -205,6 +205,10 @@ namespace Files.App.Views.Shells
 			{
 				NavigationHelpers.OpenAnimeLibrary(this);
 			}
+			else if (navParams.NavPath is "ArchiveInbox" or "SubtitleMux")
+			{
+				NavigateToMediaTool(navParams.NavPath);
+			}
 			else if (navParams.NavPath == "VideoEditor")
 			{
 				NavigateToVideoEditor();
@@ -246,11 +250,22 @@ namespace Files.App.Views.Shells
 
 		private async void ItemDisplayFrame_Navigated(object sender, NavigationEventArgs e)
 		{
+			#if FILES_RESOURCE_MANAGER
+            InstanceViewModel.IsPageTypeMediaTool = e.SourcePageType == typeof(Files.App.Views.VideoEditor.MediaToolsPage);
+#else
+            InstanceViewModel.IsPageTypeMediaTool = false;
+#endif
 			InstanceViewModel.IsPageTypeVideoEditor = e.SourcePageType == typeof(Files.App.Views.VideoEditor.VideoEditorPage);
-			if (InstanceViewModel.IsPageTypeVideoEditor)
+			if (InstanceViewModel.IsPageTypeVideoEditor || InstanceViewModel.IsPageTypeMediaTool)
 			{
 				InstanceViewModel.IsPageTypeNotHome = true;
-				ToolbarViewModel.PathControlDisplayText = Strings.VideoEditorTitle.GetLocalizedResource();
+				#if FILES_RESOURCE_MANAGER
+                ToolbarViewModel.PathControlDisplayText = InstanceViewModel.IsPageTypeMediaTool
+                    ? Files.App.Views.VideoEditor.MediaToolsPage.GetTitle((e.Parameter as NavigationArguments)?.NavPathParam ?? "")
+                    : Strings.VideoEditorTitle.GetLocalizedResource();
+#else
+                ToolbarViewModel.PathControlDisplayText = Strings.VideoEditorTitle.GetLocalizedResource();
+#endif
 				ToolbarViewModel.CanNavigateToParent = false;
 				ToolbarViewModel.SelectedItems = null;
 			}
@@ -272,7 +287,7 @@ namespace Files.App.Views.Shells
 				TabBarItemParameter = new()
 				{
 					InitialPageType = typeof(ModernShellPage),
-					NavigationParameter = parameters.IsSearchResultPage && !isTagSearch ? parameters.SearchPathParam : parameters.NavPathParam
+					NavigationParameter = parameters.IsArchiveInboxPage ? "ArchiveInbox" : parameters.IsSearchResultPage && !isTagSearch ? parameters.SearchPathParam : parameters.NavPathParam
 				};
 
 				if (parameters.IsLayoutSwitch)
@@ -603,6 +618,33 @@ namespace Files.App.Views.Shells
 				new SuppressNavigationTransitionInfo());
 		}
 
+        public override void NavigateToMediaTool(string path)
+        {
+            if (path is not ("ArchiveInbox" or "SubtitleMux")) throw new ArgumentException(nameof(path));
+            if (path == "ArchiveInbox" && Windows.Storage.ApplicationData.Current.LocalSettings.Values.TryGetValue("ArchiveInboxPath", out var saved)
+                && saved is string root && Directory.Exists(root))
+            {
+                Files.App.Services.VideoEditor.ArchiveInboxActions.Open(this, root);
+                return;
+            }
+            InstanceViewModel.IsResourceManagerMode = false;
+            InstanceViewModel.ResourceLibraryPath = null;
+            InstanceViewModel.IsPageTypeNotHome = true;
+            InstanceViewModel.IsPageTypeSearchResults = false;
+            InstanceViewModel.IsPageTypeSettings = false;
+            InstanceViewModel.IsPageTypeReleaseNotes = false;
+            InstanceViewModel.IsPageTypeRecycleBin = false;
+            InstanceViewModel.IsPageTypeMtpDevice = false;
+            InstanceViewModel.IsPageTypeFtp = false;
+            InstanceViewModel.IsPageTypeZipFolder = false;
+            InstanceViewModel.IsPageTypeLibrary = false;
+            InstanceViewModel.IsPageTypeCloudDrive = false;
+            ToolbarViewModel.SelectedItems = null;
+            ToolbarViewModel.CanNavigateToParent = false;
+            ItemDisplayFrame.Navigate(typeof(Files.App.Views.VideoEditor.MediaToolsPage),
+                new NavigationArguments { NavPathParam = path, AssociatedTabInstance = this }, new SuppressNavigationTransitionInfo());
+        }
+
 		public override void NavigateToVideoEditor()
 		{
 			InstanceViewModel.IsResourceManagerMode = false;
@@ -655,6 +697,15 @@ namespace Files.App.Views.Shells
 #endif
 
 			var shellViewModel = ShellViewModel!;
+            if (navArgs?.IsSearchResultPage != true && navArgs?.IsResourceLibraryPage != true && SlimContentPage is BaseLayoutPage { IsArchiveInboxPage: true, ArchiveInboxRoot: { } archiveRoot }
+                && navigationPath is not null && (navigationPath.Equals(archiveRoot, StringComparison.OrdinalIgnoreCase)
+                    || navigationPath.StartsWith(archiveRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)))
+            {
+                navArgs ??= new NavigationArguments { NavPathParam = navigationPath, AssociatedTabInstance = this };
+                navArgs.IsArchiveInboxPage = true;
+                navArgs.ArchiveInboxRoot = archiveRoot;
+                if (sourcePageType == typeof(ColumnsLayoutPage)) sourcePageType = typeof(DetailsLayoutPage);
+            }
 			shellViewModel.FilesAndFoldersFilter = null;
 			var isResourceManagerMode = false;
 			string? resourceLibraryPath = null;

@@ -123,7 +123,7 @@ namespace Files.App.Views.Shells
 			CurrentPageType != typeof(HomePage) &&
 			CurrentPageType != typeof(ReleaseNotesPage) &&
 			CurrentPageType != typeof(SettingsPage) &&
-			!InstanceViewModel.IsPageTypeVideoEditor &&
+			!InstanceViewModel.IsPageTypeVideoEditor && !InstanceViewModel.IsPageTypeMediaTool &&
 			(PaneHolder is null || !PaneHolder.IsMultiPaneActive || Equals(PaneHolder.ActivePane, this));
 
 		protected TabBarItemParameter? _TabItemArguments;
@@ -585,6 +585,13 @@ namespace Files.App.Views.Shells
 
 		public async Task RefreshIfNoWatcherExistsAsync()
 		{
+#if FILES_RESOURCE_MANAGER
+			if (ItemDisplay.Content is ResourceManager.ResourceLibraryPage resourceLibraryPage)
+			{
+				await resourceLibraryPage.RefreshAsync();
+				return;
+			}
+#endif
 			var shellViewModel = this.GetRequiredShellViewModel();
 			if (shellViewModel.HasNoWatcher)
 				await Refresh_Click();
@@ -596,7 +603,7 @@ namespace Files.App.Views.Shells
 			if (ItemDisplay.Content is ResourceManager.ResourceLibraryPage resourceLibraryPage)
 			{
 				ToolbarViewModel.CanRefresh = false;
-				await resourceLibraryPage.RefreshAsync();
+				await resourceLibraryPage.RefreshAsync(restorePosition: false);
 				ToolbarViewModel.CanRefresh = true;
 				return;
 			}
@@ -913,6 +920,7 @@ namespace Files.App.Views.Shells
 		public abstract void NavigateToResourceManagerTools();
 		public abstract void NavigateToResourceLibraryLocation(NavigationArguments arguments);
 		public abstract void NavigateToVideoEditor();
+		public abstract void NavigateToMediaTool(string path);
 #endif
 
 		public abstract void NavigateToSettings(string? selectItem = null);

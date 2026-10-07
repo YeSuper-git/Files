@@ -7,6 +7,8 @@ namespace Files.App.Services.ResourceManager;
 
 public interface IResourceBrowserService
 {
+    Task<ResourceBrowserItem> GetActorItemAsync(string path, ResourceSettings settings, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<ResourceBrowserItem>> GetChildrenAsync(
         string path,
         ResourceBrowserLocationKind locationKind,

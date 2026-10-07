@@ -20,6 +20,8 @@ public static class MediaRecognitionSettings
         var library = new StackPanel { Spacing = 8 };
         if (includeAnimeLibraryControls) SettingsContent.Children.Add(library);
         var display = includeAnimeLibraryControls ? AddSection(Strings.AnimeSettingsDisplaySection.GetLocalizedResource()) : new StackPanel();
+        var categoryRows = new StackPanel { Spacing = 8 };
+        if (includeAnimeLibraryControls) display.Children.Add(categoryRows);
         var images = AddSection(Strings.AnimeImagesImport.GetLocalizedResource());
         void Commit(Action<Files.App.Data.Models.ResourceManager.ResourceSettings> update)
         {
@@ -61,7 +63,7 @@ public static class MediaRecognitionSettings
                 WinRT.Interop.InitializeWithWindow.Initialize(picker, MainWindow.Instance.WindowHandle);
                 picker.FileTypeFilter.Add("*");
                 var folder = await picker.PickSingleFolderAsync();
-                if (folder is not null) { workspace.SetLibraryPath(folder.Path); rootCard.Description = folder.Path; }
+                if (folder is not null) { workspace.SetLibraryPath(folder.Path); rootCard.Description = folder.Path; RebuildCategorySettings(); }
             }
             catch (Exception ex) { rootCard.Description = ex.Message; }
         };
@@ -218,6 +220,35 @@ public static class MediaRecognitionSettings
         var dimensionCard = new SettingsCard { Header = Strings.MediaImageDimensionsValue.GetLocalizedResource(), Content = dimensions, HeaderIcon = new FontIcon { Glyph = "\uE91B" } };
         images.Children.Insert(1, SwitchExpander(Strings.MediaImageMinimumDimensions.GetLocalizedResource(), "\uE91B", dimensionCard, () => workspace.Settings.ImageSizeLimitEnabled == true, (settings, value) => settings.ImageSizeLimitEnabled = value));
         if (includeAnimeLibraryControls) AddNumber(display, Strings.AnimeLibraryPosterWidth.GetLocalizedResource(), () => workspace.Settings.AnimePosterWidth, 100, 240, (settings, value) => settings.AnimePosterWidth = value, "px", "\uE91B");
-        if (includeAnimeLibraryControls) AddNumber(display, Strings.AnimeLibraryPosterEpisodeLimit.GetLocalizedResource(), () => workspace.Settings.AnimePosterEpisodeLimit, 0, 30, (settings, value) => settings.AnimePosterEpisodeLimit = value);
+        void RebuildCategorySettings()
+        {
+            categoryRows.Children.Clear();
+            if (!includeAnimeLibraryControls || !System.IO.Directory.Exists(workspace.LibraryPath)) return;
+            try
+            {
+                foreach (var path in System.IO.Directory.EnumerateDirectories(workspace.LibraryPath).Where(path => !System.IO.Path.GetFileName(path).StartsWith('.') && System.IO.Path.GetFileName(path) != "@eaDir").OrderBy(System.IO.Path.GetFileName, StringComparer.CurrentCultureIgnoreCase))
+                {
+                    var expander = new SettingsExpander { Header = System.IO.Path.GetFileName(path), HeaderIcon = new FontIcon { Glyph = "\uE8B7" } };
+                    var options = workspace.Settings.GetAnimeCategoryDisplay(workspace.LibraryPath, path);
+                    void AddCategoryToggle(string header, bool current, bool posters)
+                    {
+                        var toggle = new ToggleSwitch { IsOn = current };
+                        toggle.Toggled += (_, _) => Commit(settings =>
+                        {
+                            var value = settings.GetAnimeCategoryDisplay(workspace.LibraryPath, path).Clone();
+                            if (posters) value.ShowEpisodePosters = toggle.IsOn; else value.ShowEpisodeCount = toggle.IsOn;
+                            settings.AnimeCategoryDisplay[path] = value;
+                        });
+                        expander.Items.Add(new SettingsCard { Header = header, Content = toggle });
+                    }
+                    AddCategoryToggle(Strings.AnimeCategoryEpisodePosters.GetLocalizedResource(), options.ShowEpisodePosters, true);
+                    AddCategoryToggle(Strings.AnimeCategoryEpisodeCount.GetLocalizedResource(), options.ShowEpisodeCount, false);
+                    categoryRows.Children.Add(expander);
+                }
+            }
+            catch (System.IO.IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+        RebuildCategorySettings();
     }
 }

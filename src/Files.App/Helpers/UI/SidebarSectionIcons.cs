@@ -31,6 +31,8 @@ namespace Files.App.Helpers
 			_ => null
 		};
 
+		public static string ForMediaTool(string path) => Resolve(path);
+
 		private static string Resolve(string name)
 		{
 			if (!AccessibilitySettings.HighContrast)
