@@ -161,7 +161,7 @@ public sealed class ArchiveInboxActions(IShellPage shell, XamlRoot xamlRoot)
 			if (File.Exists(movedPath)) RemapPending(file.Path, movedPath);
 			var workspaceForTags = library.SelectedIndex == 1 ? _anime : _drama;
 			workspaceForTags.NotifyNavigationChanged();
-			
+
 			await _shell.Refresh_Click();
 		}
 		catch (Exception ex) { await ShowNoticeAsync(ex.Message); }
