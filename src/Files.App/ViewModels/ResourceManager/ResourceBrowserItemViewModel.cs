@@ -34,6 +34,7 @@ public sealed partial class ResourceBrowserItemViewModel : ObservableObject
     public ResourceBrowserItem Model { get; }
     private readonly bool _animeLibrary;
     private int? _actorWorkCount;
+    private int? _animeEpisodeCount;
     private double _actorCardWidth = 250;
     private string? _translatedTitle;
     private bool _isTranslatedTitleShown;
@@ -90,6 +91,23 @@ public sealed partial class ResourceBrowserItemViewModel : ObservableObject
     }
     public Visibility DescriptionVisibility => string.IsNullOrWhiteSpace(DescriptionText) ? Visibility.Collapsed : Visibility.Visible;
     public string ActorWorkCountText => ActorWorkCount is { } count ? $"{count} 部作品" : "作品统计中";
+    public int? AnimeEpisodeCount
+    {
+        get => _animeEpisodeCount;
+        set { if (SetProperty(ref _animeEpisodeCount, value)) { OnPropertyChanged(nameof(AnimeEpisodeCountText)); OnPropertyChanged(nameof(AnimeEpisodeCountVisibility)); } }
+    }
+    public string AnimeEpisodeCountText => string.Format(System.Globalization.CultureInfo.CurrentCulture, Strings.AnimeCategoryEpisodeCountValue.GetLocalizedResource(), AnimeEpisodeCount ?? 0);
+    public Visibility AnimeEpisodeCountVisibility => _animeLibrary && Kind == ResourceBrowserItemKind.VideoFolder && AnimeEpisodeCount is not null
+        && _workspace.Settings.GetAnimeCategoryDisplay(_workspace.LibraryPath, Path).ShowEpisodeCount ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility ActorRetiredBadgeVisibility
+    {
+        get
+        {
+            if (_animeLibrary || Kind != ResourceBrowserItemKind.ActorFolder) return Visibility.Collapsed;
+            var details = _workspace.GetActorDetails(Path);
+            return details.IsCurrentlyActive == false || details.CareerRetirementDate is not null ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
     public Visibility ActorWorkCountVisibility => Kind == ResourceBrowserItemKind.ActorFolder ? Visibility.Visible : Visibility.Collapsed;
     public Visibility KindLabelVisibility => (_animeLibrary && Kind == ResourceBrowserItemKind.CategoryFolder) || Kind is ResourceBrowserItemKind.ActorFolder or ResourceBrowserItemKind.VideoFolder or ResourceBrowserItemKind.VideoFile
         ? Visibility.Collapsed

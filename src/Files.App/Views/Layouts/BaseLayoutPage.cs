@@ -438,6 +438,12 @@ namespace Files.App.Views.Layouts
 			return (item.DataContext as ListedItem) ?? (item.Content as ListedItem) ?? (ItemsControl.ItemFromContainer(item) as ListedItem);
 		}
 
+        public bool IsArchiveInboxPage => navigationArguments?.IsArchiveInboxPage == true;
+        public string? ArchiveInboxRoot => navigationArguments?.ArchiveInboxRoot;
+#if FILES_RESOURCE_MANAGER
+        private Files.App.Services.VideoEditor.ArchiveInboxActions? archiveInboxActions;
+#endif
+
 		protected virtual void BaseFolderSettings_LayoutModeChangeRequested(object? sender, LayoutModeEventArgs e)
 		{
 			if (ParentShellPageInstance is { SlimContentPage: not null } parentShellPage)
@@ -447,6 +453,7 @@ namespace Files.App.Views.Layouts
 				var workingDirectory = shellViewModel.WorkingDirectory
 					?? throw new InvalidOperationException("The shell page does not have a working directory.");
 				var layoutType = folderSettings.GetLayoutType(workingDirectory);
+                if (IsArchiveInboxPage && layoutType == typeof(ColumnsLayoutPage)) layoutType = typeof(DetailsLayoutPage);
 
 				if (layoutType != parentShellPage.CurrentPageType)
 				{
@@ -458,6 +465,8 @@ namespace Files.App.Views.Layouts
 					{
 						NavPathParam = args.NavPathParam,
 						IsSearchResultPage = args.IsSearchResultPage,
+                        IsArchiveInboxPage = args.IsArchiveInboxPage,
+                        ArchiveInboxRoot = args.ArchiveInboxRoot,
 						SearchPathParam = args.SearchPathParam,
 						SearchQuery = args.SearchQuery,
 						IsLayoutSwitch = true,
@@ -508,6 +517,9 @@ namespace Files.App.Views.Layouts
 
 			navigationArguments = args;
 			ParentShellPageInstance = parentShellPage;
+#if FILES_RESOURCE_MANAGER
+            archiveInboxActions = null;
+#endif
 			var folderSettings = parentShellPage.InstanceViewModel.FolderSettings;
 			parentShellPage.InstanceViewModel.IsResourceManagerMode = args.IsResourceManagerMode;
 			parentShellPage.InstanceViewModel.ResourceLibraryPath = args.IsResourceManagerMode ? args.ResourceLibraryPath : null;
@@ -555,6 +567,7 @@ namespace Files.App.Views.Layouts
 				parentShellPage.InstanceViewModel.IsPageTypeReleaseNotes = false;
 				parentShellPage.InstanceViewModel.IsPageTypeSettings = false;
 				parentShellPage.ToolbarViewModel.PathControlDisplayText = navigationPath;
+                if (args.IsArchiveInboxPage) parentShellPage.ToolbarViewModel.CanNavigateToParent = !string.Equals(workingDir.TrimEnd(Path.DirectorySeparatorChar), args.ArchiveInboxRoot?.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase);
 
 				if (folderSettings.DirectorySortOption == SortOption.Path)
 					folderSettings.DirectorySortOption = SortOption.Name;
@@ -594,7 +607,7 @@ namespace Files.App.Views.Layouts
 				if (!args.IsLayoutSwitch)
 				{
 					var displayName = App.LibraryManager.TryGetLibrary(searchPath, out var lib) ? lib.Text : searchPath;
-					await parentShellPage.UpdatePathUIToWorkingDirectoryAsync(null, string.Format(Strings.SearchPagePathBoxOverrideText.GetLocalizedResource(), args.SearchQuery, displayName));
+					await parentShellPage.UpdatePathUIToWorkingDirectoryAsync(null, args.IsArchiveInboxPage ? Strings.ArchiveInboxTitle.GetLocalizedResource() : string.Format(Strings.SearchPagePathBoxOverrideText.GetLocalizedResource(), args.SearchQuery, displayName));
 					var searchInstance = new Utils.Storage.FolderSearch
 					{
 						Query = args.SearchQuery,
@@ -677,7 +690,10 @@ namespace Files.App.Views.Layouts
 				SelectedItemsPropertiesViewModel.CheckAllFileExtensions(selectedItems.Select(x => x.FileExtension).ToList());
 
 				var items = ContentPageContextFlyoutFactory.GetItemContextCommandsWithoutShellItems(currentInstanceViewModel: instanceViewModel, selectedItems: selectedItems, selectedItemsPropertiesViewModel: SelectedItemsPropertiesViewModel, commandsViewModel: commandsViewModel, shiftPressed: shiftPressed, itemViewModel: null);
-				var host = ItemContextFlyoutHost;
+				#if FILES_RESOURCE_MANAGER
+                if (IsArchiveInboxPage) (archiveInboxActions ??= new(parentShellPage, XamlRoot)).AddCommands(items, selectedItems);
+#endif
+                var host = ItemContextFlyoutHost;
 				host.Build(items);
 
 				// Edit tags: a submenu of the available tags (FileTagsContextMenu is a standalone MenuFlyout that
@@ -996,7 +1012,10 @@ namespace Files.App.Views.Layouts
 					?? throw new InvalidOperationException("The current folder is not available.");
 				List<ListedItem> contextItems = [currentFolder];
 				var items = ContentPageContextFlyoutFactory.GetItemContextCommandsWithoutShellItems(currentInstanceViewModel: instanceViewModel, selectedItems: contextItems, commandsViewModel: commandsViewModel, shiftPressed: shiftPressed, itemViewModel: shellViewModel, selectedItemsPropertiesViewModel: null);
-				var host = BaseContextFlyoutHost;
+				#if FILES_RESOURCE_MANAGER
+                if (IsArchiveInboxPage) (archiveInboxActions ??= new(parentShellPage, XamlRoot)).AddCommands(items, null);
+#endif
+                var host = BaseContextFlyoutHost;
 				host.Build(items);
 
 				if (!instanceViewModel.IsPageTypeSearchResults && !instanceViewModel.IsPageTypeZipFolder && !instanceViewModel.IsPageTypeFtp)

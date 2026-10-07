@@ -102,6 +102,7 @@
 								<ToggleMenuFlyoutItem Tag="SortByName" IsChecked="{x:Bind Commands.SortByName.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByName.Label}" />
 								<ToggleMenuFlyoutItem Tag="SortByDateModified" IsChecked="{x:Bind Commands.SortByDateModified.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByDateModified.Label}" />
 								<ToggleMenuFlyoutItem Tag="SortByDateCreated" IsChecked="{x:Bind Commands.SortByDateCreated.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByDateCreated.Label}" />
+								<ToggleMenuFlyoutItem Tag="SortByResourceWorkCount" IsChecked="{x:Bind Commands.SortByResourceWorkCount.IsOn, Mode=TwoWay}" IsEnabled="{x:Bind Commands.SortByResourceWorkCount.IsExecutable, Mode=OneWay}" Text="{x:Bind Commands.SortByResourceWorkCount.Label}" />
 								<ToggleMenuFlyoutItem Tag="SortByAnimeAirDate" IsChecked="{x:Bind Commands.SortByAnimeAirDate.IsOn, Mode=TwoWay}" IsEnabled="{x:Bind Commands.SortByAnimeAirDate.IsExecutable, Mode=OneWay}" Text="{x:Bind Commands.SortByAnimeAirDate.Label}" />
 								<ToggleMenuFlyoutItem Tag="SortBySize" IsChecked="{x:Bind Commands.SortBySize.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortBySize.Label}" />
 								<ToggleMenuFlyoutItem Tag="SortByType" IsChecked="{x:Bind Commands.SortByType.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByType.Label}" />

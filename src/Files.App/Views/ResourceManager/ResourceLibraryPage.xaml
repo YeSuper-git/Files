@@ -82,15 +82,20 @@
                                             <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Padding="7,3" Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}" CornerRadius="5" Visibility="{Binding KindLabelVisibility, Mode=OneWay}">
                                                 <TextBlock Text="{Binding KindLabel, Mode=OneWay}" FontSize="12" />
                                             </Border>
-                                            <Border
-                                                HorizontalAlignment="Right"
-                                                VerticalAlignment="Bottom"
-                                                Margin="10"
-                                                Padding="10,5"
-                                                Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
-                                                CornerRadius="12"
+                                            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="10" Orientation="Horizontal" Spacing="6"
                                                 Visibility="{Binding ActorWorkCountVisibility, Mode=OneWay}">
-                                                <TextBlock Text="{Binding ActorWorkCountText, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" />
+                                                <Border Padding="10,5" Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+                                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="12"
+                                                    Visibility="{Binding ActorRetiredBadgeVisibility, Mode=OneWay}">
+                                                    <TextBlock Text="{helpers:ResourceString Name=ActorRetiredBadge}" FontSize="12" FontWeight="SemiBold" />
+                                                </Border>
+                                                <Border Padding="10,5" Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}" CornerRadius="12">
+                                                    <TextBlock Text="{Binding ActorWorkCountText, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" />
+                                                </Border>
+                                            </StackPanel>
+                                            <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="10" Padding="10,5"
+                                                Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}" CornerRadius="12" Visibility="{Binding AnimeEpisodeCountVisibility, Mode=OneWay}">
+                                                <TextBlock Text="{Binding AnimeEpisodeCountText, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" />
                                             </Border>
                                             <ItemsControl
                                                 Width="180"

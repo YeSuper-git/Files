@@ -259,7 +259,7 @@ namespace Files.App.ViewModels.UserControls
 				return;
 
 			var details = actor.ActorDetails;
-			AddActorProperty("出生日期", details.BirthDate?.ToString("yyyy-MM-dd") ?? string.Empty, "未知");
+			AddActorProperty("出生日期", ResourceActorDetails.FormatDate(details.BirthDate, details.BirthDateMonthOnly), "未知");
 			AddActorProperty("身高", string.IsNullOrWhiteSpace(details.HeightCm) ? string.Empty : $"{details.HeightCm} cm", "未知");
 			AddActorProperty("体重", string.IsNullOrWhiteSpace(details.WeightKg) ? string.Empty : $"{details.WeightKg} kg", "未知");
 
@@ -273,7 +273,7 @@ namespace Files.App.ViewModels.UserControls
 			AddActorProperty("数值", string.Join(" / ", measurements), "未知");
 			AddActorProperty("罩杯", details.CupSize ?? string.Empty, "未知");
 			var career = details.CareerRetirementDate is { } retiredDate
-				? $"{retiredDate:yyyy-MM-dd} 退役"
+				? $"{ResourceActorDetails.FormatDate(retiredDate, details.CareerRetirementDateMonthOnly)} 退役"
 				: details.IsCurrentlyActive switch
 				{
 					true => "现役",
@@ -318,6 +318,18 @@ namespace Files.App.ViewModels.UserControls
 		}
 
 		[DynamicWindowsRuntimeCast(typeof(Frame))]
+        private ListedItem? EffectivePreviewItem()
+        {
+            if (contentPageContext.SelectedItems.Count == 1) return contentPageContext.SelectedItems.First();
+#if FILES_RESOURCE_MANAGER
+            if (contentPageContext.SelectedItems.Count == 0 && contentPageContext.ShellPage is Files.App.Views.Shells.ModernShellPage shell)
+                return shell.CurrentResourceLibraryPage?.ActorContextPreview;
+#endif
+            return null;
+        }
+
+        public void RefreshLibrarySelection() => ContentPageContext_PropertyChanged(null, new PropertyChangedEventArgs(nameof(IContentPageContext.SelectedItem)));
+
 		private async void ContentPageContext_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{
 			switch (e.PropertyName)
@@ -328,12 +340,11 @@ namespace Files.App.ViewModels.UserControls
 					SelectedItem = null;
 					PreviewPaneContent = null;
 					PreviewPaneState = PreviewPaneStates.NoItemSelected;
+                    if (EffectivePreviewItem() is ResourceActorListedItem) RefreshLibrarySelection();
 					break;
 				case nameof(IContentPageContext.SelectedItem):
 
-					ListedItem? tempSelectedItem = null;
-					if (contentPageContext.SelectedItems.Count == 1)
-						tempSelectedItem = contentPageContext.SelectedItems.First();
+					var tempSelectedItem = EffectivePreviewItem();
 
 					var updateVersion = ++selectionUpdateVersion;
 					if (tempSelectedItem is not null)
@@ -342,7 +353,7 @@ namespace Files.App.ViewModels.UserControls
 						const int delayBeforeUpdatingPreviewPane = 100;
 						await Task.Delay(delayBeforeUpdatingPreviewPane);
 						if (updateVersion != selectionUpdateVersion ||
-							!tempSelectedItem.Equals(contentPageContext.SelectedItem))
+							!tempSelectedItem.Equals(EffectivePreviewItem()))
 							return;
 					}
 
@@ -585,7 +596,7 @@ namespace Files.App.ViewModels.UserControls
 				PreviewPaneContent = null;
 				return;
 			}
-			else if (SelectedItem is not null && contentPageContext.SelectedItems.Count == 1)
+			else if (SelectedItem is not null && Equals(SelectedItem, EffectivePreviewItem()))
 			{
 				SelectedItem?.FileDetails?.Clear();
 				var token = CreatePreviewLoadToken();

@@ -8,8 +8,11 @@ namespace Files.App.Helpers
 		public static void UpdateOpenTabsPreferences()
 		{
 #if FILES_RESOURCE_MANAGER
-			if (Ioc.Default.GetRequiredService<IContentPageContext>().ShellPage is Files.App.Views.Shells.ModernShellPage shell)
-				shell.CurrentResourceLibraryPage?.ApplyRequestedSorting();
+			if (Ioc.Default.GetRequiredService<IContentPageContext>().ShellPage is Files.App.Views.Shells.ModernShellPage shell && shell.CurrentResourceLibraryPage is { } library)
+			{
+				library.ApplyRequestedSorting();
+				return;
+			}
 #endif
 			// Services
 			var multitaskingContext = Ioc.Default.GetRequiredService<IMultitaskingContext>();

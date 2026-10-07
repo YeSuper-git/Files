@@ -53,6 +53,23 @@ namespace Files.App.Actions
 	}
 
 	[GeneratedRichCommand]
+	internal sealed partial class SortByResourceWorkCountAction : SortByAction
+	{
+		protected override SortOption SortOption => SortOption.ResourceWorkCount;
+		public override string Label => Strings.ResourceSortWorkCount.GetLocalizedResource();
+		public override string Description => Label;
+		protected override bool GetIsExecutable(ContentPageTypes pageType)
+		{
+#if FILES_RESOURCE_MANAGER
+			return Ioc.Default.GetRequiredService<IContentPageContext>().ShellPage is Files.App.Views.Shells.ModernShellPage shell
+				&& shell.CurrentResourceLibraryPage is { IsAnimeLibrary: false };
+#else
+			return false;
+#endif
+		}
+	}
+
+	[GeneratedRichCommand]
 	internal sealed partial class SortBySizeAction : SortByAction
 	{
 		protected override SortOption SortOption

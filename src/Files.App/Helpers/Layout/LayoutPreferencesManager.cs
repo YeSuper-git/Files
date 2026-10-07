@@ -401,7 +401,9 @@ namespace Files.App.Helpers
 				if (preferencesItem.DirectorySortOption != SortOption.Path &&
 					preferencesItem.DirectorySortOption != SortOption.OriginalFolder &&
 					preferencesItem.DirectorySortOption != SortOption.DateDeleted &&
-					preferencesItem.DirectorySortOption != SortOption.SyncStatus)
+					preferencesItem.DirectorySortOption != SortOption.SyncStatus &&
+					preferencesItem.DirectorySortOption != SortOption.AnimeAirDate &&
+					preferencesItem.DirectorySortOption != SortOption.ResourceWorkCount)
 				{
 					UserSettingsService.LayoutSettingsService.DefaultSortOption = preferencesItem.DirectorySortOption;
 				}

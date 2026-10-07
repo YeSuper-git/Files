@@ -4839,8 +4839,8 @@
   <data name="ResourceManagerVideoQualityOther" xml:space="preserve">
     <value>{0}p {1} class</value>
   </data>
-  <data name="VideoEditorTitle" xml:space="preserve"><value>Video Editor</value></data>
-  <data name="VideoEditorNavigationTitle" xml:space="preserve"><value>Video Editor</value></data>
+  <data name="VideoEditorTitle" xml:space="preserve"><value>Video Trimming</value></data>
+  <data name="VideoEditorNavigationTitle" xml:space="preserve"><value>Video Trimming</value></data>
   <data name="VideoEditorOpenVideo" xml:space="preserve"><value>Choose video</value></data>
   <data name="VideoEditorDropVideo" xml:space="preserve"><value>Drop a video here</value></data>
   <data name="VideoEditorDroppedFileUnsupported" xml:space="preserve"><value>Drop a supported video file to open it.</value></data>
@@ -5045,9 +5045,9 @@
   <data name="AnimeLibraryImageExtensions" xml:space="preserve"><value>Poster image extensions</value></data>
   <data name="AnimeLibraryInvalidMonth" xml:space="preserve"><value>Enter a valid year and month, e.g. 202205 or 2022-05</value></data>
   <data name="AnimeOptimizationTitle" xml:space="preserve"><value>Anime format optimization</value></data>
-  <data name="AnimeOptimizationFolders" xml:space="preserve"><value>Optimize folder names</value></data>
-  <data name="AnimeOptimizationPosters" xml:space="preserve"><value>Optimize poster names</value></data>
-  <data name="AnimeOptimizationIllustrations" xml:space="preserve"><value>Identify and optimize illustration names</value></data>
+  <data name="AnimeOptimizationFolders" xml:space="preserve"><value>Folder naming</value></data>
+  <data name="AnimeOptimizationPosters" xml:space="preserve"><value>Poster naming</value></data>
+  <data name="AnimeOptimizationIllustrations" xml:space="preserve"><value>Preview image naming</value></data>
   <data name="AnimeOptimizationScanning" xml:space="preserve"><value>Generating rename preview…</value></data>
   <data name="AnimeOptimizationNoChanges" xml:space="preserve"><value>No changes needed</value></data>
   <data name="AnimeOptimizationCount" xml:space="preserve"><value>{0} changes, {1} skipped</value></data>
@@ -5190,4 +5190,172 @@
   <data name="ResourceOptimizationSelectedCount" xml:space="preserve"><value>Selected {0} of {1} changes</value></data>
   <data name="VideoEditorRemainingMinutesSeconds" xml:space="preserve"><value>Estimated remaining: {0} min {1} sec</value></data>
   <data name="VideoEditorFastCutAdjusted" xml:space="preserve"><value>Fast keyframe cut: actual start {0}, adjusted by {1} seconds.</value></data>
+  <data name="ArchiveInboxTitle" xml:space="preserve">
+    <value>To archive</value>
+  </data>
+  <data name="SubtitleMuxTitle" xml:space="preserve">
+    <value>Subtitle Muxing</value>
+  </data>
+  <data name="ArchiveChooseFolder" xml:space="preserve">
+    <value>Choose archive inbox</value>
+  </data>
+  <data name="ArchiveIncludeSubfolders" xml:space="preserve">
+    <value>Include subfolders</value>
+  </data>
+  <data name="ArchiveFileCount" xml:space="preserve">
+    <value>{0} files</value>
+  </data>
+  <data name="ArchiveMove" xml:space="preserve">
+    <value>Move</value>
+  </data>
+  <data name="ArchiveQueuedForEditing" xml:space="preserve">
+    <value>Added {0} to the video editing queue.</value>
+  </data>
+  <data name="ArchiveFileBusy" xml:space="preserve">
+    <value>This video is being edited or processed. Close the editor or finish processing first.</value>
+  </data>
+  <data name="ArchiveTargetLibrary" xml:space="preserve">
+    <value>Target library</value>
+  </data>
+  <data name="ArchiveDestinationPath" xml:space="preserve">
+    <value>Destination folder</value>
+  </data>
+  <data name="ArchiveRecognizedPaths" xml:space="preserve">
+    <value>Suggested folders</value>
+  </data>
+  <data name="ArchiveChooseDestination" xml:space="preserve">
+    <value>Choose folder manually</value>
+  </data>
+  <data name="ArchiveRecognizing" xml:space="preserve">
+    <value>Finding matching folders…</value>
+  </data>
+  <data name="ArchiveRecognitionReady" xml:space="preserve">
+    <value>Matched by file name. Confirm or change the destination.</value>
+  </data>
+  <data name="ArchiveRecognitionEmpty" xml:space="preserve">
+    <value>No matching folder found. Choose a folder manually.</value>
+  </data>
+  <data name="ArchiveSameFolder" xml:space="preserve">
+    <value>The destination is the current folder.</value>
+  </data>
+  <data name="ArchiveMoved" xml:space="preserve">
+    <value>Moved {0} to {1}.</value>
+  </data>
+  <data name="ArchiveRecycleConfirmation" xml:space="preserve">
+    <value>Move {0} to the Recycle Bin?</value>
+  </data>
+  <data name="ArchiveRecycled" xml:space="preserve">
+    <value>Moved {0} to the Recycle Bin.</value>
+  </data>
+  <data name="MediaToolsMissingInput" xml:space="preserve">
+    <value>Make sure the video and subtitle files exist.</value>
+  </data>
+  <data name="MediaToolsOutputExists" xml:space="preserve">
+    <value>The output file already exists. Choose another name.</value>
+  </data>
+  <data name="SubtitleMuxMkvRequired" xml:space="preserve">
+    <value>The output file must have the .mkv extension.</value>
+  </data>
+  <data name="SubtitleMuxValidationFailed" xml:space="preserve">
+    <value>Output validation failed. The result was not saved.</value>
+  </data>
+  <data name="SubtitleMuxDescription" xml:space="preserve">
+    <value>Add external subtitles as selectable tracks in a new MKV. Video and audio are copied without re-encoding; source files are kept.</value>
+  </data>
+  <data name="SubtitleMuxChooseVideo" xml:space="preserve">
+    <value>Choose video</value>
+  </data>
+  <data name="SubtitleMuxTracks" xml:space="preserve">
+    <value>External subtitles</value>
+  </data>
+  <data name="SubtitleMuxAddSubtitles" xml:space="preserve">
+    <value>Add subtitles</value>
+  </data>
+  <data name="SubtitleMuxNoSubtitles" xml:space="preserve">
+    <value>Supports SRT, ASS, SSA and VTT subtitles.</value>
+  </data>
+  <data name="SubtitleMuxDefaultTrack" xml:space="preserve">
+    <value>Default subtitle</value>
+  </data>
+  <data name="SubtitleMuxEncoding" xml:space="preserve">
+    <value>Subtitle encoding</value>
+  </data>
+  <data name="SubtitleMuxOutputFolder" xml:space="preserve">
+    <value>Output folder</value>
+  </data>
+  <data name="SubtitleMuxOutputName" xml:space="preserve">
+    <value>Output file name</value>
+  </data>
+  <data name="SubtitleMuxStart" xml:space="preserve">
+    <value>Merge</value>
+  </data>
+  <data name="SubtitleMuxOutputSuffix" xml:space="preserve">
+    <value>-subtitled</value>
+  </data>
+  <data name="SubtitleMuxRemoveTrack" xml:space="preserve">
+    <value>Remove subtitle</value>
+  </data>
+  <data name="SubtitleMuxTrackName" xml:space="preserve">
+    <value>Track name</value>
+  </data>
+  <data name="SubtitleMuxLanguage" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="SubtitleMuxChinese" xml:space="preserve">
+    <value>Chinese</value>
+  </data>
+  <data name="SubtitleMuxEnglish" xml:space="preserve">
+    <value>English</value>
+  </data>
+  <data name="SubtitleMuxJapanese" xml:space="preserve">
+    <value>Japanese</value>
+  </data>
+  <data name="SubtitleMuxUnknown" xml:space="preserve">
+    <value>Unspecified</value>
+  </data>
+  <data name="SubtitleMuxInvalidName" xml:space="preserve">
+    <value>Enter a valid output file name.</value>
+  </data>
+  <data name="SubtitleMuxWorking" xml:space="preserve">
+    <value>Merging subtitles…</value>
+  </data>
+  <data name="SubtitleMuxComplete" xml:space="preserve">
+    <value>Completed: {0} · {1} · {2} seconds</value>
+  </data>
+  <data name="SubtitleMuxCancelled" xml:space="preserve">
+    <value>Merge cancelled. Source files were kept.</value>
+  </data>
+  <data name="ArchiveRecycleUnavailable" xml:space="preserve"><value>The Recycle Bin is unavailable for this path. The file was not deleted.</value></data>
+  <data name="ArchiveRecycleFailed" xml:space="preserve"><value>The file was not moved to the Recycle Bin. Check the operation result.</value></data>
+  <data name="SubtitleMuxQueued" xml:space="preserve"><value>Queued</value></data>
+  <data name="SubtitleMuxJobComplete" xml:space="preserve"><value>Completed · {0} · {1} s</value></data>
+  <data name="SubtitleMuxSourceContent" xml:space="preserve"><value>Original contents</value></data>
+  <data name="SubtitleMuxOutputContent" xml:space="preserve"><value>Output contents</value></data>
+  <data name="SubtitleMuxVideoTrack" xml:space="preserve"><value>Video</value></data>
+  <data name="SubtitleMuxAudioTrack" xml:space="preserve"><value>Audio</value></data>
+  <data name="SubtitleMuxSubtitleTrack" xml:space="preserve"><value>Subtitle</value></data>
+  <data name="SubtitleMuxAttachment" xml:space="preserve"><value>Attachment</value></data>
+  <data name="SubtitleMuxChapter" xml:space="preserve"><value>Chapters</value></data>
+  <data name="SubtitleMuxMetadata" xml:space="preserve"><value>Global tags</value></data>
+  <data name="SubtitleMuxDefault" xml:space="preserve"><value>Default</value></data>
+  <data name="SubtitleMuxAdded" xml:space="preserve"><value>New</value></data>
+  <data name="SubtitleMuxProcessingQueue" xml:space="preserve"><value>Processing</value></data>
+  <data name="SubtitleMuxDropHint" xml:space="preserve"><value>Drop video or subtitle files</value></data>
+  <data name="SubtitleMuxPreparing" xml:space="preserve"><value>Reading tracks…</value></data>
+  <data name="SubtitleMuxNewTrackHint" xml:space="preserve"><value>Add subtitles to preview the output tracks.</value></data>
+  <data name="SubtitleMuxCancelJob" xml:space="preserve"><value>Cancel task</value></data>
+  <data name="SubtitleMuxRemoveJob" xml:space="preserve"><value>Remove from list</value></data>
+  <data name="SubtitleMuxSelectVideoFirst" xml:space="preserve"><value>Add a video before adding subtitles.</value></data>
+  <data name="SubtitleMuxMultipleVideos" xml:space="preserve"><value>Add one video to the workspace at a time. Submit it to prepare the next.</value></data>
+  <data name="SubtitleMuxOutputSummary" xml:space="preserve"><value>MKV · Video and audio retained · {0} new subtitles</value></data>
+  <data name="SubtitleMuxReset" xml:space="preserve"><value>Clear workspace</value></data>
+  <data name="AnimeOptimizationFoldersDescription" xml:space="preserve"><value>Normalize folder names and episode ranges</value></data>
+  <data name="AnimeOptimizationIllustrationsDescription" xml:space="preserve"><value>Assign episodes and normalize preview image names</value></data>
+  <data name="ResourceSortWorkCount" xml:space="preserve"><value>Work count</value></data>
+  <data name="ActorDateInputHint" xml:space="preserve"><value>yyyy-MM or yyyy-MM-dd</value></data>
+  <data name="ActorDateInputInvalid" xml:space="preserve"><value>Enter a valid month or date, such as 1990-01 or 1990-01-23.</value></data>
+  <data name="ActorRetiredBadge" xml:space="preserve"><value>Retired</value></data>
+  <data name="AnimeCategoryEpisodePosters" xml:space="preserve"><value>Show posters for each episode</value></data>
+  <data name="AnimeCategoryEpisodeCount" xml:space="preserve"><value>Episode count on posters</value></data>
+  <data name="AnimeCategoryEpisodeCountValue" xml:space="preserve"><value>{0} episodes</value></data>
 </root>

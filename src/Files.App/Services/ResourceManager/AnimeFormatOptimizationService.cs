@@ -46,7 +46,7 @@ public static class AnimeFormatOptimizationService
         return result;
     }
 
-    public static Task<List<ResourceFileOperation>> PreviewAsync(string scope, ResourceSettings settings, AnimeOptimizationKind kind, bool includeScope, CancellationToken token = default)
+    public static Task<List<ResourceFileOperation>> PreviewAsync(string scope, ResourceSettings settings, AnimeOptimizationKind kind, bool includeScope, CancellationToken token = default, IResourceWorkspaceService? workspace = null)
         => Task.Run(() =>
         {
             var operations = new List<ResourceFileOperation>();
@@ -64,29 +64,27 @@ public static class AnimeFormatOptimizationService
                 var files = folder.EnumerateFiles().ToArray();
                 var videos = files.Where(file => settings.VideoExtensions.Contains(file.Extension.TrimStart('.'), StringComparer.OrdinalIgnoreCase)).OrderBy(file => file.Name, new EpisodeNameComparer()).ToArray();
                 foreach (var child in folder.EnumerateDirectories().OrderBy(child => child.Name, new EpisodeNameComparer())) Visit(child, depth + 1, true);
-                if (!process || videos.Length == 0) return;
+                if (!process) return;
                 if (kind == AnimeOptimizationKind.Folders)
                 {
-                    if (AnimeLibraryService.IsSeasonFolder(folder.Name)) return;
+                    var count = AnimeLibraryService.GetEpisodeTargets(folder.FullName, settings).Count;
+                    if (count == 0 || AnimeLibraryService.IsSeasonFolder(folder.Name)) return;
                     var name = Regex.Replace(folder.Name, @"\s*1\s*-\s*\d+$", "").TrimEnd();
-                    if (videos.Length > 1) name += $" 1-{videos.Length}";
+                    if (count > 1) name += $" 1-{count}";
                     if (name.Length > 0) Add(folder.FullName, Path.Combine(folder.Parent!.FullName, name));
                     return;
                 }
+                if (videos.Length == 0) return;
                 var images = files.Where(file => settings.ImageExtensions.Contains(file.Extension.TrimStart('.'), StringComparer.OrdinalIgnoreCase)).OrderBy(file => file.Name, new EpisodeNameComparer()).ToArray();
                 var posters = images.Where(image => AnimeLibraryService.IsSeriesCover(image.FullName, folder.FullName)).Select(image => image.FullName).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 foreach (var video in videos)
                 {
                     var stem = Path.GetFileNameWithoutExtension(video.Name);
-                    var ranked = images.Where(image => !posters.Contains(image.FullName) && !image.Name.Contains("插图", StringComparison.OrdinalIgnoreCase) && !Regex.IsMatch(Path.GetFileNameWithoutExtension(image.Name), @"^\d+\s*[（(]\d+[）)]$"))
-                        .Select(image => (Image: image, Score: AnimeLibraryService.PosterMatchScore(Path.GetFileNameWithoutExtension(image.Name), stem)))
-                        .Where(item => item.Score < 10).OrderBy(item => item.Score).ThenBy(item => item.Image.Name, new EpisodeNameComparer()).ToArray();
-                    var poster = ranked.FirstOrDefault().Image;
-                    if (poster is null && videos.Length == 1)
-                    {
-                        poster = images.FirstOrDefault(image => !posters.Contains(image.FullName) && new[] { "poster", "cover", "folder", "海报", "封面" }.Contains(Path.GetFileNameWithoutExtension(image.Name), StringComparer.OrdinalIgnoreCase));
-                        if (poster is null && images.Length == 1 && !posters.Contains(images[0].FullName) && AnimeLibraryService.GetIllustrationGroup(images[0].Name) is null && !images[0].Name.Contains("插图", StringComparison.OrdinalIgnoreCase) && !Regex.IsMatch(Path.GetFileNameWithoutExtension(images[0].Name), @"^\d+\s*[（(]\d+[）)]$")) poster = images[0];
-                    }
+                    var selected = workspace?.GetPosterOverride(video.FullName) ?? workspace?.GetPosterOverride(folder.FullName);
+                    if (selected is null)
+                        selected = AnimeLibraryService.ResolveEpisodePoster(video.FullName, folder.FullName, folder.FullName, settings, null);
+                    var poster = images.FirstOrDefault(image => string.Equals(image.FullName, selected, StringComparison.OrdinalIgnoreCase)
+                        && !AnimeLibraryService.IsPreviewImage(image.FullName));
                     if (poster is null || !posters.Add(poster.FullName)) continue;
                     if (kind == AnimeOptimizationKind.Posters) Add(poster.FullName, Path.Combine(folder.FullName, stem + poster.Extension));
                 }
@@ -103,6 +101,7 @@ public static class AnimeFormatOptimizationService
                 }
                 foreach (var image in images.Where(image => !posters.Contains(image.FullName)))
                 {
+                    if (Regex.IsMatch(Path.GetFileNameWithoutExtension(image.Name), @"^\d{2,}插图(?:_.+)? \([1-9]\d*\)$")) continue;
                     var number = AnimeLibraryService.GetIllustrationEpisodeNumber(image.Name);
                     var matches = videos.Where(video => AnimeLibraryService.GetEpisodeNumber(video.Name) == number && number is not null).ToArray();
                     if (matches.Length != 1)
@@ -113,7 +112,6 @@ public static class AnimeFormatOptimizationService
                     if (matches.Length == 0 && videos.Length == 1) { matches = videos; number = AnimeLibraryService.GetEpisodeNumber(videos[0].Name) ?? "1"; }
                     if (matches.Length != 1 || number is null)
                     { Add(image.FullName, image.FullName, "无法确定对应集数"); continue; }
-                    if (Regex.IsMatch(Path.GetFileNameWithoutExtension(image.Name), @"^\d{2,}插图(?:_.+)? \([1-9]\d*\)$")) continue;
                     if (!usedIndexes.TryGetValue(number, out var used)) usedIndexes[number] = used = [];
                     indexes.TryGetValue(number, out var index);
                     do { index++; } while (used.Contains(index));

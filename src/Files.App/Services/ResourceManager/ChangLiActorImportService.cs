@@ -185,7 +185,10 @@ internal static partial class ChangLiActorImportService
             details.CupSize = MergeText(existing.CupSize, NormalizeCupSize(match.Actor.CupSize), overwriteExisting);
 
             if (TryParseDate(match.Actor.Birthday, out var birthday) && (overwriteExisting || existing.BirthDate is null))
+            {
                 details.BirthDate = birthday;
+                details.BirthDateMonthOnly = false;
+            }
 
             details.PosterPaths = existing.PosterPaths
                 .Concat(savedPhotos)

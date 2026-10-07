@@ -153,6 +153,7 @@ namespace Files.App.Data.Contexts
 		{
 				switch (e.PropertyName)
 			{
+				case nameof(CurrentInstanceViewModel.IsPageTypeMediaTool):
 				case nameof(CurrentInstanceViewModel.IsPageTypeVideoEditor):
 				case nameof(CurrentInstanceViewModel.IsPageTypeNotHome):
 				case nameof(CurrentInstanceViewModel.IsPageTypeRecycleBin):
@@ -225,6 +226,7 @@ namespace Files.App.Data.Contexts
 			var type = ShellPage?.InstanceViewModel switch
 			{
 				null => ContentPageTypes.None,
+				{ IsPageTypeMediaTool: true } => ContentPageTypes.MediaTool,
 				{ IsPageTypeVideoEditor: true } => ContentPageTypes.VideoEditor,
 				{ IsPageTypeNotHome: false } => ContentPageTypes.Home,
 				{ IsPageTypeReleaseNotes: true } => ContentPageTypes.ReleaseNotes,
@@ -268,7 +270,8 @@ namespace Files.App.Data.Contexts
 				and not ContentPageTypes.MtpDevice
 				and not ContentPageTypes.ReleaseNotes
 				and not ContentPageTypes.Settings
-				and not ContentPageTypes.VideoEditor;
+				and not ContentPageTypes.VideoEditor
+				and not ContentPageTypes.MediaTool;
 		}
 	}
 }

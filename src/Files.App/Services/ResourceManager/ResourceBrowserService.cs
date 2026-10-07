@@ -20,6 +20,15 @@ public sealed class ResourceBrowserService : IResourceBrowserService
         _logger = logger;
     }
 
+    public Task<ResourceBrowserItem> GetActorItemAsync(string path, ResourceSettings settings, CancellationToken cancellationToken = default)
+        => Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var directory = new DirectoryInfo(path);
+            return new ResourceBrowserItem { Path = path, Name = directory.Name, Kind = ResourceBrowserItemKind.ActorFolder,
+                PosterPath = ResolvePoster(path, directory, directory.Name, settings) };
+        }, cancellationToken);
+
     public async Task<IReadOnlyList<ResourceBrowserItem>> GetChildrenAsync(
         string path,
         ResourceBrowserLocationKind locationKind,
