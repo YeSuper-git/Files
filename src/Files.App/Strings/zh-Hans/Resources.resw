@@ -5352,4 +5352,6 @@
   <data name="AnimeCategoryEpisodePosters" xml:space="preserve"><value>分集展示海报</value></data>
   <data name="AnimeCategoryEpisodeCount" xml:space="preserve"><value>海报图集数统计</value></data>
   <data name="AnimeCategoryEpisodeCountValue" xml:space="preserve"><value>{0}集</value></data>
+  <data name="AnimeOptimizationVideos" xml:space="preserve"><value>视频命名优化</value></data>
+  <data name="AnimeOptimizationVideosDescription" xml:space="preserve"><value>将新下载视频按番剧名称和集数规范命名</value></data>
 </root>

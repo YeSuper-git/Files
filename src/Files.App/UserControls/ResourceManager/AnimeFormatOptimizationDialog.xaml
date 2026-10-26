@@ -2,10 +2,11 @@
 <UserControl x:Class="Files.App.UserControls.ResourceManager.AnimeFormatOptimizationDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:helpers="using:Files.App.Helpers">
  <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="16">
   <Grid ColumnDefinitions="*,Auto"><TextBlock Text="{helpers:ResourceString Name=AnimeOptimizationTitle}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/><Button x:Name="CloseButton" Grid.Column="1" Width="36" Height="36" MinWidth="0" Padding="0" Margin="8,0,0,0" Click="Close_Click"/></Grid>
-  <Grid x:Name="FunctionOptions" Grid.Row="1" ColumnDefinitions="*,*,*" ColumnSpacing="8">
+  <Grid x:Name="FunctionOptions" Grid.Row="1" ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
    <Button x:Name="FolderFunction" Tag="0" Click="Function_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="16,12"/>
    <Button x:Name="PosterFunction" Grid.Column="1" Tag="1" Click="Function_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="16,12"/>
    <Button x:Name="IllustrationFunction" Grid.Column="2" Tag="2" Click="Function_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="16,12"/>
+   <Button x:Name="VideoFunction" Grid.Column="3" Tag="3" Click="Function_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="16,12"/>
   </Grid>
   <ScrollViewer x:Name="PreviewScroll" Grid.Row="2" HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="PreviewRows" Spacing="8"/></ScrollViewer>
   <Grid x:Name="PreviewFooter" Grid.Row="3" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">

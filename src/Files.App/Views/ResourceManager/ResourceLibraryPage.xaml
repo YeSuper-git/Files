@@ -195,7 +195,7 @@
                             </Grid>
                             <StackPanel Spacing="10">
                                 <TextBlock Text="{helpers:ResourceString Name=ResourceVideoFiles}" Style="{StaticResource SubtitleTextBlockStyle}" />
-                                <GridView x:Name="AnimeEpisodeCards" ItemsSource="{Binding BrowserItems, Mode=OneWay}" SelectionMode="Extended" SelectionChanged="VideoFileList_SelectionChanged" Visibility="Collapsed" MaxHeight="580" CanDragItems="True" DragItemsStarting="ResourceVideos_DragItemsStarting">
+                                <GridView x:Name="AnimeEpisodeCards" ItemsSource="{Binding BrowserItems, Mode=OneWay}" SelectionMode="Extended" SelectionChanged="VideoFileList_SelectionChanged" Visibility="Collapsed" ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.HorizontalScrollMode="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Disabled" CanDragItems="True" DragItemsStarting="ResourceVideos_DragItemsStarting">
                                     <GridView.ItemsPanel><ItemsPanelTemplate><ItemsWrapGrid Orientation="Horizontal" ItemWidth="156" ItemHeight="258" /></ItemsPanelTemplate></GridView.ItemsPanel>
                                     <GridView.ItemTemplate><DataTemplate>
                                         <Border Width="132" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" RightTapped="OnBrowserItemRightTapped" DoubleTapped="OnBrowserItemDoubleTapped">
@@ -208,7 +208,7 @@
                                         </Border>
                                     </DataTemplate></GridView.ItemTemplate>
                                 </GridView>
-                                <GridView x:Name="AnimeEpisodeButtons" ItemsSource="{Binding BrowserItems, Mode=OneWay}" SelectionMode="Extended" SelectionChanged="VideoFileList_SelectionChanged" Visibility="Collapsed" MaxHeight="400" CanDragItems="True" DragItemsStarting="ResourceVideos_DragItemsStarting">
+                                <GridView x:Name="AnimeEpisodeButtons" ItemsSource="{Binding BrowserItems, Mode=OneWay}" SelectionMode="Extended" SelectionChanged="VideoFileList_SelectionChanged" Visibility="Collapsed" ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.HorizontalScrollMode="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Disabled" CanDragItems="True" DragItemsStarting="ResourceVideos_DragItemsStarting">
                                     <GridView.ItemsPanel><ItemsPanelTemplate><ItemsWrapGrid Orientation="Horizontal" ItemWidth="116" ItemHeight="54" /></ItemsPanelTemplate></GridView.ItemsPanel>
                                     <GridView.ItemTemplate><DataTemplate>
                                         <Border Width="100" Height="38" CornerRadius="6" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" RightTapped="OnBrowserItemRightTapped" DoubleTapped="OnBrowserItemDoubleTapped" ToolTipService.ToolTip="{Binding Name}">
@@ -216,7 +216,7 @@
                                         </Border>
                                     </DataTemplate></GridView.ItemTemplate>
                                 </GridView>
-                                <ListView x:Name="VideoFileList" ItemsSource="{Binding BrowserItems, Mode=OneWay}" SelectionMode="Extended" SelectionChanged="VideoFileList_SelectionChanged" MaxHeight="200" CanDragItems="True" DragItemsStarting="ResourceVideos_DragItemsStarting">
+                                <ListView x:Name="VideoFileList" ItemsSource="{Binding BrowserItems, Mode=OneWay}" SelectionMode="Extended" SelectionChanged="VideoFileList_SelectionChanged" ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.HorizontalScrollMode="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Disabled" CanDragItems="True" DragItemsStarting="ResourceVideos_DragItemsStarting">
                                     <ListView.ItemContainerStyle>
                                         <Style TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
                                             <Setter Property="HorizontalContentAlignment" Value="Stretch" />

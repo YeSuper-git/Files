@@ -36,6 +36,7 @@ public sealed partial class AnimeFormatOptimizationDialog : UserControl
         _operations = new ResourceOperationsService(Ioc.Default.GetRequiredService<IResourceCodeParser>(), Ioc.Default.GetRequiredService<IResourceScanner>(), workspace, Ioc.Default.GetRequiredService<ILogger<ResourceOperationsService>>());
         var close = ResourceDialogPresentation.CreateIconButton("\uE8BB", Strings.Close.GetLocalizedResource());
         CloseButton.Content = new FontIcon { Glyph = "\uE8BB", FontSize = 16 }; CloseButton.Background = close.Background; CloseButton.Foreground = close.Foreground; CloseButton.CornerRadius = close.CornerRadius;
+        VideoFunction.Content = CreateFunctionLabel(Strings.AnimeOptimizationVideos, Strings.AnimeOptimizationVideosDescription);
         FolderFunction.Content = CreateFunctionLabel(Strings.AnimeOptimizationFolders, Strings.AnimeOptimizationFoldersDescription);
         PosterFunction.Content = CreateFunctionLabel(Strings.AnimeOptimizationPosters, Strings.ResourceOptimizeClassificationDescription);
         IllustrationFunction.Content = CreateFunctionLabel(Strings.AnimeOptimizationIllustrations, Strings.AnimeOptimizationIllustrationsDescription);
@@ -52,7 +53,7 @@ public sealed partial class AnimeFormatOptimizationDialog : UserControl
     {
         if (IsBusy || sender is not Button button) return;
         _selectedFunction = int.Parse((string)button.Tag);
-        foreach (var option in new[] { FolderFunction, PosterFunction, IllustrationFunction })
+        foreach (var option in new[] { FolderFunction, PosterFunction, IllustrationFunction, VideoFunction })
             option.BorderBrush = (Brush)Application.Current.Resources[ReferenceEquals(option, button) ? "AccentFillColorDefaultBrush" : "CardStrokeColorDefaultBrush"];
         await PreviewAsync();
     }
