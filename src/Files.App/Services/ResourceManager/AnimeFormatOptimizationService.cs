@@ -13,12 +13,12 @@ public static class AnimeFormatOptimizationService
     {
         var stem = Path.GetFileNameWithoutExtension(name);
         var explicitEpisode = Regex.Match(stem, @"(?:第\s*|(?<![A-Za-z])(?:S\d{1,2}[- _]*)?EP?(?:ISODE)?\s*)(\d{1,3})(?=集|话|[^0-9A-Za-z]|$)", RegexOptions.IgnoreCase);
-        if (explicitEpisode.Success) return int.Parse(explicitEpisode.Groups[1].Value) is > 0 and < 480 ? int.Parse(explicitEpisode.Groups[1].Value).ToString() : null;
+        if (explicitEpisode.Success) return int.Parse(explicitEpisode.Groups[1].Value) is > 0 ? int.Parse(explicitEpisode.Groups[1].Value).ToString() : null;
         var bracketed = Regex.Matches(stem, @"[\[【](\d{1,3})[\]】]")
-            .Select(match => int.Parse(match.Groups[1].Value)).Where(number => number is > 0 and < 480).Distinct().ToArray();
+            .Select(match => int.Parse(match.Groups[1].Value)).Where(number => number is > 0).Distinct().ToArray();
         if (bracketed.Length > 0) return bracketed.Length == 1 ? bracketed[0].ToString() : null;
         var fallback = AnimeLibraryService.GetEpisodeNumber(name);
-        return int.TryParse(fallback, out var number) && number is > 0 and < 480 ? fallback : null;
+        return int.TryParse(fallback, out var number) && number is > 0 ? fallback : null;
     }
 
     public static List<ResourceFileOperation> PreviewAssignments(IReadOnlyDictionary<string, string?> assignments, ResourceSettings settings)
