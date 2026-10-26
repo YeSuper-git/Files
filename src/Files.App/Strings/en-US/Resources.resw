@@ -5358,4 +5358,6 @@
   <data name="AnimeCategoryEpisodePosters" xml:space="preserve"><value>Show posters for each episode</value></data>
   <data name="AnimeCategoryEpisodeCount" xml:space="preserve"><value>Episode count on posters</value></data>
   <data name="AnimeCategoryEpisodeCountValue" xml:space="preserve"><value>{0} episodes</value></data>
+  <data name="AnimeOptimizationVideos" xml:space="preserve"><value>Video naming</value></data>
+  <data name="AnimeOptimizationVideosDescription" xml:space="preserve"><value>Normalize downloaded video names using the series title and episode number</value></data>
 </root>

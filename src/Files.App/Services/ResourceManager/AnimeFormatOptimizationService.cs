@@ -5,10 +5,21 @@ using System.Text.RegularExpressions;
 
 namespace Files.App.Services.ResourceManager;
 
-public enum AnimeOptimizationKind { Folders, Posters, Illustrations }
+public enum AnimeOptimizationKind { Folders, Posters, Illustrations, Videos }
 
 public static class AnimeFormatOptimizationService
 {
+    private static string? GetDownloadedEpisodeNumber(string name)
+    {
+        var stem = Path.GetFileNameWithoutExtension(name);
+        var explicitEpisode = Regex.Match(stem, @"(?:第\s*|(?<![A-Za-z])(?:S\d{1,2}[- _]*)?EP?(?:ISODE)?\s*)(\d{1,3})(?=集|话|[^0-9A-Za-z]|$)", RegexOptions.IgnoreCase);
+        if (explicitEpisode.Success) return int.Parse(explicitEpisode.Groups[1].Value).ToString();
+        var bracketed = Regex.Matches(stem, @"[\[【](\d{1,3})[\]】]")
+            .Select(match => int.Parse(match.Groups[1].Value)).Where(number => number is > 0 and < 480).Distinct().ToArray();
+        if (bracketed.Length > 0) return bracketed.Length == 1 ? bracketed[0].ToString() : null;
+        return AnimeLibraryService.GetEpisodeNumber(name);
+    }
+
     public static List<ResourceFileOperation> PreviewAssignments(IReadOnlyDictionary<string, string?> assignments, ResourceSettings settings)
     {
         var result = new List<ResourceFileOperation>();
@@ -75,6 +86,26 @@ public static class AnimeFormatOptimizationService
                     return;
                 }
                 if (videos.Length == 0) return;
+                if (kind == AnimeOptimizationKind.Videos)
+                {
+                    var title = AnimeLibraryService.IsSeasonFolder(folder.Name)
+                        ? AnimeLibraryService.GetSeasonTitle(folder.FullName)
+                        : Regex.Replace(folder.Name, @"\s*1\s*-\s*\d+$", "").TrimEnd();
+                    if (string.IsNullOrWhiteSpace(title)) return;
+                    var canonical = new Regex("^" + Regex.Escape(title) + @" \d{2,}$", RegexOptions.IgnoreCase);
+                    var candidates = videos.Where(video => !canonical.IsMatch(Path.GetFileNameWithoutExtension(video.Name)))
+                        .Select(video => (Video: video, Number: GetDownloadedEpisodeNumber(video.Name))).ToArray();
+                    var counts = candidates.Where(item => item.Number is not null).GroupBy(item => item.Number!)
+                        .ToDictionary(group => group.Key, group => group.Count());
+                    foreach (var candidate in candidates)
+                    {
+                        if (candidate.Number is null)
+                        { Add(candidate.Video.FullName, candidate.Video.FullName, "无法确定集数，请先确认视频名称中的集数"); continue; }
+                        var target = Path.Combine(folder.FullName, $"{title} {int.Parse(candidate.Number):D2}{candidate.Video.Extension}");
+                        Add(candidate.Video.FullName, target, counts[candidate.Number] > 1 ? "多个视频对应同一集数，请手动确认" : null);
+                    }
+                    return;
+                }
                 var images = files.Where(file => settings.ImageExtensions.Contains(file.Extension.TrimStart('.'), StringComparer.OrdinalIgnoreCase)).OrderBy(file => file.Name, new EpisodeNameComparer()).ToArray();
                 var posters = images.Where(image => AnimeLibraryService.IsSeriesCover(image.FullName, folder.FullName)).Select(image => image.FullName).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 foreach (var video in videos)
