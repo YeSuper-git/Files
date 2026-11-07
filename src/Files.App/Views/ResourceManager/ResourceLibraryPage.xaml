@@ -181,6 +181,7 @@
                                     </Grid>
                                     <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
                                         <Button x:Name="VideoDetailPlayButton" Content="{helpers:ResourceString Name=ResourceVideoPlay}" Click="VideoDetailPlay_Click" />
+                                        <Button x:Name="BangumiScrapeButton" Content="{helpers:ResourceString Name=AnimeLibraryScrapeMetadata}" Click="BangumiScrape_Click" />
                                         <Button x:Name="AnimeDetailEditButton" MinWidth="52" Content="{helpers:ResourceString Name=AnimeLibraryEditDetails}" Click="AnimeDetailEdit_Click" Visibility="Collapsed" />
                                         <Button x:Name="AnimeDetailCancelButton" Content="{helpers:ResourceString Name=AnimeLibraryCancel}" Click="AnimeMetadataCancel_Click" Visibility="Collapsed" />
                                     </StackPanel>

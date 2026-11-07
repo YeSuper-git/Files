@@ -348,6 +348,7 @@ namespace Files.App.Helpers
 					.AddSingleton<Files.App.Services.ResourceManager.IResourceBrowserService, Files.App.Services.ResourceManager.ResourceBrowserService>()
 						.AddSingleton<Files.App.Services.ResourceManager.AnimeLibraryService>()
 					.AddSingleton<Files.App.Services.ResourceManager.VideoAssistantSearchService>()
+					.AddSingleton<Files.App.Services.ResourceManager.BangumiScraperService>()
 					.AddTransient<Files.App.ViewModels.Assistant.VideoAssistantViewModel>()
 					.AddSingleton<Files.App.Services.ResourceManager.IResourceOperationsService, Files.App.Services.ResourceManager.ResourceOperationsService>()
 					.AddTransient<Files.App.ViewModels.ResourceManager.ResourceManagerViewModel>()

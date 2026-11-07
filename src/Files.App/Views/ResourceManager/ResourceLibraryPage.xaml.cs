@@ -62,6 +62,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
     private readonly IBailianQwenMtTitleTranslationService _bailianTranslation = Ioc.Default.GetRequiredService<IBailianQwenMtTitleTranslationService>();
     private readonly IAppSettingsService _appSettings = Ioc.Default.GetRequiredService<IAppSettingsService>();
     private readonly VideoAssistantSearchService _videoAssistantSearch = Ioc.Default.GetRequiredService<VideoAssistantSearchService>();
+    private readonly BangumiScraperService _bangumiScraper = Ioc.Default.GetRequiredService<BangumiScraperService>();
     private readonly IContentPageContext _contentPageContext = Ioc.Default.GetRequiredService<IContentPageContext>();
     private readonly IDisplayPageContext _displayContext = Ioc.Default.GetRequiredService<IDisplayPageContext>();
     private readonly Dictionary<ResourceBrowserItemViewModel, ListedItem> _sortItems = [];
@@ -1156,6 +1157,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
     {
         var item = _activeVideoItem;
         var hasVideo = item is not null && !item.Model.IsPosterOnly && File.Exists(item.Path);
+        BangumiScrapeButton.Visibility = _animeLibrary ? Visibility.Visible : Visibility.Collapsed;
         VideoDetailPlayButton.Content = (hasVideo ? Strings.ResourceVideoPlay : Strings.ResourceVideoNoResource).GetLocalizedResource();
         VideoDetailPlayButton.IsEnabled = hasVideo;
         VideoDetailModified.Visibility = _animeLibrary ? Visibility.Collapsed : Visibility.Visible;
@@ -1290,7 +1292,12 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
             { AnimeEditError.Visibility = Visibility.Visible; return; }
             month = new DateTimeOffset(date);
         }
-        var details = new ResourceVideoDetails { Synopsis = AnimeSynopsisEditor.Text, AirDate = month };
+        var details = new ResourceVideoDetails
+        {
+            Synopsis = AnimeSynopsisEditor.Text,
+            AirDate = month,
+            BangumiSubjectId = _workspace.GetVideoDetails(_animeEditingPath).BangumiSubjectId
+        };
         foreach (var path in _animeEditingPaths)
             _workspace.SetVideoDetails(path, details);
         _animeEditingPaths = [];
@@ -1324,6 +1331,121 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
     {
         if (_animeEditingPath is null) BeginAnimeEdit();
         else AnimeMetadataSave_Click(sender, e);
+    }
+
+    private async void BangumiScrape_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_animeLibrary || _detailFolderItem is null || AnimeMetadataPath is null)
+            return;
+
+        var queryBox = new TextBox
+        {
+            Text = _detailFolderItem.Name,
+            PlaceholderText = Strings.BangumiScrapePlaceholder.GetLocalizedResource(),
+            MinWidth = 440
+        };
+        var results = new ListView
+        {
+            MinHeight = 220,
+            MaxHeight = 360,
+            SelectionMode = ListViewSelectionMode.Single,
+            DisplayMemberPath = nameof(BangumiSubject.DisplayLabel)
+        };
+        var status = new TextBlock
+        {
+            Text = Strings.BangumiScrapeHint.GetLocalizedResource(),
+            TextWrapping = TextWrapping.Wrap
+        };
+        var content = new StackPanel { Spacing = 10 };
+        content.Children.Add(queryBox);
+        content.Children.Add(status);
+        content.Children.Add(results);
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = Strings.BangumiScrapeTitle.GetLocalizedResource(),
+            Content = content,
+            PrimaryButtonText = Strings.BangumiScrapeApply.GetLocalizedResource(),
+            SecondaryButtonText = Strings.BangumiScrapeSearch.GetLocalizedResource(),
+            CloseButtonText = Strings.AnimeLibraryCancel.GetLocalizedResource(),
+            DefaultButton = ContentDialogButton.Primary,
+            IsPrimaryButtonEnabled = false
+        };
+
+        async Task SearchAsync()
+        {
+            status.Text = Strings.BangumiScrapeSearching.GetLocalizedResource();
+            results.ItemsSource = null;
+            dialog.IsPrimaryButtonEnabled = false;
+            try
+            {
+                var matches = await _bangumiScraper.SearchAnimeAsync(queryBox.Text);
+                results.ItemsSource = matches;
+                status.Text = matches.Count == 0
+                    ? Strings.BangumiScrapeNoResults.GetLocalizedResource()
+                    : string.Format(Strings.BangumiScrapeResults.GetLocalizedResource(), matches.Count);
+            }
+            catch (Exception ex)
+            {
+                status.Text = string.Format(Strings.BangumiScrapeFailed.GetLocalizedResource(), ex.Message);
+            }
+        }
+
+        results.SelectionChanged += (_, _) => dialog.IsPrimaryButtonEnabled = results.SelectedItem is BangumiSubject;
+        dialog.Opened += async (_, _) => await SearchAsync();
+        dialog.SecondaryButtonClick += async (_, args) =>
+        {
+            args.Cancel = true;
+            await SearchAsync();
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary || results.SelectedItem is not BangumiSubject selected)
+            return;
+
+        var path = _detailFolderItem.Path;
+        var existing = _workspace.GetVideoDetails(path);
+        var airDate = DateTimeOffset.TryParse(selected.Date, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var parsedDate)
+            ? parsedDate
+            : existing.AirDate;
+        var scrapedDetails = new ResourceVideoDetails
+        {
+            Synopsis = string.IsNullOrWhiteSpace(selected.Summary) ? existing.Synopsis : selected.Summary,
+            AirDate = airDate,
+            BangumiSubjectId = selected.Id
+        };
+        var metadataPaths = BrowserItems
+            .Where(item => item.Kind == ResourceBrowserItemKind.VideoFile)
+            .Select(item => item.Path)
+            .Append(path)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+        foreach (var metadataPath in metadataPaths)
+            _workspace.SetVideoDetails(metadataPath, scrapedDetails);
+
+        string? posterError = null;
+        if (!string.IsNullOrWhiteSpace(selected.ImageUrl))
+        {
+            string? temporaryImage = null;
+            try
+            {
+                var imageBytes = await _bangumiScraper.DownloadImageAsync(selected.ImageUrl);
+                temporaryImage = Path.Combine(Path.GetTempPath(), $"bangumi-{Guid.NewGuid():N}.jpg");
+                await File.WriteAllBytesAsync(temporaryImage, imageBytes);
+                var importedPoster = await _workspace.ImportPosterAsync(temporaryImage);
+                _workspace.SetPosterOverride(path, importedPoster);
+            }
+            catch (Exception ex)
+            {
+                posterError = string.Format(Strings.BangumiScrapePosterFailed.GetLocalizedResource(), ex.Message);
+            }
+            finally
+            {
+                if (temporaryImage is not null && File.Exists(temporaryImage))
+                    File.Delete(temporaryImage);
+            }
+        }
+
+        await LoadLocationAsync(_locations[^1]);
+        SetResourceStatusMessage(posterError ?? string.Format(Strings.BangumiScrapeSuccess.GetLocalizedResource(), selected.DisplayName));
     }
 
     private void VideoDetailPlay_Click(object sender, RoutedEventArgs e)
