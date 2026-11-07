@@ -6,4 +6,5 @@ public sealed class ResourceVideoDetails
 {
     public string Synopsis { get; set; } = string.Empty;
     public DateTimeOffset? AirDate { get; set; }
+    public int? BangumiSubjectId { get; set; }
 }

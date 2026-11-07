@@ -5030,6 +5030,18 @@
   <data name="AnimeLibrarySynopsis" xml:space="preserve"><value>简介</value></data>
   <data name="AnimeLibraryAirDateLabel" xml:space="preserve"><value>播出日期</value></data>
   <data name="AnimeLibraryEditDetails" xml:space="preserve"><value>编辑</value></data>
+  <data name="AnimeLibraryScrapeMetadata" xml:space="preserve"><value>搜刮信息</value></data>
+  <data name="BangumiScrapeTitle" xml:space="preserve"><value>从 Bangumi 搜刮动漫信息</value></data>
+  <data name="BangumiScrapePlaceholder" xml:space="preserve"><value>输入动漫名称</value></data>
+  <data name="BangumiScrapeHint" xml:space="preserve"><value>选择正确条目后，将导入简介、播出日期和海报。</value></data>
+  <data name="BangumiScrapeApply" xml:space="preserve"><value>应用所选条目</value></data>
+  <data name="BangumiScrapeSearch" xml:space="preserve"><value>搜索</value></data>
+  <data name="BangumiScrapeSearching" xml:space="preserve"><value>正在搜索 Bangumi…</value></data>
+  <data name="BangumiScrapeNoResults" xml:space="preserve"><value>没有找到匹配条目。可修改名称后再搜索。</value></data>
+  <data name="BangumiScrapeResults" xml:space="preserve"><value>找到 {0} 个候选项，请确认正确条目。</value></data>
+  <data name="BangumiScrapeFailed" xml:space="preserve"><value>搜索失败：{0}</value></data>
+  <data name="BangumiScrapePosterFailed" xml:space="preserve"><value>资料已保存，但海报下载失败：{0}</value></data>
+  <data name="BangumiScrapeSuccess" xml:space="preserve"><value>已应用“{0}”的 Bangumi 资料。</value></data>
   <data name="AnimeLibrarySave" xml:space="preserve"><value>保存</value></data>
   <data name="AnimeLibraryCancel" xml:space="preserve"><value>取消</value></data>
   <data name="AnimeLibraryFlattenSeasons" xml:space="preserve"><value>在分类下展开各季</value></data>

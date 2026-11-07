@@ -471,13 +471,18 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
     {
         var key = Path.GetFullPath(path);
         return _state.VideoDetails.TryGetValue(key, out var details)
-            ? new ResourceVideoDetails { Synopsis = details.Synopsis, AirDate = details.AirDate }
+            ? new ResourceVideoDetails { Synopsis = details.Synopsis, AirDate = details.AirDate, BangumiSubjectId = details.BangumiSubjectId }
             : new ResourceVideoDetails();
     }
 
     public void SetVideoDetails(string path, ResourceVideoDetails details)
     {
-        _state.VideoDetails[Path.GetFullPath(path)] = new ResourceVideoDetails { Synopsis = details.Synopsis.Trim(), AirDate = details.AirDate };
+        _state.VideoDetails[Path.GetFullPath(path)] = new ResourceVideoDetails
+        {
+            Synopsis = details.Synopsis.Trim(),
+            AirDate = details.AirDate,
+            BangumiSubjectId = details.BangumiSubjectId
+        };
         PersistState();
     }
 
