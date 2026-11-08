@@ -63,6 +63,7 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
     private readonly IAppSettingsService _appSettings = Ioc.Default.GetRequiredService<IAppSettingsService>();
     private readonly VideoAssistantSearchService _videoAssistantSearch = Ioc.Default.GetRequiredService<VideoAssistantSearchService>();
     private readonly BangumiScraperService _bangumiScraper = Ioc.Default.GetRequiredService<BangumiScraperService>();
+    private readonly MikanProjectService _mikanProject = Ioc.Default.GetRequiredService<MikanProjectService>();
     private readonly IContentPageContext _contentPageContext = Ioc.Default.GetRequiredService<IContentPageContext>();
     private readonly IDisplayPageContext _displayContext = Ioc.Default.GetRequiredService<IDisplayPageContext>();
     private readonly Dictionary<ResourceBrowserItemViewModel, ListedItem> _sortItems = [];
@@ -1197,6 +1198,15 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
         VideoDetailLayout.DataContext = _detailFolderItem;
         AnimeDetailMetadata.DataContext = _detailFolderItem;
         if (_detailFolderItem is null) return;
+        var mikanFollow = _workspace.MikanAnimeFollows.FirstOrDefault(follow => PathEquals(follow.FolderPath, _detailFolderItem.Path));
+        MikanResourcesButton.Visibility = mikanFollow is null ? Visibility.Collapsed : Visibility.Visible;
+        if (mikanFollow is not null)
+        {
+            MikanResourcesButton.Content = string.Format(Strings.MikanViewResourcesCount.GetLocalizedResource(), mikanFollow.UnseenReleaseCount);
+            ToolTipService.SetToolTip(MikanResourcesButton, mikanFollow.LastCheckedAt is { } checkedAt
+                ? string.Format(Strings.MikanLastCheckedTooltip.GetLocalizedResource(), checkedAt.ToString("g", CultureInfo.CurrentCulture))
+                : Strings.MikanNeverChecked.GetLocalizedResource());
+        }
         var details = _workspace.GetVideoDetails(AnimeMetadataPath!);
         AnimeSynopsis.Text = string.IsNullOrWhiteSpace(details.Synopsis) ? Strings.AnimeLibraryNoSynopsis.GetLocalizedResource() : details.Synopsis;
         AnimeAirDate.Text = details.AirDate?.ToString("Y", CultureInfo.CurrentCulture) ?? "—";
@@ -1446,6 +1456,27 @@ public sealed partial class ResourceLibraryPage : Page, IPageSettingsContext
 
         await LoadLocationAsync(_locations[^1]);
         SetResourceStatusMessage(posterError ?? string.Format(Strings.BangumiScrapeSuccess.GetLocalizedResource(), selected.DisplayName));
+    }
+
+    private async void MikanDiscovery_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_animeLibrary || string.IsNullOrWhiteSpace(_libraryPath))
+            return;
+
+        await MikanAnimeDiscoveryDialog.ShowAsync(XamlRoot, _workspace, _mikanProject, _libraryPath, _bangumiScraper);
+        if (_locations.Count > 0 && Directory.Exists(_locations[^1].Path))
+            await LoadLocationAsync(_locations[^1]);
+    }
+
+    private async void MikanResources_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_animeLibrary || _detailFolderItem is null)
+            return;
+        var follow = _workspace.MikanAnimeFollows.FirstOrDefault(item => PathEquals(item.FolderPath, _detailFolderItem.Path));
+        if (follow is null)
+            return;
+        await MikanAnimeDiscoveryDialog.ShowAsync(XamlRoot, _workspace, _mikanProject, _libraryPath, _bangumiScraper, follow.MikanBangumiId);
+        UpdateAnimeMetadata();
     }
 
     private void VideoDetailPlay_Click(object sender, RoutedEventArgs e)

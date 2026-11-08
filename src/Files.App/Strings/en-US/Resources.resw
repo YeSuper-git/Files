@@ -5048,6 +5048,32 @@
   <data name="BangumiScrapeFailed" xml:space="preserve"><value>Search failed: {0}</value></data>
   <data name="BangumiScrapePosterFailed" xml:space="preserve"><value>Metadata was saved, but the poster download failed: {0}</value></data>
   <data name="BangumiScrapeSuccess" xml:space="preserve"><value>Applied Bangumi metadata for “{0}”.</value></data>
+  <data name="MikanDiscoveryOpen" xml:space="preserve"><value>Discover anime</value></data>
+  <data name="MikanAddFollow" xml:space="preserve"><value>Follow anime</value></data>
+  <data name="MikanViewResources" xml:space="preserve"><value>Mikan releases</value></data>
+  <data name="MikanDiscoveryTitle" xml:space="preserve"><value>Mikan Project</value></data>
+  <data name="MikanDiscoverTab" xml:space="preserve"><value>Discover anime</value></data>
+  <data name="MikanUpdatesTab" xml:space="preserve"><value>Followed updates</value></data>
+  <data name="MikanRefresh" xml:space="preserve"><value>Refresh</value></data>
+  <data name="MikanCopyAllMagnets" xml:space="preserve"><value>Copy all magnets</value></data>
+  <data name="MikanCopyMagnet" xml:space="preserve"><value>Copy magnet</value></data>
+  <data name="MikanMarkUpdatesSeen" xml:space="preserve"><value>Mark as viewed</value></data>
+  <data name="MikanTargetCategory" xml:space="preserve"><value>Anime category</value></data>
+  <data name="MikanLoading" xml:space="preserve"><value>Loading Mikan Project…</value></data>
+  <data name="MikanLoadFailed" xml:space="preserve"><value>Unable to load: {0}</value></data>
+  <data name="MikanCandidateCount" xml:space="preserve"><value>{0} anime in this season. Select one to view details and releases.</value></data>
+  <data name="MikanFollowingCount" xml:space="preserve"><value>Following {0} anime; {1} unviewed releases found.</value></data>
+  <data name="MikanNewReleaseCount" xml:space="preserve"><value>{0} new</value></data>
+  <data name="MikanReleaseCount" xml:space="preserve"><value>{0} groups, {1} releases</value></data>
+  <data name="MikanUpdateStatus" xml:space="preserve"><value>{0} unviewed releases, {1} total</value></data>
+  <data name="MikanNoReleases" xml:space="preserve"><value>No releases available</value></data>
+  <data name="MikanChooseCategory" xml:space="preserve"><value>Select an anime category first.</value></data>
+  <data name="MikanFolderExists" xml:space="preserve"><value>The destination folder already exists. Choose another category or rename the folder.</value></data>
+  <data name="MikanFollowAdded" xml:space="preserve"><value>Added to your anime library. A local folder was created; no video was downloaded.</value></data>
+  <data name="MikanFollowAddedPosterFailed" xml:space="preserve"><value>Added to your anime library, but the poster could not be fetched: {0}</value></data>
+  <data name="MikanAddFailed" xml:space="preserve"><value>Unable to add anime: {0}</value></data>
+  <data name="MikanCopiedMagnets" xml:space="preserve"><value>Copied {0} magnet links.</value></data>
+  <data name="MikanUpdatesMarkedSeen" xml:space="preserve"><value>Current releases marked as viewed.</value></data>
   <data name="AnimeLibrarySave" xml:space="preserve"><value>Save</value></data>
   <data name="AnimeLibraryCancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="AnimeLibraryFlattenSeasons" xml:space="preserve"><value>Show seasons directly in categories</value></data>
@@ -5372,4 +5398,33 @@
   <data name="AnimeCategoryEpisodeCountValue" xml:space="preserve"><value>{0} episodes</value></data>
   <data name="AnimeOptimizationVideos" xml:space="preserve"><value>Video naming</value></data>
   <data name="AnimeOptimizationVideosDescription" xml:space="preserve"><value>Normalize downloaded video names using the series title and episode number</value></data>
+  <data name="MikanTargetFolderMissing" xml:space="preserve"><value>The selected folder no longer exists. Choose another folder.</value></data>
+  <data name="MikanFilterUndecided" xml:space="preserve"><value>Undecided</value></data>
+  <data name="MikanSourceBangumi" xml:space="preserve"><value>Bangumi</value></data>
+  <data name="MikanWantToFollow" xml:space="preserve"><value>Want to follow</value></data>
+  <data name="MikanBangumiNoResults" xml:space="preserve"><value>No matching Bangumi entries found.</value></data>
+  <data name="MikanNeverChecked" xml:space="preserve"><value>Never checked</value></data>
+  <data name="MikanMarkedWantToFollow" xml:space="preserve"><value>Marked as want to follow.</value></data>
+  <data name="MikanBangumiChooseResult" xml:space="preserve"><value>Choose a Bangumi entry.</value></data>
+  <data name="MikanLastCheckedTooltip" xml:space="preserve"><value>Last checked: {0}</value></data>
+  <data name="MikanViewResourcesCount" xml:space="preserve"><value>Mikan releases ({0})</value></data>
+  <data name="MikanMarkedNotInterested" xml:space="preserve"><value>Marked as not interested.</value></data>
+  <data name="MikanMetadataSource" xml:space="preserve"><value>Metadata source</value></data>
+  <data name="MikanFolderAlreadyLinked" xml:space="preserve"><value>This folder is already linked to another anime.</value></data>
+  <data name="MikanAllGroups" xml:space="preserve"><value>All groups</value></data>
+  <data name="MikanSourceMikan" xml:space="preserve"><value>Mikan Project</value></data>
+  <data name="MikanBangumiSearchFailed" xml:space="preserve"><value>Bangumi search failed: {0}</value></data>
+  <data name="MikanNotInterested" xml:space="preserve"><value>Not interested</value></data>
+  <data name="MikanFilterAllCandidates" xml:space="preserve"><value>All anime</value></data>
+  <data name="MikanChooseTargetFolder" xml:space="preserve"><value>Select a target folder.</value></data>
+  <data name="MikanBangumiUnavailable" xml:space="preserve"><value>Bangumi metadata is unavailable.</value></data>
+  <data name="MikanUpdateStatusChecked" xml:space="preserve"><value>{0} preferred releases unread, {1} releases total; last checked: {2}</value></data>
+  <data name="MikanAllVersions" xml:space="preserve"><value>All versions</value></data>
+  <data name="MikanSaveReleasePreference" xml:space="preserve"><value>Save release preference</value></data>
+  <data name="MikanReleasePreferenceSaved" xml:space="preserve"><value>Group and version preferences saved.</value></data>
+  <data name="MikanGroupFilter" xml:space="preserve"><value>Group and version</value></data>
+  <data name="MikanCreateFolderOption" xml:space="preserve"><value>Create folder: {0}</value></data>
+  <data name="MikanSearchingBangumi" xml:space="preserve"><value>Searching Bangumi…</value></data>
+  <data name="MikanBangumiPreviewSelected" xml:space="preserve"><value>Previewing the selected Bangumi entry.</value></data>
+  <data name="MikanFolderLinked" xml:space="preserve"><value>The selected local folder is now linked.</value></data>
 </root>

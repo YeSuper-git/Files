@@ -16,8 +16,15 @@ public interface IResourceWorkspaceService
     IReadOnlyList<string> HiddenActorFolders { get; }
     IReadOnlyList<ResourceTagDefinition> ResourceTags { get; }
     IReadOnlyList<ResourceToolSnapshot> ResourceToolSnapshots { get; }
+    IReadOnlyList<MikanAnimeFollow> MikanAnimeFollows { get; }
+    IReadOnlyList<MikanAnimeCandidateState> MikanAnimeCandidateStates { get; }
 
     void SetLibraryPath(string path);
+    void AddMikanAnimeFollow(MikanAnimeFollow follow);
+    void MarkMikanEpisodesSeen(int mikanBangumiId, IEnumerable<string> episodeIds);
+    void UpdateMikanFollowCheck(int mikanBangumiId, DateTimeOffset checkedAt, int unseenReleaseCount);
+    void SaveMikanReleasePreferences(int mikanBangumiId, int? preferredGroupId, string? preferredVariant);
+    void SetMikanAnimeCandidateDisposition(int mikanBangumiId, string title, MikanAnimeCandidateDisposition disposition);
     void UpdateSettings(ResourceSettings settings);
     string? GetPosterOverride(string itemPath);
     void SetPosterOverride(string itemPath, string posterPath);

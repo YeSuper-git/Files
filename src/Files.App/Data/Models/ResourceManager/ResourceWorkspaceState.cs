@@ -24,4 +24,6 @@ public sealed class ResourceWorkspaceState
     public Dictionary<string, DateTimeOffset> VideoLastWatchedAt { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, ResourceVideoTitleTranslation> VideoTitleTranslations { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public List<ResourceToolSnapshot> ResourceToolSnapshots { get; set; } = [];
+    public List<MikanAnimeFollow> MikanAnimeFollows { get; set; } = [];
+    public List<MikanAnimeCandidateState> MikanAnimeCandidateStates { get; set; } = [];
 }
