@@ -5366,4 +5366,59 @@
   <data name="AnimeCategoryEpisodeCountValue" xml:space="preserve"><value>{0}集</value></data>
   <data name="AnimeOptimizationVideos" xml:space="preserve"><value>视频命名优化</value></data>
   <data name="AnimeOptimizationVideosDescription" xml:space="preserve"><value>将新下载视频按番剧名称和集数规范命名</value></data>
+  <data name="MikanDiscoveryOpen" xml:space="preserve"><value>发现番剧</value></data>
+  <data name="MikanAddFollow" xml:space="preserve"><value>加入追番</value></data>
+  <data name="MikanViewResources" xml:space="preserve"><value>蜜柑资源</value></data>
+  <data name="MikanDiscoveryTitle" xml:space="preserve"><value>蜜柑计划</value></data>
+  <data name="MikanDiscoverTab" xml:space="preserve"><value>发现新番</value></data>
+  <data name="MikanUpdatesTab" xml:space="preserve"><value>追番更新</value></data>
+  <data name="MikanRefresh" xml:space="preserve"><value>刷新</value></data>
+  <data name="MikanCopyAllMagnets" xml:space="preserve"><value>复制全部磁链</value></data>
+  <data name="MikanCopyMagnet" xml:space="preserve"><value>复制磁链</value></data>
+  <data name="MikanMarkUpdatesSeen" xml:space="preserve"><value>标记已查看</value></data>
+  <data name="MikanTargetCategory" xml:space="preserve"><value>追番分类</value></data>
+  <data name="MikanLoading" xml:space="preserve"><value>正在读取蜜柑计划…</value></data>
+  <data name="MikanLoadFailed" xml:space="preserve"><value>读取失败：{0}</value></data>
+  <data name="MikanCandidateCount" xml:space="preserve"><value>本季度共 {0} 部番剧。选择番剧查看详情和全部字幕组资源。</value></data>
+  <data name="MikanFollowingCount" xml:space="preserve"><value>已追 {0} 部番剧，发现 {1} 条未查看更新。</value></data>
+  <data name="MikanNewReleaseCount" xml:space="preserve"><value>{0} 条新更新</value></data>
+  <data name="MikanReleaseCount" xml:space="preserve"><value>共 {0} 个字幕组，{1} 条发布</value></data>
+  <data name="MikanUpdateStatus" xml:space="preserve"><value>{0} 条未查看更新，共 {1} 条发布</value></data>
+  <data name="MikanNoReleases" xml:space="preserve"><value>暂无发布资源</value></data>
+  <data name="MikanChooseCategory" xml:space="preserve"><value>请先选择追番分类。</value></data>
+  <data name="MikanFolderExists" xml:space="preserve"><value>目标文件夹已存在，请检查分类或重命名该文件夹。</value></data>
+  <data name="MikanFollowAdded" xml:space="preserve"><value>已加入追番并创建本地资源文件夹；没有下载视频。</value></data>
+  <data name="MikanFollowAddedPosterFailed" xml:space="preserve"><value>已加入追番并创建文件夹，但海报获取失败：{0}</value></data>
+  <data name="MikanAddFailed" xml:space="preserve"><value>加入追番失败：{0}</value></data>
+  <data name="MikanCopiedMagnets" xml:space="preserve"><value>已复制 {0} 条磁链。</value></data>
+  <data name="MikanUpdatesMarkedSeen" xml:space="preserve"><value>已将当前发布标记为查看。</value></data>
+  <data name="MikanTargetFolderMissing" xml:space="preserve"><value>所选文件夹不存在，请重新选择。</value></data>
+  <data name="MikanFilterUndecided" xml:space="preserve"><value>待决定</value></data>
+  <data name="MikanSourceBangumi" xml:space="preserve"><value>Bangumi</value></data>
+  <data name="MikanWantToFollow" xml:space="preserve"><value>想追</value></data>
+  <data name="MikanBangumiNoResults" xml:space="preserve"><value>没有找到匹配的 Bangumi 条目。</value></data>
+  <data name="MikanNeverChecked" xml:space="preserve"><value>尚未检查</value></data>
+  <data name="MikanMarkedWantToFollow" xml:space="preserve"><value>已标记为想追。</value></data>
+  <data name="MikanBangumiChooseResult" xml:space="preserve"><value>请选择一个 Bangumi 条目。</value></data>
+  <data name="MikanLastCheckedTooltip" xml:space="preserve"><value>上次检查：{0}</value></data>
+  <data name="MikanViewResourcesCount" xml:space="preserve"><value>蜜柑资源 ({0})</value></data>
+  <data name="MikanMarkedNotInterested" xml:space="preserve"><value>已标记为不感兴趣。</value></data>
+  <data name="MikanMetadataSource" xml:space="preserve"><value>资料来源</value></data>
+  <data name="MikanFolderAlreadyLinked" xml:space="preserve"><value>此文件夹已关联其他番剧。</value></data>
+  <data name="MikanAllGroups" xml:space="preserve"><value>全部字幕组</value></data>
+  <data name="MikanSourceMikan" xml:space="preserve"><value>蜜柑计划</value></data>
+  <data name="MikanBangumiSearchFailed" xml:space="preserve"><value>搜索 Bangumi 失败：{0}</value></data>
+  <data name="MikanNotInterested" xml:space="preserve"><value>不感兴趣</value></data>
+  <data name="MikanFilterAllCandidates" xml:space="preserve"><value>全部番剧</value></data>
+  <data name="MikanChooseTargetFolder" xml:space="preserve"><value>请选择目标文件夹。</value></data>
+  <data name="MikanBangumiUnavailable" xml:space="preserve"><value>Bangumi 资料服务不可用。</value></data>
+  <data name="MikanUpdateStatusChecked" xml:space="preserve"><value>{0} 条偏好资源未查看，共 {1} 条发布；上次检查：{2}</value></data>
+  <data name="MikanAllVersions" xml:space="preserve"><value>全部版本</value></data>
+  <data name="MikanSaveReleasePreference" xml:space="preserve"><value>保存资源偏好</value></data>
+  <data name="MikanReleasePreferenceSaved" xml:space="preserve"><value>已保存字幕组和版本偏好。</value></data>
+  <data name="MikanGroupFilter" xml:space="preserve"><value>字幕组与版本</value></data>
+  <data name="MikanCreateFolderOption" xml:space="preserve"><value>新建文件夹：{0}</value></data>
+  <data name="MikanSearchingBangumi" xml:space="preserve"><value>正在搜索 Bangumi 条目…</value></data>
+  <data name="MikanBangumiPreviewSelected" xml:space="preserve"><value>已预览所选 Bangumi 资料。</value></data>
+  <data name="MikanFolderLinked" xml:space="preserve"><value>已关联所选本地文件夹。</value></data>
 </root>

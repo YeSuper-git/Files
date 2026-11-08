@@ -59,6 +59,30 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
         .Select(snapshot => snapshot.Clone())
         .ToArray();
 
+    public IReadOnlyList<MikanAnimeFollow> MikanAnimeFollows => _state.MikanAnimeFollows
+        .Select(follow => new MikanAnimeFollow
+        {
+            MikanBangumiId = follow.MikanBangumiId,
+            BangumiSubjectId = follow.BangumiSubjectId,
+            Title = follow.Title,
+            FolderPath = follow.FolderPath,
+            LastCheckedAt = follow.LastCheckedAt,
+            UnseenReleaseCount = follow.UnseenReleaseCount,
+            PreferredGroupId = follow.PreferredGroupId,
+            PreferredVariants = new(follow.PreferredVariants ?? []),
+            SeenEpisodeIds = [.. (follow.SeenEpisodeIds ?? [])],
+        })
+        .ToArray();
+
+    public IReadOnlyList<MikanAnimeCandidateState> MikanAnimeCandidateStates => _state.MikanAnimeCandidateStates
+        .Select(candidate => new MikanAnimeCandidateState
+        {
+            MikanBangumiId = candidate.MikanBangumiId,
+            Title = candidate.Title,
+            Disposition = candidate.Disposition,
+        })
+        .ToArray();
+
     public ResourceVideoWatchStatus GetVideoWatchStatus(string videoPath)
     {
         try
@@ -448,6 +472,26 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
                 .ToList();
             changed |= !_state.HiddenActorFolders.SequenceEqual(hiddenActorFolders, StringComparer.OrdinalIgnoreCase);
 
+            var mikanAnimeFollows = _state.MikanAnimeFollows
+                .Select(follow =>
+                {
+                    var folderPath = RemapPath(follow.FolderPath, mappings);
+                    changed |= !string.Equals(folderPath, follow.FolderPath, StringComparison.OrdinalIgnoreCase);
+                    return new MikanAnimeFollow
+                    {
+                        MikanBangumiId = follow.MikanBangumiId,
+                        BangumiSubjectId = follow.BangumiSubjectId,
+                        Title = follow.Title,
+                        FolderPath = folderPath,
+                        LastCheckedAt = follow.LastCheckedAt,
+                        UnseenReleaseCount = follow.UnseenReleaseCount,
+                        PreferredGroupId = follow.PreferredGroupId,
+                        PreferredVariants = new(follow.PreferredVariants ?? []),
+                        SeenEpisodeIds = [.. (follow.SeenEpisodeIds ?? [])],
+                    };
+                })
+                .ToList();
+
             if (!changed)
                 return;
 
@@ -459,6 +503,7 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
             _state.VideoDetails = videoDetails;
             _state.ActorDetails = actorDetails;
             _state.HiddenActorFolders = hiddenActorFolders;
+            _state.MikanAnimeFollows = mikanAnimeFollows;
             PersistState();
         }
         catch (Exception ex)
@@ -586,6 +631,95 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
             .ToList();
         PersistState();
         NotifyNavigationChanged();
+    }
+
+    public void AddMikanAnimeFollow(MikanAnimeFollow follow)
+    {
+        if (follow.MikanBangumiId <= 0 || string.IsNullOrWhiteSpace(follow.FolderPath))
+            return;
+
+        var existing = _state.MikanAnimeFollows.FirstOrDefault(item => item.MikanBangumiId == follow.MikanBangumiId);
+        if (existing is not null)
+        {
+            existing.FolderPath = Path.GetFullPath(follow.FolderPath);
+            existing.Title = follow.Title;
+            existing.BangumiSubjectId = follow.BangumiSubjectId;
+            existing.LastCheckedAt = follow.LastCheckedAt;
+            existing.UnseenReleaseCount = follow.UnseenReleaseCount;
+            existing.PreferredGroupId = follow.PreferredGroupId;
+            existing.PreferredVariants = new(follow.PreferredVariants ?? []);
+            existing.SeenEpisodeIds = [.. (follow.SeenEpisodeIds ?? [])];
+        }
+        else
+        {
+            follow.FolderPath = Path.GetFullPath(follow.FolderPath);
+            follow.PreferredVariants ??= [];
+            follow.SeenEpisodeIds ??= [];
+            _state.MikanAnimeFollows.Add(follow);
+        }
+        PersistState();
+    }
+
+    public void MarkMikanEpisodesSeen(int mikanBangumiId, IEnumerable<string> episodeIds)
+    {
+        var follow = _state.MikanAnimeFollows.FirstOrDefault(item => item.MikanBangumiId == mikanBangumiId);
+        if (follow is null)
+            return;
+
+        follow.SeenEpisodeIds ??= [];
+        follow.SeenEpisodeIds = follow.SeenEpisodeIds
+            .Concat(episodeIds.Where(id => !string.IsNullOrWhiteSpace(id)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        follow.UnseenReleaseCount = 0;
+        PersistState();
+    }
+
+    public void UpdateMikanFollowCheck(int mikanBangumiId, DateTimeOffset checkedAt, int unseenReleaseCount)
+    {
+        var follow = _state.MikanAnimeFollows.FirstOrDefault(item => item.MikanBangumiId == mikanBangumiId);
+        if (follow is null)
+            return;
+        follow.LastCheckedAt = checkedAt;
+        follow.UnseenReleaseCount = Math.Max(0, unseenReleaseCount);
+        PersistState();
+    }
+
+    public void SaveMikanReleasePreferences(int mikanBangumiId, int? preferredGroupId, string? preferredVariant)
+    {
+        var follow = _state.MikanAnimeFollows.FirstOrDefault(item => item.MikanBangumiId == mikanBangumiId);
+        if (follow is null)
+            return;
+        follow.PreferredGroupId = preferredGroupId;
+        follow.PreferredVariants ??= [];
+        if (preferredGroupId is null)
+        {
+            follow.PreferredVariants.Clear();
+        }
+        else if (string.IsNullOrWhiteSpace(preferredVariant))
+        {
+            follow.PreferredVariants.Remove(preferredGroupId.Value);
+        }
+        else
+        {
+            follow.PreferredVariants[preferredGroupId.Value] = preferredVariant;
+        }
+        PersistState();
+    }
+
+    public void SetMikanAnimeCandidateDisposition(int mikanBangumiId, string title, MikanAnimeCandidateDisposition disposition)
+    {
+        if (mikanBangumiId <= 0)
+            return;
+        var candidate = _state.MikanAnimeCandidateStates.FirstOrDefault(item => item.MikanBangumiId == mikanBangumiId);
+        if (candidate is null)
+        {
+            candidate = new MikanAnimeCandidateState { MikanBangumiId = mikanBangumiId };
+            _state.MikanAnimeCandidateStates.Add(candidate);
+        }
+        candidate.Title = title ?? string.Empty;
+        candidate.Disposition = disposition;
+        PersistState();
     }
 
     public void UpdateSettings(ResourceSettings settings)
@@ -799,6 +933,8 @@ public sealed class ResourceWorkspaceService : IResourceWorkspaceService
                     state.VideoLastWatchedAt = NormalizeVideoLastWatchedAt(state.VideoLastWatchedAt);
                     state.VideoTitleTranslations = NormalizeVideoTitleTranslations(state.VideoTitleTranslations);
                     state.ResourceToolSnapshots ??= [];
+                    state.MikanAnimeFollows ??= [];
+                    state.MikanAnimeCandidateStates ??= [];
                     state.ResourceToolSnapshots = state.ResourceToolSnapshots
                         .Where(snapshot => !string.IsNullOrWhiteSpace(snapshot.Id))
                         .Select(snapshot =>
