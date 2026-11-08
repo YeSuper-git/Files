@@ -1161,6 +1161,20 @@ jobs:
           }
           Write-Host "Installed Files.exe source revision verified: $installedRevision."
 
+          $installedAssemblyPath = Join-Path $installDir 'Files.dll'
+          if (-not (Test-Path -LiteralPath $installedAssemblyPath -PathType Leaf)) {
+            throw "Files application assembly was not installed at '$installedAssemblyPath'."
+          }
+          $installedAssemblyInfo = [Diagnostics.FileVersionInfo]::GetVersionInfo($installedAssemblyPath)
+          if ([version]$installedAssemblyInfo.FileVersion -ne [version]"$env:INSTALLER_VERSION.0") {
+            throw "Installed Files.dll file version mismatch: expected $env:INSTALLER_VERSION.0, found $($installedAssemblyInfo.FileVersion)."
+          }
+          if (-not $installedAssemblyInfo.ProductVersion -or
+              -not $installedAssemblyInfo.ProductVersion.Contains($env:GITHUB_SHA, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Installed Files.dll does not match this workflow source revision. Expected '$($env:GITHUB_SHA)', found '$($installedAssemblyInfo.ProductVersion)'."
+          }
+          Write-Host "Installed Files.dll source revision verified: $($installedAssemblyInfo.ProductVersion)."
+
           $identity = Get-AppxPackage -Name 'FilesDev' -ErrorAction SilentlyContinue |
             Where-Object { $_.Publisher -eq 'CN=Files' -and $_.Status -eq 'Ok' } |
             Select-Object -First 1
